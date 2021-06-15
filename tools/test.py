@@ -11,68 +11,56 @@ from mmcv.utils import DictAction
 from mmseg.apis import multi_gpu_test, single_gpu_test
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
+from mmseg.core.utils import propagate_root_dir
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='mmseg test (and eval) a model')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('checkpoint', help='checkpoint file')
-    parser.add_argument(
-        '--aug-test', action='store_true', help='Use Flip and Multi scale aug')
-    parser.add_argument('--out', help='output result file in pickle format')
-    parser.add_argument(
-        '--format-only',
-        action='store_true',
-        help='Format the output results without perform evaluation. It is'
-        'useful when you want to format the result to a specific format and '
-        'submit it to the test server')
-    parser.add_argument(
-        '--eval',
-        type=str,
-        nargs='+',
-        help='evaluation metrics, which depends on the dataset, e.g., "mIoU"'
-        ' for generic datasets, and "cityscapes" for Cityscapes')
-    parser.add_argument('--show', action='store_true', help='show results')
-    parser.add_argument(
-        '--show-dir', help='directory where painted images will be saved')
-    parser.add_argument(
-        '--gpu-collect',
-        action='store_true',
-        help='whether to use gpu to collect results.')
-    parser.add_argument(
-        '--tmpdir',
-        help='tmp directory used for collecting results from multiple '
-        'workers, available when gpu_collect is not specified')
-    parser.add_argument(
-        '--options', nargs='+', action=DictAction, help='custom options')
-    parser.add_argument(
-        '--eval-options',
-        nargs='+',
-        action=DictAction,
-        help='custom options for evaluation')
-    parser.add_argument(
-        '--launcher',
-        choices=['none', 'pytorch', 'slurm', 'mpi'],
-        default='none',
-        help='job launcher')
-    parser.add_argument(
-        '--opacity',
-        type=float,
-        default=0.5,
-        help='Opacity of painted segmentation map. In (0, 1] range.')
+    parser = argparse.ArgumentParser(description='mmseg test (and eval) a model')
+    parser.add_argument('config',
+                        help='test config file path')
+    parser.add_argument('checkpoint',
+                        help='checkpoint file')
+    parser.add_argument('--data-dir', type=str,
+                        help='the dir with dataset')
+    parser.add_argument('--aug-test', action='store_true',
+                        help='Use Flip and Multi scale aug')
+    parser.add_argument('--out',
+                        help='output result file in pickle format')
+    parser.add_argument('--format-only', action='store_true',
+                        help='Format the output results without perform evaluation. It is'
+                             'useful when you want to format the result to a specific format and '
+                             'submit it to the test server')
+    parser.add_argument('--eval', type=str, nargs='+',
+                        help='evaluation metrics, which depends on the dataset, e.g., "mIoU"'
+                             ' for generic datasets, and "cityscapes" for Cityscapes')
+    parser.add_argument('--show', action='store_true',
+                        help='show results')
+    parser.add_argument('--show-dir',
+                        help='directory where painted images will be saved')
+    parser.add_argument('--gpu-collect', action='store_true',
+                        help='whether to use gpu to collect results.')
+    parser.add_argument('--tmpdir',
+                        help='tmp directory used for collecting results from multiple '
+                             'workers, available when gpu_collect is not specified')
+    parser.add_argument('--options', nargs='+', action=DictAction,
+                        help='custom options')
+    parser.add_argument('--eval-options', nargs='+', action=DictAction,
+                        help='custom options for evaluation')
+    parser.add_argument('--launcher', choices=['none', 'pytorch', 'slurm', 'mpi'], default='none',
+                        help='job launcher')
+    parser.add_argument('--opacity', type=float, default=0.5,
+                        help='Opacity of painted segmentation map. In (0, 1] range.')
     parser.add_argument('--local_rank', type=int, default=0)
     args = parser.parse_args()
+
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
+
     return args
 
 
-def main():
-    args = parse_args()
-
-    assert args.out or args.eval or args.format_only or args.show \
-        or args.show_dir, \
+def check_args(args):
+    assert args.out or args.eval or args.format_only or args.show or args.show_dir, \
         ('Please specify at least one operation (save/eval/format/show the '
          'results / save the results) with the argument "--out", "--eval"'
          ', "--format-only", "--show" or "--show-dir"')
@@ -83,12 +71,12 @@ def main():
     if args.out is not None and not args.out.endswith(('.pkl', '.pickle')):
         raise ValueError('The output file must be a pkl file.')
 
-    cfg = mmcv.Config.fromfile(args.config)
-    if args.options is not None:
-        cfg.merge_from_dict(args.options)
+
+def update_config(cfg, args):
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
+
     if args.aug_test:
         # hard code index
         cfg.data.test.pipeline[1].img_ratios = [
@@ -97,6 +85,19 @@ def main():
         cfg.data.test.pipeline[1].flip = True
     cfg.model.pretrained = None
     cfg.data.test.test_mode = True
+
+    return cfg
+
+
+def main():
+    args = parse_args()
+    check_args(args)
+
+    cfg = mmcv.Config.fromfile(args.config)
+    if args.options is not None:
+        cfg.merge_from_dict(args.options)
+    cfg = update_config(cfg, args)
+    cfg = propagate_root_dir(cfg, args.data_dir)
 
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':

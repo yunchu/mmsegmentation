@@ -34,13 +34,12 @@ mmsegmentation
 │   │   │   ├── dataset
 │   │   │   │   ├── cls
 │   ├── ade
-│   │   ├── ADEChallengeData2016
-│   │   │   ├── annotations
-│   │   │   │   ├── training
-│   │   │   │   ├── validation
-│   │   │   ├── images
-│   │   │   │   ├── training
-│   │   │   │   ├── validation
+│   │   ├── annotations
+│   │   │   ├── training
+│   │   │   ├── validation
+│   │   ├── images
+│   │   │   ├── training
+│   │   │   ├── validation
 │   ├── CHASE_DB1
 │   │   ├── images
 │   │   │   ├── training
