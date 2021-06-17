@@ -308,7 +308,7 @@ class CustomDataset(Dataset):
                  metric='mIoU',
                  logger=None,
                  efficient_test=False,
-                 print_log=False,
+                 show_log=False,
                  **kwargs):
         """Evaluate the dataset.
 
@@ -361,7 +361,7 @@ class CustomDataset(Dataset):
         ret_metrics_class.move_to_end('Class', last=False)
 
         # for logger
-        if print_log:
+        if show_log:
             class_table_data = PrettyTable()
             for key, val in ret_metrics_class.items():
                 class_table_data.add_column(key, val)
@@ -374,9 +374,9 @@ class CustomDataset(Dataset):
                     summary_table_data.add_column('m' + key, [val])
 
             print_log('\nPer class results:', logger)
-            print_log(class_table_data.get_string(), logger=logger)
+            print_log('\n' + class_table_data.get_string(), logger=logger)
             print_log('\nSummary:', logger)
-            print_log(summary_table_data.get_string(), logger=logger)
+            print_log('\n' + summary_table_data.get_string(), logger=logger)
 
         # each metric dict
         eval_results = {}
