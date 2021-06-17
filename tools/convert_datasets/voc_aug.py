@@ -22,13 +22,11 @@ def generate_aug_list(merged_list, excluded_list):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Convert PASCAL VOC annotations to mmsegmentation format')
+    parser = argparse.ArgumentParser(description='Convert PASCAL VOC annotations to mmsegmentation format')
     parser.add_argument('devkit_path', help='pascal voc devkit path')
     parser.add_argument('aug_path', help='pascal voc aug path')
     parser.add_argument('-o', '--out_dir', help='output path')
-    parser.add_argument(
-        '--nproc', default=1, type=int, help='number of process')
+    parser.add_argument('--nproc', default=1, type=int, help='number of process')
     args = parser.parse_args()
     return args
 
@@ -48,7 +46,8 @@ def main():
     mmcv.track_parallel_progress(
         partial(convert_mat, in_dir=in_dir, out_dir=out_dir),
         list(mmcv.scandir(in_dir, suffix='.mat')),
-        nproc=nproc)
+        nproc=nproc
+    )
 
     full_aug_list = []
     with open(osp.join(aug_path, 'dataset', 'train.txt')) as f:
@@ -56,32 +55,20 @@ def main():
     with open(osp.join(aug_path, 'dataset', 'val.txt')) as f:
         full_aug_list += [line.strip() for line in f]
 
-    with open(
-            osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation',
-                     'train.txt')) as f:
+    with open(osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation', 'train.txt')) as f:
         ori_train_list = [line.strip() for line in f]
-    with open(
-            osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation',
-                     'val.txt')) as f:
+    with open(osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation', 'val.txt')) as f:
         val_list = [line.strip() for line in f]
 
-    aug_train_list = generate_aug_list(ori_train_list + full_aug_list,
-                                       val_list)
-    assert len(aug_train_list) == AUG_LEN, 'len(aug_train_list) != {}'.format(
-        AUG_LEN)
+    aug_train_list = generate_aug_list(ori_train_list + full_aug_list, val_list)
+    assert len(aug_train_list) == AUG_LEN, 'len(aug_train_list) != {}'.format(AUG_LEN)
 
-    with open(
-            osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation',
-                     'trainaug.txt'), 'w') as f:
+    with open(osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation', 'trainaug.txt'), 'w') as f:
         f.writelines(line + '\n' for line in aug_train_list)
 
     aug_list = generate_aug_list(full_aug_list, ori_train_list + val_list)
-    assert len(aug_list) == AUG_LEN - len(
-        ori_train_list), 'len(aug_list) != {}'.format(AUG_LEN -
-                                                      len(ori_train_list))
-    with open(
-            osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation', 'aug.txt'),
-            'w') as f:
+    assert len(aug_list) == AUG_LEN - len(ori_train_list), 'len(aug_list) != {}'.format(AUG_LEN - len(ori_train_list))
+    with open(osp.join(devkit_path, 'VOC2012/ImageSets/Segmentation', 'aug.txt'), 'w') as f:
         f.writelines(line + '\n' for line in aug_list)
 
     print('Done!')

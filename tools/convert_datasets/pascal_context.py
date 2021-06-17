@@ -38,7 +38,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='Convert PASCAL VOC annotations to mmsegmentation format')
     parser.add_argument('devkit_path', help='pascal voc devkit path')
-    parser.add_argument('json_path', help='annoation json filepath')
+    parser.add_argument('json_path', help='annotation json filepath')
     parser.add_argument('-o', '--out_dir', help='output path')
     args = parser.parse_args()
     return args
@@ -61,22 +61,14 @@ def main():
     val_detail = Detail(json_path, img_dir, 'val')
     val_ids = val_detail.getImgs()
 
-    mmcv.mkdir_or_exist(
-        osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext'))
+    mmcv.mkdir_or_exist(osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext'))
 
-    train_list = mmcv.track_progress(
-        partial(generate_labels, detail=train_detail, out_dir=out_dir),
-        train_ids)
-    with open(
-            osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext',
-                     'train.txt'), 'w') as f:
+    train_list = mmcv.track_progress(partial(generate_labels, detail=train_detail, out_dir=out_dir), train_ids)
+    with open(osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext', 'train.txt'), 'w') as f:
         f.writelines(line + '\n' for line in sorted(train_list))
 
-    val_list = mmcv.track_progress(
-        partial(generate_labels, detail=val_detail, out_dir=out_dir), val_ids)
-    with open(
-            osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext',
-                     'val.txt'), 'w') as f:
+    val_list = mmcv.track_progress(partial(generate_labels, detail=val_detail, out_dir=out_dir), val_ids)
+    with open(osp.join(devkit_path, 'VOC2010/ImageSets/SegmentationContext', 'val.txt'), 'w') as f:
         f.writelines(line + '\n' for line in sorted(val_list))
 
     print('Done!')

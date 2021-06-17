@@ -130,10 +130,13 @@ class Resize(object):
         """
 
         assert isinstance(img_scale, tuple) and len(img_scale) == 2
+
         min_ratio, max_ratio = ratio_range
         assert min_ratio <= max_ratio
+
         ratio = np.random.random_sample() * (max_ratio - min_ratio) + min_ratio
         scale = int(img_scale[0] * ratio), int(img_scale[1] * ratio)
+
         return scale, None
 
     def _random_scale(self, results):
@@ -177,8 +180,8 @@ class Resize(object):
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
         if self.keep_ratio:
-            img, scale_factor = mmcv.imrescale(
-                results['img'], results['scale'], return_scale=True)
+            img, scale_factor = mmcv.imrescale(results['img'], results['scale'], return_scale=True)
+
             # the w_scale and h_scale has minor difference
             # a real fix should be done in the mmcv.imrescale in the future
             new_h, new_w = img.shape[:2]
@@ -186,10 +189,9 @@ class Resize(object):
             w_scale = new_w / w
             h_scale = new_h / h
         else:
-            img, w_scale, h_scale = mmcv.imresize(
-                results['img'], results['scale'], return_scale=True)
-        scale_factor = np.array([w_scale, h_scale, w_scale, h_scale],
-                                dtype=np.float32)
+            img, w_scale, h_scale = mmcv.imresize(results['img'], results['scale'], return_scale=True)
+
+        scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32)
         results['img'] = img
         results['img_shape'] = img.shape
         results['pad_shape'] = img.shape  # in case that there is no padding
@@ -200,11 +202,10 @@ class Resize(object):
         """Resize semantic segmentation map with ``results['scale']``."""
         for key in results.get('seg_fields', []):
             if self.keep_ratio:
-                gt_seg = mmcv.imrescale(
-                    results[key], results['scale'], interpolation='nearest')
+                gt_seg = mmcv.imrescale(results[key], results['scale'], interpolation='nearest')
             else:
-                gt_seg = mmcv.imresize(
-                    results[key], results['scale'], interpolation='nearest')
+                gt_seg = mmcv.imresize(results[key], results['scale'], interpolation='nearest')
+
             results[key] = gt_seg
 
     def __call__(self, results):
@@ -221,8 +222,10 @@ class Resize(object):
 
         if 'scale' not in results:
             self._random_scale(results)
+
         self._resize_img(results)
         self._resize_seg(results)
+
         return results
 
     def __repr__(self):
