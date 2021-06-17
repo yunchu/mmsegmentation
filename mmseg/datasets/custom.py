@@ -308,6 +308,7 @@ class CustomDataset(Dataset):
                  metric='mIoU',
                  logger=None,
                  efficient_test=False,
+                 print_log=False,
                  **kwargs):
         """Evaluate the dataset.
 
@@ -324,16 +325,17 @@ class CustomDataset(Dataset):
 
         if isinstance(metric, str):
             metric = [metric]
+
         allowed_metrics = ['mIoU', 'mDice', 'mFscore']
         if not set(metric).issubset(set(allowed_metrics)):
             raise KeyError('metric {} is not supported'.format(metric))
-        eval_results = {}
+
         gt_seg_maps = self.get_gt_seg_maps(efficient_test)
-        if self.CLASSES is None:
-            num_classes = len(
-                reduce(np.union1d, [np.unique(_) for _ in gt_seg_maps]))
-        else:
-            num_classes = len(self.CLASSES)
+        num_classes = len(reduce(np.union1d, [np.unique(_) for _ in gt_seg_maps])) \
+            if self.CLASSES is None else len(self.CLASSES)
+        class_names = tuple(range(num_classes)) \
+            if self.CLASSES is None else self.CLASSES
+
         ret_metrics = eval_metrics(
             results,
             gt_seg_maps,
@@ -343,44 +345,41 @@ class CustomDataset(Dataset):
             label_map=self.label_map,
             reduce_zero_label=self.reduce_zero_label)
 
-        if self.CLASSES is None:
-            class_names = tuple(range(num_classes))
-        else:
-            class_names = self.CLASSES
-
         # summary table
         ret_metrics_summary = OrderedDict({
-            ret_metric: np.round(np.nanmean(ret_metric_value) * 100, 2)
+            ret_metric: np.round(np.nanmean(ret_metric_value) * 100.0, 2)
             for ret_metric, ret_metric_value in ret_metrics.items()
         })
 
         # each class table
         ret_metrics.pop('aAcc', None)
         ret_metrics_class = OrderedDict({
-            ret_metric: np.round(ret_metric_value * 100, 2)
+            ret_metric: np.round(ret_metric_value * 100.0, 2)
             for ret_metric, ret_metric_value in ret_metrics.items()
         })
         ret_metrics_class.update({'Class': class_names})
         ret_metrics_class.move_to_end('Class', last=False)
 
         # for logger
-        class_table_data = PrettyTable()
-        for key, val in ret_metrics_class.items():
-            class_table_data.add_column(key, val)
+        if print_log:
+            class_table_data = PrettyTable()
+            for key, val in ret_metrics_class.items():
+                class_table_data.add_column(key, val)
 
-        summary_table_data = PrettyTable()
-        for key, val in ret_metrics_summary.items():
-            if key == 'aAcc':
-                summary_table_data.add_column(key, [val])
-            else:
-                summary_table_data.add_column('m' + key, [val])
+            summary_table_data = PrettyTable()
+            for key, val in ret_metrics_summary.items():
+                if key == 'aAcc':
+                    summary_table_data.add_column(key, [val])
+                else:
+                    summary_table_data.add_column('m' + key, [val])
 
-        print_log('per class results:', logger)
-        print_log('\n' + class_table_data.get_string(), logger=logger)
-        print_log('Summary:', logger)
-        print_log('\n' + summary_table_data.get_string(), logger=logger)
+            print_log('\nPer class results:', logger)
+            print_log(class_table_data.get_string(), logger=logger)
+            print_log('\nSummary:', logger)
+            print_log(summary_table_data.get_string(), logger=logger)
 
         # each metric dict
+        eval_results = {}
         for key, value in ret_metrics_summary.items():
             if key == 'aAcc':
                 eval_results[key] = value / 100.0
@@ -397,4 +396,5 @@ class CustomDataset(Dataset):
         if mmcv.is_list_of(results, str):
             for file_name in results:
                 os.remove(file_name)
+
         return eval_results

@@ -90,10 +90,8 @@ def main():
     cfg = propagate_root_dir(cfg, args.data_dir)
 
     # init distributed env first, since logger depends on the dist info.
-    if args.launcher == 'none':
-        distributed = False
-    else:
-        distributed = True
+    distributed = args.launcher != 'none'
+    if distributed:
         init_dist(args.launcher, **cfg.dist_params)
 
     # create work_dir
@@ -112,8 +110,7 @@ def main():
     env_info_dict = collect_env()
     env_info = '\n'.join([f'{k}: {v}' for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
-    logger.info('Environment info:\n' + dash_line + env_info + '\n' +
-                dash_line)
+    logger.info('Environment info:\n' + dash_line + env_info + '\n' + dash_line)
     meta['env_info'] = env_info
 
     # log some basic info
@@ -122,8 +119,7 @@ def main():
 
     # set random seeds
     if args.seed is not None:
-        logger.info(f'Set random seed to {args.seed}, deterministic: '
-                    f'{args.deterministic}')
+        logger.info(f'Set random seed to {args.seed}, deterministic: {args.deterministic}')
         set_random_seed(args.seed, deterministic=args.deterministic)
     cfg.seed = args.seed
     meta['seed'] = args.seed

@@ -67,8 +67,7 @@ class DistEvalHook(_DistEvalHook):
         if self.broadcast_bn_buffer:
             model = runner.model
             for name, module in model.named_modules():
-                if isinstance(module,
-                              _BatchNorm) and module.track_running_stats:
+                if isinstance(module, _BatchNorm) and module.track_running_stats:
                     dist.broadcast(module.running_var, 0)
                     dist.broadcast(module.running_mean, 0)
 
@@ -85,6 +84,7 @@ class DistEvalHook(_DistEvalHook):
             self.dataloader,
             tmpdir=tmpdir,
             gpu_collect=self.gpu_collect)
+
         if runner.rank == 0:
             print('\n')
             runner.log_buffer.output['eval_iter_num'] = len(self.dataloader)

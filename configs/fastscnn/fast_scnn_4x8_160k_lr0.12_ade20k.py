@@ -8,7 +8,8 @@ norm_cfg = dict(type='SyncBN', requires_grad=True, momentum=0.01)
 model = dict(
     decode_head=dict(
         channels=256,
-        num_classes=150
+        num_classes=150,
+        loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
     ),
     auxiliary_head=[
         dict(
@@ -21,8 +22,8 @@ model = dict(
             norm_cfg=norm_cfg,
             concat_input=False,
             align_corners=False,
-            loss_decode=dict(
-                type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.4)),
+            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
+        ),
         dict(
             type='FCNHead',
             in_channels=64,
@@ -33,8 +34,8 @@ model = dict(
             norm_cfg=norm_cfg,
             concat_input=False,
             align_corners=False,
-            loss_decode=dict(
-                type='CrossEntropyLoss', use_sigmoid=True, loss_weight=0.4)),
+            loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)
+        ),
     ])
 
 # Re-config the data sampler.

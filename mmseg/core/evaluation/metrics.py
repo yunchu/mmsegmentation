@@ -6,7 +6,7 @@ import torch
 
 
 def f_score(precision, recall, beta=1):
-    """calcuate the f-score value.
+    """Calculates the f-score value.
 
     Args:
         precision (float | torch.Tensor): The precision value.
@@ -75,13 +75,11 @@ def intersect_and_union(pred_label,
     label = label[mask]
 
     intersect = pred_label[pred_label == label]
-    area_intersect = torch.histc(
-        intersect.float(), bins=(num_classes), min=0, max=num_classes - 1)
-    area_pred_label = torch.histc(
-        pred_label.float(), bins=(num_classes), min=0, max=num_classes - 1)
-    area_label = torch.histc(
-        label.float(), bins=(num_classes), min=0, max=num_classes - 1)
+    area_intersect = torch.histc(intersect.float(), bins=num_classes, min=0, max=num_classes - 1)
+    area_pred_label = torch.histc(pred_label.float(), bins=num_classes, min=0, max=num_classes - 1)
+    area_label = torch.histc(label.float(), bins=num_classes, min=0, max=num_classes - 1)
     area_union = area_pred_label + area_label - area_intersect
+
     return area_intersect, area_union, area_pred_label, area_label
 
 
@@ -113,21 +111,21 @@ def total_intersect_and_union(results,
     """
     num_imgs = len(results)
     assert len(gt_seg_maps) == num_imgs
+
     total_area_intersect = torch.zeros((num_classes, ), dtype=torch.float64)
     total_area_union = torch.zeros((num_classes, ), dtype=torch.float64)
     total_area_pred_label = torch.zeros((num_classes, ), dtype=torch.float64)
     total_area_label = torch.zeros((num_classes, ), dtype=torch.float64)
     for i in range(num_imgs):
         area_intersect, area_union, area_pred_label, area_label = \
-            intersect_and_union(
-                results[i], gt_seg_maps[i], num_classes, ignore_index,
-                label_map, reduce_zero_label)
+            intersect_and_union(results[i], gt_seg_maps[i], num_classes,
+                                ignore_index, label_map, reduce_zero_label)
         total_area_intersect += area_intersect
         total_area_union += area_union
         total_area_pred_label += area_pred_label
         total_area_label += area_label
-    return total_area_intersect, total_area_union, total_area_pred_label, \
-        total_area_label
+
+    return total_area_intersect, total_area_union, total_area_pred_label, total_area_label
 
 
 def mean_iou(results,
@@ -263,7 +261,7 @@ def eval_metrics(results,
                  label_map=dict(),
                  reduce_zero_label=False,
                  beta=1):
-    """Calculate evaluation metrics
+    """Calculates evaluation metrics
     Args:
         results (list[ndarray] | list[str]): List of prediction segmentation
             maps or list of prediction result filenames.
@@ -287,11 +285,10 @@ def eval_metrics(results,
     if not set(metrics).issubset(set(allowed_metrics)):
         raise KeyError('metrics {} is not supported'.format(metrics))
 
-    total_area_intersect, total_area_union, total_area_pred_label, \
-        total_area_label = total_intersect_and_union(
-            results, gt_seg_maps, num_classes, ignore_index, label_map,
-            reduce_zero_label)
+    total_area_intersect, total_area_union, total_area_pred_label, total_area_label = \
+        total_intersect_and_union(results, gt_seg_maps, num_classes, ignore_index, label_map, reduce_zero_label)
     all_acc = total_area_intersect.sum() / total_area_label.sum()
+
     ret_metrics = OrderedDict({'aAcc': all_acc})
     for metric in metrics:
         if metric == 'mIoU':
@@ -318,9 +315,11 @@ def eval_metrics(results,
         metric: value.numpy()
         for metric, value in ret_metrics.items()
     }
+
     if nan_to_num is not None:
         ret_metrics = OrderedDict({
             metric: np.nan_to_num(metric_value, nan=nan_to_num)
             for metric, metric_value in ret_metrics.items()
         })
+
     return ret_metrics
