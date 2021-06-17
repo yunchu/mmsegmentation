@@ -126,7 +126,8 @@ class CityscapesDataset(CustomDataset):
                  metric='mIoU',
                  logger=None,
                  imgfile_prefix=None,
-                 efficient_test=False):
+                 efficient_test=False,
+                 show_log=False):
         """Evaluation in Cityscapes/default protocol.
 
         Args:
@@ -151,13 +152,13 @@ class CityscapesDataset(CustomDataset):
         eval_results = dict()
         metrics = metric.copy() if isinstance(metric, list) else [metric]
         if 'cityscapes' in metrics:
-            eval_results.update(
-                self._evaluate_cityscapes(results, logger, imgfile_prefix))
+            eval_results.update(self._evaluate_cityscapes(results, logger, imgfile_prefix))
             metrics.remove('cityscapes')
+
         if len(metrics) > 0:
-            eval_results.update(
-                super(CityscapesDataset,
-                      self).evaluate(results, metrics, logger, efficient_test))
+            eval_results.update(super(CityscapesDataset, self).evaluate(
+                results, metrics, logger, efficient_test, show_log
+            ))
 
         return eval_results
 

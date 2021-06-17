@@ -374,9 +374,9 @@ class CustomDataset(Dataset):
                     summary_table_data.add_column('m' + key, [val])
 
             print_log('\nPer class results:', logger)
-            print_log('\n' + class_table_data.get_string(), logger=logger)
+            print_log(class_table_data.get_string(), logger=logger)
             print_log('\nSummary:', logger)
-            print_log('\n' + summary_table_data.get_string(), logger=logger)
+            print_log(summary_table_data.get_string(), logger=logger)
 
         # each metric dict
         eval_results = {}
