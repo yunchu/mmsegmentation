@@ -6,12 +6,15 @@ _base_ = [
 # Re-config the model head.
 norm_cfg = dict(type='SyncBN', requires_grad=True, momentum=0.01)
 model = dict(
-    decode_head=dict(num_classes=150),
+    decode_head=dict(
+        channels=256,
+        num_classes=150
+    ),
     auxiliary_head=[
         dict(
             type='FCNHead',
             in_channels=128,
-            channels=32,
+            channels=256,
             num_convs=1,
             num_classes=150,
             in_index=-2,
@@ -23,7 +26,7 @@ model = dict(
         dict(
             type='FCNHead',
             in_channels=64,
-            channels=32,
+            channels=256,
             num_convs=1,
             num_classes=150,
             in_index=-3,
