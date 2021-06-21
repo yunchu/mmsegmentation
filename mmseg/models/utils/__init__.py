@@ -6,8 +6,17 @@ from .se_layer import SELayer
 from .self_attention_block import SelfAttentionBlock
 from .up_conv_block import UpConvBlock
 from .weight_init import trunc_normal_
+from .channel_shuffle import channel_shuffle
 
 __all__ = [
-    'ResLayer', 'SelfAttentionBlock', 'make_divisible', 'InvertedResidual',
-    'UpConvBlock', 'InvertedResidualV3', 'SELayer', 'DropPath', 'trunc_normal_'
+    'ResLayer',
+    'SelfAttentionBlock',
+    'make_divisible',
+    'InvertedResidual',
+    'UpConvBlock',
+    'InvertedResidualV3',
+    'SELayer',
+    'DropPath',
+    'trunc_normal_',
+    'channel_shuffle',
 ]

@@ -121,6 +121,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             assert isinstance(in_channels, (list, tuple))
             assert isinstance(in_index, (list, tuple))
             assert len(in_channels) == len(in_index)
+
             if input_transform == 'resize_concat':
                 self.in_channels = sum(in_channels)
             else:
@@ -128,6 +129,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         else:
             assert isinstance(in_channels, int)
             assert isinstance(in_index, int)
+
             self.in_channels = in_channels
 
     def init_weights(self):

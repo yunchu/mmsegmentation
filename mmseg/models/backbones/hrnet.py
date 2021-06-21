@@ -1,6 +1,5 @@
 import torch.nn as nn
-from mmcv.cnn import (build_conv_layer, build_norm_layer, constant_init,
-                      kaiming_init)
+from mmcv.cnn import build_conv_layer, build_norm_layer, constant_init, kaiming_init
 from mmcv.runner import load_checkpoint
 from mmcv.utils.parrots_wrapper import _BatchNorm
 
@@ -329,10 +328,8 @@ class HRNet(nn.Module):
 
         block = self.blocks_dict[block_type]
         num_channels = [channel * block.expansion for channel in num_channels]
-        self.transition1 = self._make_transition_layer([stage1_out_channels],
-                                                       num_channels)
-        self.stage2, pre_stage_channels = self._make_stage(
-            self.stage2_cfg, num_channels)
+        self.transition1 = self._make_transition_layer([stage1_out_channels], num_channels)
+        self.stage2, pre_stage_channels = self._make_stage(self.stage2_cfg, num_channels)
 
         # stage 3
         self.stage3_cfg = self.extra['stage3']
@@ -341,10 +338,8 @@ class HRNet(nn.Module):
 
         block = self.blocks_dict[block_type]
         num_channels = [channel * block.expansion for channel in num_channels]
-        self.transition2 = self._make_transition_layer(pre_stage_channels,
-                                                       num_channels)
-        self.stage3, pre_stage_channels = self._make_stage(
-            self.stage3_cfg, num_channels)
+        self.transition2 = self._make_transition_layer(pre_stage_channels, num_channels)
+        self.stage3, pre_stage_channels = self._make_stage(self.stage3_cfg, num_channels)
 
         # stage 4
         self.stage4_cfg = self.extra['stage4']
@@ -353,10 +348,8 @@ class HRNet(nn.Module):
 
         block = self.blocks_dict[block_type]
         num_channels = [channel * block.expansion for channel in num_channels]
-        self.transition3 = self._make_transition_layer(pre_stage_channels,
-                                                       num_channels)
-        self.stage4, pre_stage_channels = self._make_stage(
-            self.stage4_cfg, num_channels)
+        self.transition3 = self._make_transition_layer(pre_stage_channels, num_channels)
+        self.stage4, pre_stage_channels = self._make_stage(self.stage4_cfg, num_channels)
 
     @property
     def norm1(self):
@@ -417,6 +410,7 @@ class HRNet(nn.Module):
 
     def _make_layer(self, block, inplanes, planes, blocks, stride=1):
         """Make each layer."""
+
         downsample = None
         if stride != 1 or inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -427,27 +421,26 @@ class HRNet(nn.Module):
                     kernel_size=1,
                     stride=stride,
                     bias=False),
-                build_norm_layer(self.norm_cfg, planes * block.expansion)[1])
+                build_norm_layer(self.norm_cfg, planes * block.expansion)[1]
+            )
 
-        layers = []
-        layers.append(
-            block(
-                inplanes,
-                planes,
-                stride,
-                downsample=downsample,
-                with_cp=self.with_cp,
-                norm_cfg=self.norm_cfg,
-                conv_cfg=self.conv_cfg))
+        layers = [block(
+            inplanes,
+            planes,
+            stride,
+            downsample=downsample,
+            with_cp=self.with_cp,
+            norm_cfg=self.norm_cfg,
+            conv_cfg=self.conv_cfg)]
         inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(
-                block(
-                    inplanes,
-                    planes,
-                    with_cp=self.with_cp,
-                    norm_cfg=self.norm_cfg,
-                    conv_cfg=self.conv_cfg))
+            layers.append(block(
+                inplanes,
+                planes,
+                with_cp=self.with_cp,
+                norm_cfg=self.norm_cfg,
+                conv_cfg=self.conv_cfg
+            ))
 
         return nn.Sequential(*layers)
 

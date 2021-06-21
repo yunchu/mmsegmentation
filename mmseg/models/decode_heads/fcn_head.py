@@ -35,7 +35,6 @@ class FCNHead(BaseDecodeHead):
             assert self.in_channels == self.channels
 
         conv_padding = (kernel_size // 2) * dilation
-
         convs = [ConvModule(
             self.in_channels,
             self.channels,
@@ -61,6 +60,7 @@ class FCNHead(BaseDecodeHead):
             self.convs = nn.Identity()
         else:
             self.convs = nn.Sequential(*convs)
+
         if self.concat_input:
             self.conv_cat = ConvModule(
                 self.in_channels + self.channels,
@@ -75,8 +75,11 @@ class FCNHead(BaseDecodeHead):
     def forward(self, inputs):
         """Forward function."""
         x = self._transform_inputs(inputs)
+
         output = self.convs(x)
         if self.concat_input:
             output = self.conv_cat(torch.cat([x, output], dim=1))
+
         output = self.cls_seg(output)
+
         return output
