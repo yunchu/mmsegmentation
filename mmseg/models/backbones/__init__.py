@@ -11,6 +11,8 @@ from .resnext import ResNeXt
 from .unet import UNet
 from .vit import VisionTransformer
 from .dabnet import DABNet
+# from .efficientnet import EfficientNet
+# from .hyperseg import HyperGen
 
 __all__ = [
     'ResNet',
@@ -28,4 +30,6 @@ __all__ = [
     'VisionTransformer',
     'ICNet',
     'DABNet',
+    # 'EfficientNet',
+    # 'HyperGen',
 ]
