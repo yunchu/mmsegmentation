@@ -60,8 +60,10 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                      loss_weight=1.0),
                  ignore_index=255,
                  sampler=None,
-                 align_corners=False):
+                 align_corners=False,
+                 enable_out_seg=True):
         super(BaseDecodeHead, self).__init__()
+
         self._init_inputs(in_channels, in_index, input_transform)
         self.channels = channels
         self.num_classes = num_classes
@@ -73,17 +75,18 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.loss_decode = build_loss(loss_decode)
         self.ignore_index = ignore_index
         self.align_corners = align_corners
+        self.fp16_enabled = False
+
+        self.sampler = None
         if sampler is not None:
             self.sampler = build_pixel_sampler(sampler, context=self)
-        else:
-            self.sampler = None
 
-        self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
-        if dropout_ratio > 0:
+        self.dropout = None
+        if dropout_ratio is not None and dropout_ratio > 0:
             self.dropout = nn.Dropout2d(dropout_ratio)
-        else:
-            self.dropout = None
-        self.fp16_enabled = False
+
+        if enable_out_seg:
+            self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
 
     def extra_repr(self):
         """Extra repr."""
@@ -208,9 +211,12 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
     def cls_seg(self, feat):
         """Classify each pixel."""
+
         if self.dropout is not None:
             feat = self.dropout(feat)
+
         output = self.conv_seg(feat)
+
         return output
 
     @force_fp32(apply_to=('seg_logit', ))

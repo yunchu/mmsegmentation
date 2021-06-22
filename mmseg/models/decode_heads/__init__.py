@@ -20,10 +20,30 @@ from .psp_head import PSPHead
 from .sep_aspp_head import DepthwiseSeparableASPPHead
 from .sep_fcn_head import DepthwiseSeparableFCNHead
 from .uper_head import UPerHead
+from .dfa_head import DFAHead
 
 __all__ = [
-    'FCNHead', 'PSPHead', 'ASPPHead', 'PSAHead', 'NLHead', 'GCHead', 'CCHead',
-    'UPerHead', 'DepthwiseSeparableASPPHead', 'ANNHead', 'DAHead', 'OCRHead',
-    'EncHead', 'DepthwiseSeparableFCNHead', 'FPNHead', 'EMAHead', 'DNLHead',
-    'PointHead', 'APCHead', 'DMHead', 'LRASPPHead', 'ICHead'
+    'FCNHead',
+    'PSPHead',
+    'ASPPHead',
+    'PSAHead',
+    'NLHead',
+    'GCHead',
+    'CCHead',
+    'UPerHead',
+    'DepthwiseSeparableASPPHead',
+    'ANNHead',
+    'DAHead',
+    'OCRHead',
+    'EncHead',
+    'DepthwiseSeparableFCNHead',
+    'FPNHead',
+    'EMAHead',
+    'DNLHead',
+    'PointHead',
+    'APCHead',
+    'DMHead',
+    'LRASPPHead',
+    'ICHead',
+    'DFAHead',
 ]
