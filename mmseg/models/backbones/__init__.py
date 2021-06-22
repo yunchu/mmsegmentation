@@ -10,6 +10,7 @@ from .resnet import ResNet, ResNetV1c, ResNetV1d
 from .resnext import ResNeXt
 from .unet import UNet
 from .vit import VisionTransformer
+from .dabnet import DABNet
 
 __all__ = [
     'ResNet',
@@ -26,4 +27,5 @@ __all__ = [
     'MobileNetV3',
     'VisionTransformer',
     'ICNet',
+    'DABNet',
 ]
