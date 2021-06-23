@@ -22,6 +22,7 @@ from .sep_fcn_head import DepthwiseSeparableFCNHead
 from .uper_head import UPerHead
 from .dfa_head import DFAHead
 from .ddr_head import DDRHead
+from .bise_head import BiSeHead
 
 __all__ = [
     'FCNHead',
@@ -48,4 +49,5 @@ __all__ = [
     'ICHead',
     'DFAHead',
     'DDRHead',
+    'BiSeHead',
 ]
