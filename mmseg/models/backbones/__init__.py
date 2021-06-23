@@ -13,6 +13,7 @@ from .vit import VisionTransformer
 from .dabnet import DABNet
 from .dfanet import DFANet
 from .xception_a import XceptionA
+from .ddrnet import DDRNet
 # from .efficientnet import EfficientNet
 # from .hyperseg import HyperGen
 
@@ -34,6 +35,7 @@ __all__ = [
     'DABNet',
     'DFANet',
     'XceptionA',
+    'DDRNet',
     # 'EfficientNet',
     # 'HyperGen',
 ]
