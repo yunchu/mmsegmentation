@@ -15,6 +15,7 @@ from .dfanet import DFANet
 from .xception_a import XceptionA
 from .ddrnet import DDRNet
 from .bisenet_v2 import BiSeNetV2
+from .shelfnet import ShelfNet
 # from .efficientnet import EfficientNet
 # from .hyperseg import HyperGen
 
@@ -38,6 +39,7 @@ __all__ = [
     'XceptionA',
     'DDRNet',
     'BiSeNetV2',
+    'ShelfNet',
     # 'EfficientNet',
     # 'HyperGen',
 ]

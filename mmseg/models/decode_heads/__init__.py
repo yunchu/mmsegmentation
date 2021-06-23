@@ -23,6 +23,7 @@ from .uper_head import UPerHead
 from .dfa_head import DFAHead
 from .ddr_head import DDRHead
 from .bise_head import BiSeHead
+from .shelf_head import ShelfHead
 
 __all__ = [
     'FCNHead',
@@ -50,4 +51,5 @@ __all__ = [
     'DFAHead',
     'DDRHead',
     'BiSeHead',
+    'ShelfHead',
 ]
