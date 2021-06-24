@@ -85,6 +85,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         if dropout_ratio is not None and dropout_ratio > 0:
             self.dropout = nn.Dropout2d(dropout_ratio)
 
+        self.conv_seg = None
         if enable_out_seg:
             self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
 
@@ -137,7 +138,9 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
     def init_weights(self):
         """Initialize weights of classification layer."""
-        normal_init(self.conv_seg, mean=0, std=0.01)
+
+        if self.conv_seg is not None:
+            normal_init(self.conv_seg, mean=0, std=0.01)
 
     def _transform_inputs(self, inputs):
         """Transform inputs for decoder.

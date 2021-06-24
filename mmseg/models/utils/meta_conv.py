@@ -231,27 +231,3 @@ def make_meta_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, padding=None,
         layers.append(nn.Dropout(dropout))
 
     return MetaSequential(*layers)
-
-
-def main(model='hyperseg.meta_conv.MetaConv2d(3,3,3)', res=(256,)):
-    hyper_conv = MetaConv2d(3, 3, 3, padding=1, groups=3)
-    print(hyper_conv)
-    x = torch.ones(4, 3, 64, 64)
-    x[0::2] = 0.
-    w = torch.ones(4, hyper_conv.hyper_params)
-    w[0::2] = 0.
-
-    out = hyper_conv(x, w)
-    print(out.max())
-
-
-if __name__ == "__main__":
-    # Parse program arguments
-    import argparse
-
-    parser = argparse.ArgumentParser('res_unet test')
-    parser.add_argument('-m', '--model', default='hyperseg.meta_conv.MetaConv2d(3,3,3)',
-                        help='model object')
-    parser.add_argument('-r', '--res', default=(256,), type=int, nargs='+',
-                        metavar='N', help='image resolution')
-    main(**vars(parser.parse_args()))

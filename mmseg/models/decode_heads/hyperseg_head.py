@@ -2,7 +2,6 @@
 
 import numbers
 from itertools import groupby
-from functools import partial
 
 import numpy as np
 import torch
@@ -10,95 +9,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
-from mmseg.models.backbones import efficientnet
 from mmseg.models.utils import MetaConv2d, MetaSequential
-from ..builder import BACKBONES
-
-
-@BACKBONES.register_module()
-class HyperGen(nn.Module):
-    """ Hypernetwork generator comprised of a backbone network, weight mapper, and a decoder.
-
-    Args:
-        backbone (nn.Module factory): Backbone network
-        weight_mapper (nn.Module factory): Weight mapper network.
-        in_nc (int): input number of channels.
-        num_classes (int): output number of classes.
-        kernel_sizes (int): the kernel size of the decoder layers.
-        level_layers (int): number of layers in each level of the decoder.
-        level_channels (list of int, optional): If specified, sets the output channels of each level in the decoder.
-        expand_ratio (int): inverted residual block's expansion ratio in the decoder.
-        groups (int, optional): Number of blocked connections from input channels to output channels.
-        weight_groups (int, optional): per level signal to weights groups in the decoder.
-        inference_hflip (bool): If true, enables horizontal flip of input tensor.
-        inference_gather (str): Inference gather type: ``mean'' or ``max''.
-        with_out_fc (bool): If True, add a final fully connected layer to the decoder.
-        decoder_groups (int, optional): per level groups in the decoder.
-        decoder_dropout (float): If specified, enables dropout with the given probability.
-        coords_res (list of tuple of int, optional): list of inference resolutions for caching positional embedding.
-        unify_level (int, optional): the starting level to unify the signal to weights operation from.
-    """
-    def __init__(self, backbone, weight_mapper, in_nc=3, num_classes=3, kernel_sizes=3, level_layers=1,
-                 level_channels=None, expand_ratio=1, groups=1, weight_groups=1, inference_hflip=False,
-                 inference_gather='mean', with_out_fc=False, decoder_groups=1, decoder_dropout=None, coords_res=None,
-                 unify_level=None):
-        super(HyperGen, self).__init__()
-
-        self.inference_hflip = inference_hflip
-        self.inference_gather = inference_gather
-
-        self.backbone = backbone()
-        feat_channels = [in_nc] + self.backbone.feat_channels[:-1]
-        self.decoder = MultiScaleDecoder(feat_channels, self.backbone.feat_channels[-1], num_classes, kernel_sizes,
-                                         level_layers, level_channels, with_out_fc=with_out_fc, out_kernel_size=1,
-                                         expand_ratio=expand_ratio, groups=decoder_groups, weight_groups=weight_groups,
-                                         dropout=decoder_dropout, coords_res=coords_res, unify_level=unify_level)
-        self.weight_mapper = weight_mapper(self.backbone.feat_channels[-1], self.decoder.param_groups)
-
-    @property
-    def hyper_params(self):
-        return self.decoder.hyper_params
-
-    def process_single_tensor(self, x, hflip=False):
-        x = torch.flip(x, [-1]) if hflip else x
-        features = self.backbone(x)
-        weights = self.weight_mapper(features[-1])
-        x = [x] + features[:-1]
-        x = self.decoder(x, weights)
-        x = torch.flip(x, [-1]) if hflip else x
-
-        return x
-
-    def gather_results(self, x, y=None):
-        assert x is not None
-        if y is None:
-            return x
-        if self.inference_gather == 'mean':
-            return (x + y) * 0.5
-        else:
-            return torch.max(x, y)
-
-    def forward(self, x):
-        assert isinstance(x, (list, tuple, torch.Tensor)), f'x must be of type list, tuple, or tensor'
-        if isinstance(x, torch.Tensor):
-            return self.process_single_tensor(x)
-
-        # Note: the first pyramid will determine the output resolution
-        out_res = x[0].shape[2:]
-        out = None
-        for p in x:
-            if self.inference_hflip:
-                p = torch.max(self.process_single_tensor(p), self.process_single_tensor(p, hflip=True))
-            else:
-                p = self.process_single_tensor(p)
-
-            # Resize current image to output resolution if necessary
-            if p.shape[2:] != out_res:
-                p = F.interpolate(p, out_res, mode='bilinear', align_corners=False)
-
-            out = self.gather_results(p, out)
-
-        return out
+from ..builder import HEADS
+from .decode_head import BaseDecodeHead
 
 
 class MultiScaleDecoder(nn.Module):
@@ -127,6 +40,7 @@ class MultiScaleDecoder(nn.Module):
                  expand_ratio=1, groups=1, weight_groups=1, with_out_fc=False, dropout=None,
                  coords_res=None, unify_level=None):  # must be a list of tuples
         super(MultiScaleDecoder, self).__init__()
+
         if isinstance(kernel_sizes, numbers.Number):
             kernel_sizes = (kernel_sizes,) * len(level_channels)
         if isinstance(level_layers, numbers.Number):
@@ -141,6 +55,7 @@ class MultiScaleDecoder(nn.Module):
             f'expand_ratio ({len(expand_ratio)}) must be of size {len(level_channels)}'
         if isinstance(groups, (list, tuple)):
             assert len(groups) == len(level_channels), f'groups ({len(groups)}) must be of size {len(level_channels)}'
+
         self.level_layers = level_layers
         self.levels = len(level_channels)
         self.unify_level = unify_level
@@ -209,7 +124,8 @@ class MultiScaleDecoder(nn.Module):
         init_signal2weights(self, list(signal_features), weight_groups=weight_groups)
         self.hyper_params = sum(self.param_groups)
 
-    def cache_image_coordinates(self, h, w):
+    @staticmethod
+    def cache_image_coordinates(h, w):
         x = torch.linspace(-1, 1, steps=w)
         y = torch.linspace(-1, 1, steps=h)
         grid = torch.stack(torch.meshgrid(y, x)[::-1], dim=0).unsqueeze(0)
@@ -405,11 +321,11 @@ class WeightMapper(nn.Module):
         out_channels (int): output number of channels.
         levels (int): number of levels operating on different strides.
         bias (bool): if True, enables bias in all convolution operations.
-        min_unit (int): legacy parameter, no longer used.
         weight_groups (int): legacy parameter, no longer used.
     """
-    def __init__(self, in_channels, out_channels, levels=3, bias=False, min_unit=4, weight_groups=1):
+    def __init__(self, in_channels, out_channels, levels=3, bias=False, weight_groups=1):
         super(WeightMapper, self).__init__()
+
         assert levels > 0, 'levels must be greater than zero'
         assert in_channels % 2 == 0, 'in_channels must be divisible by 2'
         if isinstance(weight_groups, (list, tuple)):
@@ -429,17 +345,20 @@ class WeightMapper(nn.Module):
         self.in_conv = nn.Sequential(
             nn.Conv2d(in_channels, in_channels // 2, kernel_size=1, stride=1, bias=bias),
             nn.BatchNorm2d(in_channels // 2),
-            nn.ReLU(inplace=True))
+            nn.ReLU(inplace=True)
+        )
 
         for level in range(self.levels - 1):
             self.down_blocks.append(nn.Sequential(
                 nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2, bias=bias),
                 nn.BatchNorm2d(in_channels // 2),
-                nn.ReLU(inplace=True)))
+                nn.ReLU(inplace=True))
+            )
             self.up_blocks.append(nn.Sequential(
                 nn.Conv2d(in_channels, in_channels // 2, 1, bias=bias),
                 nn.BatchNorm2d(in_channels // 2),
-                nn.ReLU(inplace=True)))
+                nn.ReLU(inplace=True))
+            )
 
         self.upsample = nn.UpsamplingNearest2d(scale_factor=2)
 
@@ -659,24 +578,47 @@ def divide_feature(in_feature, out_features, min_unit=8):
     return divided_in_features
 
 
-def hyperseg_efficientnet(model_name, pretrained=False, out_feat_scale=0.25, levels=3, weights_path=None, **kwargs):
-    weight_mapper = partial(
-        WeightMapper,
-        levels=levels
-    )
-    backbone = partial(
-        efficientnet,
-        model_name,
-        pretrained=pretrained,
-        out_feat_scale=out_feat_scale,
-        head=None,
-        return_features=True
-    )
-    model = HyperGen(backbone, weight_mapper, **kwargs)
+@HEADS.register_module()
+class HyperSegHead(BaseDecodeHead):
+    """ Hypernetwork generator comprised of a backbone network, weight mapper, and a decoder.
 
-    if weights_path is not None:
-        checkpoint = torch.load(weights_path)
-        state_dict = checkpoint['state_dict']
-        model.load_state_dict(state_dict, strict=True)
+    Args:
+        backbone (nn.Module factory): Backbone network
+        weight_mapper (nn.Module factory): Weight mapper network.
+        in_nc (int): input number of channels.
+        num_classes (int): output number of classes.
+        kernel_sizes (int): the kernel size of the decoder layers.
+        level_layers (int): number of layers in each level of the decoder.
+        level_channels (list of int, optional): If specified, sets the output channels of each level in the decoder.
+        expand_ratio (int): inverted residual block's expansion ratio in the decoder.
+        weight_groups (int, optional): per level signal to weights groups in the decoder.
+        with_out_fc (bool): If True, add a final fully connected layer to the decoder.
+        decoder_groups (int, optional): per level groups in the decoder.
+        decoder_dropout (float): If specified, enables dropout with the given probability.
+        coords_res (list of tuple of int, optional): list of inference resolutions for caching positional embedding.
+        unify_level (int, optional): the starting level to unify the signal to weights operation from.
+    """
 
-    return model
+    def __init__(self, kernel_sizes=3, level_layers=1,
+                 level_channels=None, expand_ratio=1, weight_groups=1,
+                 with_out_fc=False, decoder_groups=1, decoder_dropout=None, coords_res=None,
+                 unify_level=None, weight_levels=3, **kwargs):
+        super().__init__(input_transform='multiple_select', enable_out_seg=False, **kwargs)
+
+        feat_channels = self.in_channels[:-1]
+        self.decoder = MultiScaleDecoder(feat_channels, self.in_channels[-1], self.num_classes,
+                                         kernel_sizes, level_layers, level_channels,
+                                         with_out_fc=with_out_fc, out_kernel_size=1,
+                                         expand_ratio=expand_ratio, groups=decoder_groups,
+                                         weight_groups=weight_groups, dropout=decoder_dropout,
+                                         coords_res=coords_res, unify_level=unify_level)
+        self.weight_mapper = WeightMapper(self.in_channels[-1], self.decoder.param_groups,
+                                          levels=weight_levels)
+
+    def forward(self, inputs):
+        features = self._transform_inputs(inputs)
+
+        dynamic_weights = self.weight_mapper(features[-1])
+        out = self.decoder(features[:-1], dynamic_weights)
+
+        return out
