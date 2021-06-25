@@ -29,12 +29,11 @@ class DFANet(nn.Module):
         backbone_args = dict(fc_channels=self.fc_channels)
 
         self.backbone1 = backbone(backbone_args, conv_cfg=conv_cfg, norm_cfg=norm_cfg, norm_eval=norm_eval)
-        self.backbone1_up = nn.UpsamplingBilinear2d(scale_factor=4)
-
         self.backbone2 = backbone(backbone_args, conv_cfg=conv_cfg, norm_cfg=norm_cfg, norm_eval=norm_eval)
-        self.backbone2_up = nn.UpsamplingBilinear2d(scale_factor=4)
-
         self.backbone3 = backbone(backbone_args, conv_cfg=conv_cfg, norm_cfg=norm_cfg, norm_eval=norm_eval)
+
+        self.backbone1_up = nn.UpsamplingBilinear2d(scale_factor=4)
+        self.backbone2_up = nn.UpsamplingBilinear2d(scale_factor=4)
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone.
