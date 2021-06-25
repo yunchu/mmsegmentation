@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
-from mmcv.cnn import (ConvModule, DepthwiseSeparableConvModule, constant_init,
-                      kaiming_init)
+from mmcv.cnn import ConvModule, DepthwiseSeparableConvModule, constant_init, kaiming_init
+from mmcv.runner import load_checkpoint
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmseg.models.decode_heads.psp_head import PPM
 from mmseg.ops import resize
+from mmseg.utils import get_root_logger
 from ..builder import BACKBONES
 from ..utils.inverted_residual import InvertedResidual
 
@@ -20,10 +21,8 @@ class LearningToDownsample(nn.Module):
         out_channels (int): Number of output channels of the whole
             'learning to downsample' module.
         conv_cfg (dict | None): Config of conv layers. Default: None
-        norm_cfg (dict | None): Config of norm layers. Default:
-            dict(type='BN')
-        act_cfg (dict): Config of activation layers. Default:
-            dict(type='ReLU')
+        norm_cfg (dict | None): Config of norm layers. Default: dict(type='BN')
+        act_cfg (dict): Config of activation layers. Default: dict(type='ReLU')
     """
 
     def __init__(self,
@@ -33,40 +32,46 @@ class LearningToDownsample(nn.Module):
                  conv_cfg=None,
                  norm_cfg=dict(type='BN'),
                  act_cfg=dict(type='ReLU')):
-        super(LearningToDownsample, self).__init__()
+        super().__init__()
+
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
+
         dw_channels1 = dw_channels[0]
         dw_channels2 = dw_channels[1]
 
         self.conv = ConvModule(
             in_channels,
             dw_channels1,
-            3,
+            kernel_size=3,
             stride=2,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg
+        )
         self.dsconv1 = DepthwiseSeparableConvModule(
             dw_channels1,
             dw_channels2,
             kernel_size=3,
             stride=2,
             padding=1,
-            norm_cfg=self.norm_cfg)
+            norm_cfg=self.norm_cfg
+        )
         self.dsconv2 = DepthwiseSeparableConvModule(
             dw_channels2,
             out_channels,
             kernel_size=3,
             stride=2,
             padding=1,
-            norm_cfg=self.norm_cfg)
+            norm_cfg=self.norm_cfg
+        )
 
     def forward(self, x):
         x = self.conv(x)
         x = self.dsconv1(x)
         x = self.dsconv2(x)
+
         return x
 
 
@@ -115,20 +120,35 @@ class GlobalFeatureExtractor(nn.Module):
                  norm_cfg=dict(type='BN'),
                  act_cfg=dict(type='ReLU'),
                  align_corners=False):
-        super(GlobalFeatureExtractor, self).__init__()
+        super().__init__()
+
+        assert len(block_channels) == len(num_blocks) == 3
+
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
-        assert len(block_channels) == len(num_blocks) == 3
-        self.bottleneck1 = self._make_layer(in_channels, block_channels[0],
-                                            num_blocks[0], strides[0],
-                                            expand_ratio)
-        self.bottleneck2 = self._make_layer(block_channels[0],
-                                            block_channels[1], num_blocks[1],
-                                            strides[1], expand_ratio)
-        self.bottleneck3 = self._make_layer(block_channels[1],
-                                            block_channels[2], num_blocks[2],
-                                            strides[2], expand_ratio)
+
+        self.bottleneck1 = self._make_layer(
+            in_channels,
+            block_channels[0],
+            num_blocks[0],
+            strides[0],
+            expand_ratio
+        )
+        self.bottleneck2 = self._make_layer(
+            block_channels[0],
+            block_channels[1],
+            num_blocks[1],
+            strides[1],
+            expand_ratio)
+        self.bottleneck3 = self._make_layer(
+            block_channels[1],
+            block_channels[2],
+            num_blocks[2],
+            strides[2],
+            expand_ratio
+        )
+
         self.ppm = PPM(
             pool_scales,
             block_channels[2],
@@ -136,37 +156,35 @@ class GlobalFeatureExtractor(nn.Module):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=align_corners)
+            align_corners=align_corners
+        )
+
         self.out = ConvModule(
             block_channels[2] * 2,
             out_channels,
             1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg
+        )
 
-    def _make_layer(self,
-                    in_channels,
-                    out_channels,
-                    blocks,
-                    stride=1,
-                    expand_ratio=6):
-        layers = [
-            InvertedResidual(
-                in_channels,
-                out_channels,
-                stride,
-                expand_ratio,
-                norm_cfg=self.norm_cfg)
-        ]
+    def _make_layer(self, in_channels, out_channels, blocks, stride=1, expand_ratio=6):
+        layers = [InvertedResidual(
+            in_channels,
+            out_channels,
+            stride,
+            expand_ratio,
+            norm_cfg=self.norm_cfg
+        )]
         for i in range(1, blocks):
-            layers.append(
-                InvertedResidual(
-                    out_channels,
-                    out_channels,
-                    1,
-                    expand_ratio,
-                    norm_cfg=self.norm_cfg))
+            layers.append(InvertedResidual(
+                out_channels,
+                out_channels,
+                1,
+                expand_ratio,
+                norm_cfg=self.norm_cfg
+            ))
+
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -204,32 +222,38 @@ class FeatureFusionModule(nn.Module):
                  norm_cfg=dict(type='BN'),
                  act_cfg=dict(type='ReLU'),
                  align_corners=False):
-        super(FeatureFusionModule, self).__init__()
+        super().__init__()
+
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
         self.align_corners = align_corners
+
         self.dwconv = ConvModule(
             lower_in_channels,
             out_channels,
-            1,
+            kernel_size=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg
+        )
+
         self.conv_lower_res = ConvModule(
             out_channels,
             out_channels,
-            1,
+            kernel_size=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=None)
+            act_cfg=None
+        )
         self.conv_higher_res = ConvModule(
             higher_in_channels,
             out_channels,
-            1,
+            kernel_size=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=None)
+            act_cfg=None
+        )
         self.relu = nn.ReLU(True)
 
     def forward(self, higher_res_feature, lower_res_feature):
@@ -237,12 +261,14 @@ class FeatureFusionModule(nn.Module):
             lower_res_feature,
             size=higher_res_feature.size()[2:],
             mode='bilinear',
-            align_corners=self.align_corners)
+            align_corners=self.align_corners
+        )
         lower_res_feature = self.dwconv(lower_res_feature)
         lower_res_feature = self.conv_lower_res(lower_res_feature)
 
         higher_res_feature = self.conv_higher_res(higher_res_feature)
         out = higher_res_feature + lower_res_feature
+
         return self.relu(out)
 
 
@@ -332,13 +358,15 @@ class FastSCNN(nn.Module):
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
         self.align_corners = align_corners
+
         self.learning_to_downsample = LearningToDownsample(
             in_channels,
             downsample_dw_channels,
             global_in_channels,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg
+        )
         self.global_feature_extractor = GlobalFeatureExtractor(
             global_in_channels,
             global_block_channels,
@@ -347,7 +375,8 @@ class FastSCNN(nn.Module):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
+            align_corners=self.align_corners
+        )
         self.feature_fusion = FeatureFusionModule(
             higher_in_channels,
             lower_in_channels,
@@ -355,21 +384,26 @@ class FastSCNN(nn.Module):
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
-            align_corners=self.align_corners)
+            align_corners=self.align_corners
+        )
 
     def init_weights(self, pretrained=None):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                kaiming_init(m)
-            elif isinstance(m, (_BatchNorm, nn.GroupNorm)):
-                constant_init(m, 1)
+        if isinstance(pretrained, str):
+            logger = get_root_logger()
+            load_checkpoint(self, pretrained, strict=False, logger=logger)
+        elif pretrained is None:
+            for m in self.modules():
+                if isinstance(m, nn.Conv2d):
+                    kaiming_init(m)
+                elif isinstance(m, (_BatchNorm, nn.GroupNorm)):
+                    constant_init(m, 1)
 
     def forward(self, x):
         higher_res_features = self.learning_to_downsample(x)
         lower_res_features = self.global_feature_extractor(higher_res_features)
-        fusion_output = self.feature_fusion(higher_res_features,
-                                            lower_res_features)
+        fusion_output = self.feature_fusion(higher_res_features, lower_res_features)
 
         outs = [higher_res_features, lower_res_features, fusion_output]
         outs = [outs[i] for i in self.out_indices]
+
         return tuple(outs)
