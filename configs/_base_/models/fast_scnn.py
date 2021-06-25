@@ -28,7 +28,7 @@ model = dict(
         loss_decode=dict(
             type='CrossEntropyLoss',
             use_sigmoid=True,
-            loss_weight=0.4
+            loss_weight=20
         )
     ),
     # auxiliary_head=[
