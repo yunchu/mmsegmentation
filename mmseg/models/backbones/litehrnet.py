@@ -424,23 +424,22 @@ class ShuffleUnit(nn.Module):
                 norm_cfg=norm_cfg,
                 act_cfg=act_cfg))
 
-    def forward(self, x):
-
-        def _inner_forward(x):
-            if self.stride > 1:
-                out = torch.cat((self.branch1(x), self.branch2(x)), dim=1)
-            else:
-                x1, x2 = x.chunk(2, dim=1)
-                out = torch.cat((x1, self.branch2(x2)), dim=1)
-
-            out = channel_shuffle(out, 2)
-
-            return out
-
-        if self.with_cp and x.requires_grad:
-            out = cp.checkpoint(_inner_forward, x)
+    def _inner_forward(self, x):
+        if self.stride > 1:
+            out = torch.cat((self.branch1(x), self.branch2(x)), dim=1)
         else:
-            out = _inner_forward(x)
+            x1, x2 = x.chunk(2, dim=1)
+            out = torch.cat((x1, self.branch2(x2)), dim=1)
+
+        out = channel_shuffle(out, 2)
+
+        return out
+
+    def forward(self, x):
+        if self.with_cp and x.requires_grad:
+            out = cp.checkpoint(self._inner_forward, x)
+        else:
+            out = self._inner_forward(x)
 
         return out
 
