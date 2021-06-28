@@ -1,4 +1,14 @@
+import glob
+import os
 from setuptools import find_packages, setup
+
+
+try:
+    from torch.utils.cpp_extension import CppExtension, BuildExtension
+    cmd_class = {'build_ext': BuildExtension}
+except ModuleNotFoundError:
+    cmd_class = {}
+    print('Skip building ext ops due to the absence of torch.')
 
 
 def readme():
@@ -92,6 +102,29 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     return packages
 
 
+def get_extensions():
+    extensions = []
+
+    ext_name = 'mmseg._mpl'
+
+    # prevent ninja from using too many resources
+    os.environ.setdefault('MAX_JOBS', '4')
+    extra_compile_args = {'cxx': []}
+
+    print(f'Compiling {ext_name} without CUDA')
+    op_files = glob.glob('./mmseg/ops/csrc/*.cpp')
+    include_path = os.path.abspath('./mmseg/ops/csrc')
+    ext_ops = CppExtension(
+        name=ext_name,
+        sources=op_files,
+        include_dirs=[include_path],
+        define_macros=[],
+        extra_compile_args=extra_compile_args)
+    extensions.append(ext_ops)
+
+    return extensions
+
+
 if __name__ == '__main__':
     setup(
         name='mmsegmentation',
@@ -123,5 +156,6 @@ if __name__ == '__main__':
             'build': parse_requirements('requirements/build.txt'),
             'optional': parse_requirements('requirements/optional.txt'),
         },
-        ext_modules=[],
+        ext_modules=get_extensions(),
+        cmdclass=cmd_class,
         zip_safe=False)
