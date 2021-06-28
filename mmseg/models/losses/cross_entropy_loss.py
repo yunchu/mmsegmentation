@@ -21,13 +21,19 @@ def cross_entropy(pred,
         label,
         weight=class_weight,
         reduction='none',
-        ignore_index=ignore_index)
+        ignore_index=ignore_index
+    )
 
     # apply weights and do the reduction
     if weight is not None:
         weight = weight.float()
+
     loss = weight_reduce_loss(
-        loss, weight=weight, reduction=reduction, avg_factor=avg_factor)
+        loss,
+        weight=weight,
+        reduction=reduction,
+        avg_factor=avg_factor
+    )
 
     return loss
 
@@ -157,8 +163,10 @@ class CrossEntropyLoss(nn.Module):
                  reduction='mean',
                  class_weight=None,
                  loss_weight=1.0):
-        super(CrossEntropyLoss, self).__init__()
         assert (use_sigmoid is False) or (use_mask is False)
+
+        super(CrossEntropyLoss, self).__init__()
+
         self.use_sigmoid = use_sigmoid
         self.use_mask = use_mask
         self.reduction = reduction
@@ -181,12 +189,13 @@ class CrossEntropyLoss(nn.Module):
                 **kwargs):
         """Forward function."""
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (
-            reduction_override if reduction_override else self.reduction)
+        reduction = (reduction_override if reduction_override else self.reduction)
+
         if self.class_weight is not None:
             class_weight = cls_score.new_tensor(self.class_weight)
         else:
             class_weight = None
+
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score,
             label,
@@ -194,5 +203,7 @@ class CrossEntropyLoss(nn.Module):
             class_weight=class_weight,
             reduction=reduction,
             avg_factor=avg_factor,
-            **kwargs)
+            **kwargs
+        )
+
         return loss_cls

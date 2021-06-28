@@ -23,6 +23,7 @@ def lovasz_grad(gt_sorted):
     jaccard = 1. - intersection / union
     if p > 1:  # cover 1-pixel case
         jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
+
     return jaccard
 
 

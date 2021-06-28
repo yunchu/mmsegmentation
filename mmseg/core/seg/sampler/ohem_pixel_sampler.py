@@ -21,9 +21,11 @@ class OHEMPixelSampler(BasePixelSampler):
     """
 
     def __init__(self, context, thresh=None, min_kept=100000):
-        super(OHEMPixelSampler, self).__init__()
-        self.context = context
         assert min_kept > 1
+
+        super(OHEMPixelSampler, self).__init__()
+
+        self.context = context
         self.thresh = thresh
         self.min_kept = min_kept
 
@@ -37,14 +39,17 @@ class OHEMPixelSampler(BasePixelSampler):
         Returns:
             torch.Tensor: segmentation weight, shape (N, H, W)
         """
+
         with torch.no_grad():
             assert seg_logit.shape[2:] == seg_label.shape[2:]
             assert seg_label.shape[1] == 1
+
             seg_label = seg_label.squeeze(1).long()
             batch_kept = self.min_kept * seg_label.size(0)
             valid_mask = seg_label != self.context.ignore_index
             seg_weight = seg_logit.new_zeros(size=seg_label.size())
             valid_seg_weight = seg_weight[valid_mask]
+
             if self.thresh is not None:
                 seg_prob = F.softmax(seg_logit, dim=1)
 
@@ -54,11 +59,11 @@ class OHEMPixelSampler(BasePixelSampler):
                 sort_prob, sort_indices = seg_prob[valid_mask].sort()
 
                 if sort_prob.numel() > 0:
-                    min_threshold = sort_prob[min(batch_kept,
-                                                  sort_prob.numel() - 1)]
+                    min_threshold = sort_prob[min(batch_kept, sort_prob.numel() - 1)]
                 else:
                     min_threshold = 0.0
                 threshold = max(min_threshold, self.thresh)
+
                 valid_seg_weight[seg_prob[valid_mask] < threshold] = 1.
             else:
                 losses = self.context.loss_decode(
@@ -66,7 +71,9 @@ class OHEMPixelSampler(BasePixelSampler):
                     seg_label,
                     weight=None,
                     ignore_index=self.context.ignore_index,
-                    reduction_override='none')
+                    reduction_override='none'
+                )
+
                 # faster than topk according to https://github.com/pytorch/pytorch/issues/22812  # noqa
                 _, sort_indices = losses[valid_mask].sort(descending=True)
                 valid_seg_weight[sort_indices[:batch_kept]] = 1.

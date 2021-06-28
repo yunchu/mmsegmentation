@@ -5,7 +5,10 @@ model = dict(
         depth=101,
         dilations=(1, 1, 1, 2),
         strides=(1, 2, 2, 1),
-        multi_grid=(1, 2, 4)),
+        multi_grid=(1, 2, 4)
+    ),
     decode_head=dict(
         dilations=(1, 6, 12, 18),
-        sampler=dict(type='OHEMPixelSampler', min_kept=100000)))
+        sampler=dict(type='OHEMPixelSampler', min_kept=100000)
+    )
+)

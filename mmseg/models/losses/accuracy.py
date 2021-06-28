@@ -20,6 +20,7 @@ def accuracy(pred, target, topk=1, thresh=None):
             function will return a tuple containing accuracies of
             each ``topk`` number.
     """
+
     assert isinstance(topk, (int, tuple))
     if isinstance(topk, int):
         topk = (topk, )
@@ -33,8 +34,8 @@ def accuracy(pred, target, topk=1, thresh=None):
         return accu[0] if return_single else accu
     assert pred.ndim == target.ndim + 1
     assert pred.size(0) == target.size(0)
-    assert maxk <= pred.size(1), \
-        f'maxk {maxk} exceeds pred dimension {pred.size(1)}'
+    assert maxk <= pred.size(1), f'maxk {maxk} exceeds pred dimension {pred.size(1)}'
+
     pred_value, pred_label = pred.topk(maxk, dim=1)
     # transpose to shape (maxk, N, ...)
     pred_label = pred_label.transpose(0, 1)
@@ -42,10 +43,12 @@ def accuracy(pred, target, topk=1, thresh=None):
     if thresh is not None:
         # Only prediction values larger than thresh are counted as correct
         correct = correct & (pred_value > thresh).t()
+
     res = []
     for k in topk:
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / target.numel()))
+
     return res[0] if return_single else res
 
 
@@ -62,6 +65,7 @@ class Accuracy(nn.Module):
                 under this threshold are considered incorrect. Default to None.
         """
         super().__init__()
+
         self.topk = topk
         self.thresh = thresh
 
