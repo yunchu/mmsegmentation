@@ -24,7 +24,10 @@ void compute_weights(int size,
     // Algorithm #1
     int n = size - pos;
     int m = int(ratio * n);
-    if (n <= 0 || m <= 0) return;
+    if (n <= 0 || m <= 0) {
+        return;
+    }
+
     float q = p / (p - 1.0);
     int c = m - n + 1;
     float a[2] = {0.0};

@@ -42,18 +42,20 @@ class MaxPoolingPixelSampler(BasePixelSampler):
                 reduction_override='none'
             )
 
-            sort_losses, sort_indices = losses[valid_mask].sort()
+            losses = losses.view(-1)
+            sort_losses, sort_indices = losses[valid_mask.view(-1)].sort()
 
-            weights = torch.zeros(sort_losses.size(0))
+            weights = torch.zeros(sort_losses.size())
             ext_module.compute_weights(
                 sort_losses.size(0),
                 sort_losses.cpu(),
                 sort_indices.cpu(),
-                weights,
+                weights.cpu(),
                 self.ratio,
                 self.p
             )
 
-            seg_weight[valid_mask] = weights.to(seg_logit.device)
+            scale = float(sort_losses.size(0))
+            seg_weight[valid_mask] = scale * weights.to(seg_logit.device)
 
             return seg_weight
