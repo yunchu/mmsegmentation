@@ -33,8 +33,8 @@ class CustomcosLrUpdaterHook(BaseLrUpdaterHook):
         self.iter_cumulative_periods = None
         self.max_iters = None
 
-    def before_train_epoch(self, runner):
-        super(CustomcosLrUpdaterHook, self).before_train_epoch(runner)
+    def _init_states(self, runner):
+        super(CustomcosLrUpdaterHook, self)._init_states(runner)
 
         if self.by_epoch:
             self.iter_periods = [

@@ -37,6 +37,7 @@ class BaseLrUpdaterHook(Hook, metaclass=ABCMeta):
 
         self.base_lr = []
         self.epoch_len = None
+        self.need_update = True
 
     @staticmethod
     def _set_lr(runner, lr_groups):
@@ -127,13 +128,17 @@ class BaseLrUpdaterHook(Hook, metaclass=ABCMeta):
                 group['initial_lr'] for group in runner.optimizer.param_groups
             ]
 
-    def before_train_epoch(self, runner):
+    def _init_states(self, runner):
         if self.by_epoch:
             self.epoch_len = len(runner.data_loader)
             self.fixed_iters = self.fixed_iters * self.epoch_len
             self.warmup_iters = self.warmup_iters * self.epoch_len
 
     def before_train_iter(self, runner):
+        if self.need_update:
+            self._init_states(runner)
+            self.need_update = False
+
         cur_iter = runner.iter
         regular_lr = self.get_regular_lr(runner)
 
