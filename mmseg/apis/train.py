@@ -5,10 +5,12 @@ import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import build_optimizer, build_runner
+from mmcv.runner.hooks import EMAHook
 
-from mmseg.core import DistEvalHook, EvalHook
+from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.utils import get_root_logger
+from mmseg.models import build_params_manager
 
 
 def set_random_seed(seed, deterministic=False):
@@ -87,10 +89,23 @@ def train_segmentor(model,
             logger=logger,
             meta=meta))
 
+    if distributed and 'type' not in cfg.optimizer_config:
+        optimizer_config = DistOptimizerHook(**cfg.optimizer_config)
+    else:
+        optimizer_config = cfg.optimizer_config
+
+    ema_cfg = cfg.get('ema_config', None)
+    if ema_cfg:
+        runner.register_hook(EMAHook(**ema_cfg))
+
     # register hooks
-    runner.register_training_hooks(cfg.lr_config, cfg.optimizer_config,
+    runner.register_training_hooks(cfg.lr_config, optimizer_config,
                                    cfg.checkpoint_config, cfg.log_config,
                                    cfg.get('momentum_config', None))
+
+    params_manager_cfg = cfg.get('params_config', None)
+    if params_manager_cfg is not None:
+        runner.register_hook(build_params_manager(params_manager_cfg))
 
     # an ugly walkaround to make the .log and .log.json filenames the same
     runner.timestamp = timestamp

@@ -10,6 +10,7 @@ NECKS = MODELS
 HEADS = MODELS
 LOSSES = MODELS
 SEGMENTORS = MODELS
+PARAMS_MANAGERS = MODELS
 
 
 def build_backbone(cfg):
@@ -44,3 +45,7 @@ def build_segmentor(cfg, train_cfg=None, test_cfg=None):
         'test_cfg specified in both outer field and model field '
     return SEGMENTORS.build(
         cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
+
+
+def build_params_manager(cfg):
+    return PARAMS_MANAGERS.build(cfg)
