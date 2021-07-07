@@ -1,17 +1,17 @@
 # optimizer
 optimizer = dict(
     type='SGD',
-    lr=0.01,
+    lr=1e-3,
     momentum=0.9,
     weight_decay=0.0005
 )
 optimizer_config = dict(
     grad_clip=dict(
-        method='adaptive',
-        clip=0.2,
-        # method='default',
-        # max_norm=40,
-        # norm_type=2
+        # method='adaptive',
+        # clip=0.2,
+        method='default',
+        max_norm=40,
+        norm_type=2
     )
 )
 
@@ -28,14 +28,14 @@ lr_config = dict(
     policy='customcos',
     by_epoch=False,
     periods=[156000],
-    min_lr_ratio=1e-4,
+    min_lr_ratio=1e-3,
     alpha=1.5,
     # fixed='constant',
     # fixed_iters=5,
     # fixed_ratio=10.0,
     warmup='cos',
     warmup_iters=4000,
-    warmup_ratio=1e-4,
+    warmup_ratio=1e-3,
 )
 
 # runtime settings
