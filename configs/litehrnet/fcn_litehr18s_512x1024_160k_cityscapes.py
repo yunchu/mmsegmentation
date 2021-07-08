@@ -1,8 +1,10 @@
-# model settings
+_base_ = [
+    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/cityscapes.py',
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_cos_160k.py'
+]
+
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
-    type='EncoderDecoder',
-    pretrained=None,
     backbone=dict(
         type='LiteHRNet',
         norm_cfg=norm_cfg,
@@ -12,7 +14,7 @@ model = dict(
                 stem_channels=32,
                 out_channels=32,
                 expand_ratio=1,
-                extra_stride=False
+                extra_stride=True
             ),
             num_stages=3,
             stages_spec=dict(
@@ -46,13 +48,11 @@ model = dict(
         num_classes=19,
         norm_cfg=norm_cfg,
         align_corners=False,
+        sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         loss_decode=dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,
             loss_weight=1.0
         )
     ),
-    # model training and testing settings
-    train_cfg=dict(),
-    test_cfg=dict(mode='whole')
 )

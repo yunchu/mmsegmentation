@@ -173,7 +173,8 @@ class Stem(nn.Module):
                  expand_ratio,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN'),
-                 with_cp=False):
+                 with_cp=False,
+                 extra_stride=False):
         super().__init__()
 
         self.in_channels = in_channels
@@ -192,6 +193,19 @@ class Stem(nn.Module):
             norm_cfg=self.norm_cfg,
             act_cfg=dict(type='ReLU')
         )
+
+        self.conv2 = None
+        if extra_stride:
+            self.conv2 = ConvModule(
+                in_channels=stem_channels,
+                out_channels=stem_channels,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                conv_cfg=self.conv_cfg,
+                norm_cfg=self.norm_cfg,
+                act_cfg=dict(type='ReLU')
+            )
 
         mid_channels = int(round(stem_channels * expand_ratio))
         branch_channels = stem_channels // 2
@@ -257,6 +271,9 @@ class Stem(nn.Module):
 
     def _inner_forward(self, x):
         x = self.conv1(x)
+        if self.conv2 is not None:
+            x = self.conv2(x)
+
         x1, x2 = x.chunk(2, dim=1)
 
         x1 = self.branch1(x1)
@@ -703,6 +720,7 @@ class LiteHRNet(nn.Module):
             stem_channels=self.extra['stem']['stem_channels'],
             out_channels=self.extra['stem']['out_channels'],
             expand_ratio=self.extra['stem']['expand_ratio'],
+            extra_stride=self.extra['stem']['extra_stride'],
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg
         )

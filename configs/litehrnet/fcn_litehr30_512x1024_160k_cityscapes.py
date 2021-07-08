@@ -1,11 +1,13 @@
 _base_ = './fcn_litehr18_512x1024_160k_cityscapes.py'
+
 model = dict(
     backbone=dict(
         extra=dict(
             stem=dict(
                 stem_channels=32,
                 out_channels=32,
-                expand_ratio=1
+                expand_ratio=1,
+                extra_stride=False
             ),
             num_stages=3,
             stages_spec=dict(
