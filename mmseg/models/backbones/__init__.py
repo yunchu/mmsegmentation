@@ -18,6 +18,7 @@ from .bisenet_v2 import BiSeNetV2
 from .shelfnet import ShelfNet
 from .efficientnet import EfficientNet
 from .cabinet import CABiNet
+from .stdcnet import STDCNet
 
 __all__ = [
     'ResNet',
@@ -42,4 +43,5 @@ __all__ = [
     'ShelfNet',
     'EfficientNet',
     'CABiNet',
+    'STDCNet',
 ]
