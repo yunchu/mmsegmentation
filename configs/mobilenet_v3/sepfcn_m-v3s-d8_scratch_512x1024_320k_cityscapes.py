@@ -1,13 +1,17 @@
-_base_ = [
-    '../_base_/models/cabinet.py', '../_base_/datasets/cityscapes.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_cos_160k.py'
-]
+_base_ = './lraspp_m-v3-d8_scratch_512x1024_320k_cityscapes.py'
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
+    type='EncoderDecoder',
+    backbone=dict(
+        type='MobileNetV3',
+        arch='small',
+        out_indices=(12,),
+        norm_cfg=norm_cfg
+    ),
     decode_head=dict(
         type='DepthwiseSeparableFCNHead',
-        in_channels=128,
+        in_channels=576,
         channels=128,
         num_convs=1,
         concat_input=False,
