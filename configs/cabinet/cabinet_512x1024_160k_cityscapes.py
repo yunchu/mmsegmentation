@@ -14,6 +14,7 @@ model = dict(
         in_index=-1,
         norm_cfg=norm_cfg,
         align_corners=False,
+        input_transform=None,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         loss_decode=dict(
             type='CrossEntropyLoss',
