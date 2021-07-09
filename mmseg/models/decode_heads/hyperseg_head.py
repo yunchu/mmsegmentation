@@ -210,7 +210,8 @@ def init_signal2weights(model, signal_features, signal_index=0, weight_groups=1)
 
 class WeightLayer(nn.Module):
     def __init__(self, target_params):
-        super(WeightLayer, self).__init__()
+        super().__init__()
+
         self.target_params = target_params
         self.signal_channels = None
         self.signal_index = None
@@ -225,6 +226,7 @@ class WeightLayer(nn.Module):
     def apply_signal2weights(self, s):
         if self.signal2weights is None:
             return s
+
         w = self.signal2weights(s[:, self.signal_index:self.signal_index + self.signal_channels])[:, :self.target_params]
 
         return w
@@ -236,7 +238,8 @@ class WeightLayer(nn.Module):
 class HyperPatchInvertedResidual(nn.Module):
     def __init__(self, in_nc, out_nc, kernel_size=3, stride=1, expand_ratio=1, norm_layer=nn.BatchNorm2d,
                  act_layer=nn.ReLU6(inplace=True), padding_mode='reflect'):
-        super(HyperPatchInvertedResidual, self).__init__()
+        super().__init__()
+
         self.stride = stride
         assert stride in [1, 2]
 
@@ -248,6 +251,7 @@ class HyperPatchInvertedResidual(nn.Module):
         self.kernel_size = _pair(kernel_size)
         self.hidden_dim = int(round(in_nc * expand_ratio))
         self.use_res_connect = self.stride == 1 and in_nc == out_nc
+
         self.act_layer = act_layer
         self.bn1 = norm_layer(self.hidden_dim)
         self.bn2 = norm_layer(self.hidden_dim)
@@ -265,16 +269,13 @@ class HyperPatchInvertedResidual(nn.Module):
 
     def conv(self, x, weight):
         b, c, h, w = x.shape
-        # assert b == 1
+
         fh, fw = weight.shape[-2:]
         ph, pw = x.shape[-2] // fh, x.shape[-1] // fw
         kh, kw = ph + self.padding[0] * 2, pw + self.padding[1] * 2
 
         if self.padding_mode != 'zeros' and np.any(self._padding_repeated_twice):
             x = F.pad(x, self._padding_repeated_twice, mode=self.padding_mode)
-            padding = _pair(0)
-        else:
-            padding = self.padding
 
         x = x.permute(0, 2, 3, 1).unfold(1, kh, ph).unfold(2, kw, pw).reshape(1, -1, kh, kw)
 
@@ -284,21 +285,23 @@ class HyperPatchInvertedResidual(nn.Module):
             weight = weight.permute(0, 2, 3, 1).reshape(-1, weight.shape[1])
 
         # Conv1
-        weight1 = weight[:, self._ranges[0]:self._ranges[1]].reshape(b * fh * fw * self.hidden_dim, self.in_nc, 1, 1)
+        weight1 = weight[:, self._ranges[0]:self._ranges[1]]
+        weight1 = weight1.reshape(b * fh * fw * self.hidden_dim, self.in_nc, 1, 1)
         x = F.conv2d(x, weight1, bias=None, groups=b * fh * fw)
         x = self.bn1(x.view(b * fh * fw, -1, kh, kw)).view(1, -1, kh, kw)
         x = self.act_layer(x)
-        # x = self.act_layer(self.bn1(F.conv2d(x, weight1, bias=None, groups=b * fh * fw)))
 
         # Conv2
-        weight2 = weight[:, self._ranges[1]:self._ranges[2]].reshape(b * fh * fw * self.hidden_dim, 1,
-                                                                     *self.kernel_size)
+
+        weight2 = weight[:, self._ranges[1]:self._ranges[2]]
+        weight2 = weight2.reshape(b * fh * fw * self.hidden_dim, 1, *self.kernel_size)
         x = F.conv2d(x, weight2, bias=None, stride=self.stride, groups=b * fh * fw * self.hidden_dim)
         x = self.bn2(x.view(b * fh * fw, -1, ph, pw)).view(1, -1, ph, pw)
         x = self.act_layer(x)
 
         # Conv3
-        weight3 = weight[:, self._ranges[2]:self._ranges[3]].reshape(b * fh * fw * self.out_nc, self.hidden_dim, 1, 1)
+        weight3 = weight[:, self._ranges[2]:self._ranges[3]]
+        weight3 = weight3.reshape(b * fh * fw * self.out_nc, self.hidden_dim, 1, 1)
         x = F.conv2d(x, weight3, bias=None, groups=b * fh * fw)
         x = self.bn3(x.view(b * fh * fw, -1, ph, pw))
 
@@ -307,10 +310,12 @@ class HyperPatchInvertedResidual(nn.Module):
         return x
 
     def forward(self, x, s):
+        y = self.conv(x, s)
+
         if self.use_res_connect:
-            return x + self.conv(x, s)
+            return x + y
         else:
-            return self.conv(x, s)
+            return y
 
 
 class WeightMapper(nn.Module):
@@ -323,8 +328,9 @@ class WeightMapper(nn.Module):
         bias (bool): if True, enables bias in all convolution operations.
         weight_groups (int): legacy parameter, no longer used.
     """
+
     def __init__(self, in_channels, out_channels, levels=3, bias=False, weight_groups=1):
-        super(WeightMapper, self).__init__()
+        super().__init__()
 
         assert levels > 0, 'levels must be greater than zero'
         assert in_channels % 2 == 0, 'in_channels must be divisible by 2'
@@ -338,16 +344,16 @@ class WeightMapper(nn.Module):
         self.bias = bias
         self.weight_groups = weight_groups
 
-        # Add blocks
-        self.down_blocks = nn.ModuleList()
-        self.up_blocks = nn.ModuleList()
-
         self.in_conv = nn.Sequential(
             nn.Conv2d(in_channels, in_channels // 2, kernel_size=1, stride=1, bias=bias),
             nn.BatchNorm2d(in_channels // 2),
             nn.ReLU(inplace=True)
         )
 
+        # Add blocks
+        self.down_blocks = nn.ModuleList()
+        self.up_blocks = nn.ModuleList()
+        self.upsample_blocks = nn.ModuleList()
         for level in range(self.levels - 1):
             self.down_blocks.append(nn.Sequential(
                 nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2, bias=bias),
@@ -359,8 +365,7 @@ class WeightMapper(nn.Module):
                 nn.BatchNorm2d(in_channels // 2),
                 nn.ReLU(inplace=True))
             )
-
-        self.upsample = nn.UpsamplingNearest2d(scale_factor=2)
+            self.upsample_blocks.append(nn.UpsamplingNearest2d(scale_factor=2))
 
     def forward(self, x):
         x = self.in_conv(x)
@@ -380,7 +385,7 @@ class WeightMapper(nn.Module):
         for level in range(self.levels - 2, -1, -1):
             x = torch.cat((feat.pop(-1), x), dim=1)
             x = self.up_blocks[level](x)
-            x = self.upsample(x)
+            x = self.upsample_blocks[level](x)
 
         # Output head
         x = torch.cat((feat.pop(-1), x), dim=1)
@@ -394,11 +399,13 @@ def next_multiply(x, base):
 
 class HyperPatchNoPadding(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1):
-        super(HyperPatchNoPadding, self).__init__()
+        super().__init__()
+
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
         if out_channels % groups != 0:
             raise ValueError('out_channels must be divisible by groups')
+
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = _pair(kernel_size)
@@ -412,8 +419,9 @@ class HyperPatchNoPadding(nn.Module):
         fh, fw = weight.shape[-2:]
         ph, pw = x.shape[-2] // fh, x.shape[-1] // fw
 
-        weight = weight.permute(0, 2, 3, 1).reshape(
-            b * fh * fw * self.out_channels, self.in_channels // self.groups, *self.kernel_size)
+        weight = weight.permute(0, 2, 3, 1)
+        weight = weight.reshape(b * fh * fw * self.out_channels, self.in_channels // self.groups, *self.kernel_size)
+
         x = x.view(b, c, fh, ph, fw, pw).permute(0, 2, 4, 1, 3, 5).reshape(1, -1, ph, pw)
         x = F.conv2d(x, weight, bias=None, stride=self.stride, dilation=self.dilation, groups=b * fh * fw * self.groups)
         x = x.view(b, fh, fw, -1, ph, pw).permute(0, 3, 1, 4, 2, 5).reshape(b, -1, h, w)
@@ -423,7 +431,8 @@ class HyperPatchNoPadding(nn.Module):
 
 class HyperPatch(nn.Module):
     def __init__(self, module: nn.Module, padding=0, padding_mode='reflect'):
-        super(HyperPatch, self).__init__()
+        super().__init__()
+
         valid_padding_modes = {'zeros', 'reflect', 'replicate', 'circular'}
         if padding_mode not in valid_padding_modes:
             raise ValueError(
@@ -443,10 +452,13 @@ class HyperPatch(nn.Module):
         fh, fw = weight.shape[-2:]
         ph, pw = x.shape[-2] // fh, x.shape[-1] // fw
         kh, kw = ph + self.padding[0] * 2, pw + self.padding[1] * 2
+
         weight = weight.permute(0, 2, 3, 1).reshape(-1, weight.shape[1]).contiguous()
+
         x = F.pad(x, self._padding_repeated_twice, mode=self.padding_mode)
         x = torch.nn.functional.unfold(x, (kh, kw), stride=(ph, pw))  # B x (C x (ph x pw)) x (fh * fw)
         x = x.transpose(1, 2).reshape(-1, c, kh, kw).contiguous()
+
         x = self.hyper_module(x, weight)
         x = x.view(b, fh * fw, -1, ph * pw).permute(0, 2, 3, 1).reshape(b, -1, fh * fw)
         x = F.fold(x, (h, w), kernel_size=(ph, pw), stride=(ph, pw))
@@ -458,7 +470,7 @@ class HyperPatchConv2d(HyperPatch):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1,
                  padding_mode='reflect'):
         conv = MetaConv2d(in_channels, out_channels, kernel_size, stride, 0, dilation, groups)
-        super(HyperPatchConv2d, self).__init__(conv, padding, padding_mode)
+        super().__init__(conv, padding, padding_mode)
 
     @property
     def in_channels(self):
@@ -487,9 +499,11 @@ class HyperPatchConv2d(HyperPatch):
         if self.padding_mode != 'zeros':
             s += ', padding_mode={padding_mode}'
         s += ')'
+
         d = {**self.hyper_module.__dict__}
         d['padding'] = self.padding
         d['padding_mode'] = self.padding_mode
+
         return s.format(**d)
 
 
@@ -512,16 +526,21 @@ def make_hyper_patch_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, paddin
         act_layer (nn.Module): Type of activation layer
         dropout (float): If specified, enables dropout with the given probability
     """
+
     assert dropout is None or isinstance(dropout, float)
+
     padding = kernel_size // 2 if padding is None else padding
     if padding == 0:
         layers = [HyperPatchNoPadding(in_nc, out_nc, kernel_size, stride, dilation, groups)]
     else:
         layers = [HyperPatchConv2d(in_nc, out_nc, kernel_size, stride, padding, dilation, groups, padding_mode)]
+
     if norm_layer is not None:
         layers.append(norm_layer(out_nc))
+
     if act_layer is not None:
         layers.append(act_layer)
+
     if dropout is not None:
         layers.append(nn.Dropout(dropout))
 
@@ -544,7 +563,9 @@ def divide_feature(in_feature, out_features, min_unit=8):
     Returns:
         np.array: array of integers of the divided input feature in the size of out_features.
     """
+
     assert in_feature % min_unit == 0, f'in_feature ({in_feature}) must be divisible by min_unit ({min_unit})'
+
     units = in_feature // min_unit
     indices = np.argsort(out_features)
     out_features_sorted = np.array(out_features)[indices]
