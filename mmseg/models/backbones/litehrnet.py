@@ -11,7 +11,7 @@ from mmcv.runner import load_checkpoint
 from mmcv.utils.parrots_wrapper import _BatchNorm
 
 from mmseg.utils import get_root_logger
-from mmseg.models.utils import channel_shuffle
+from mmseg.models.utils import channel_shuffle, LocalAttentionModule, AsymmetricPositionAttentionModule
 from ..builder import BACKBONES
 from .resnet import BasicBlock, Bottleneck
 
@@ -316,6 +316,7 @@ class IterativeAggregator(nn.Module):
                 kernel_size=3,
                 stride=1,
                 padding=1,
+                conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
                 act_cfg=dict(type='ReLU'),
                 dw_act_cfg=None,
@@ -745,9 +746,46 @@ class LiteHRNet(nn.Module):
             )
             setattr(self, 'stage{}'.format(i), stage)
 
-        self.with_head = self.extra['out_aggregator'] and self.extra['out_aggregator']['enable']
-        if self.with_head:
-            self.head_layer = IterativeAggregator(
+        self.out_modules = None
+        if self.extra.get('out_modules') is not None:
+            out_modules = []
+            in_modules_channels, out_modules_channels = num_channels_last[-1], None
+            if self.extra['out_modules']['conv']['enable']:
+                out_modules_channels = self.extra['out_modules']['conv']['channels']
+                out_modules.append(ConvModule(
+                    in_channels=in_modules_channels,
+                    out_channels=out_modules_channels,
+                    kernel_size=1,
+                    stride=1,
+                    padding=1,
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg,
+                    act_cfg=dict(type='ReLU')
+                ))
+                in_modules_channels = out_modules_channels
+            if self.extra['out_modules']['position_att']['enable']:
+                out_modules.append(AsymmetricPositionAttentionModule(
+                    in_channels=in_modules_channels,
+                    key_channels=self.extra['out_modules']['position_att']['key_channels'],
+                    value_channels=self.extra['out_modules']['position_att']['value_channels'],
+                    psp_size=self.extra['out_modules']['position_att']['psp_size'],
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg,
+                ))
+            if self.extra['out_modules']['local_att']['enable']:
+                out_modules.append(LocalAttentionModule(
+                    num_channels=in_modules_channels,
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg,
+                ))
+
+            if len(out_modules) > 0:
+                self.out_modules = nn.Sequential(*out_modules)
+                num_channels_last.append(in_modules_channels)
+
+        self.with_aggregator = self.extra['out_aggregator'] and self.extra['out_aggregator']['enable']
+        if self.with_aggregator:
+            self.aggregator = IterativeAggregator(
                 in_channels=num_channels_last,
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg
@@ -908,9 +946,15 @@ class LiteHRNet(nn.Module):
             stage_module = getattr(self, 'stage{}'.format(i))
             y_list = stage_module(x_list)
 
+        if self.out_modules is not None:
+            y_list.append(self.out_modules(y_list[-1]))
+
         out = y_list
-        if self.with_head:
-            out = self.head_layer(out)
+        if self.with_aggregator:
+            out = self.aggregator(out)
+
+        if self.extra.get('add_input', False):
+            y_list = [x] + y_list
 
         return out
 

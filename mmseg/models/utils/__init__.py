@@ -9,6 +9,9 @@ from .weight_init import trunc_normal_
 from .channel_shuffle import channel_shuffle
 from .meta_sequential import MetaSequential
 from .meta_conv import MetaConv2d
+from .local_attention import LocalAttentionModule
+from .psp_layer import PSPModule
+from .asymmetric_position_attention import AsymmetricPositionAttentionModule
 
 __all__ = [
     'ResLayer',
@@ -23,4 +26,7 @@ __all__ = [
     'channel_shuffle',
     'MetaSequential',
     'MetaConv2d',
+    'LocalAttentionModule',
+    'PSPModule',
+    'AsymmetricPositionAttentionModule',
 ]

@@ -8,6 +8,7 @@ from mmcv.runner import load_checkpoint
 from mmcv.utils.parrots_wrapper import _BatchNorm
 
 from mmseg.utils import get_root_logger
+from mmseg.models.utils import LocalAttentionModule, PSPModule
 from ..builder import BACKBONES
 from .mobilenet_v3 import MobileNetV3
 
@@ -75,90 +76,6 @@ class SpatialBranch(nn.Module):
         y = self.conv3(y)
 
         out = self.conv_out(y)
-
-        return out
-
-
-class LocalAttentionModule(nn.Module):
-    """Reference: https://github.com/lxtGH/GALD-DGCNet
-    """
-
-    def __init__(self,
-                 num_channels,
-                 conv_cfg=None,
-                 norm_cfg=dict(type='BN')):
-        super().__init__()
-
-        self.num_channels = num_channels
-        self.conv_cfg = conv_cfg
-        self.norm_cfg = norm_cfg
-
-        self.dwconv1 = ConvModule(
-            in_channels=self.num_channels,
-            out_channels=self.num_channels,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            groups=self.num_channels,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=dict(type='ReLU')
-        )
-        self.dwconv2 = ConvModule(
-            in_channels=self.num_channels,
-            out_channels=self.num_channels,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            groups=self.num_channels,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=dict(type='ReLU')
-        )
-        self.dwconv3 = ConvModule(
-            in_channels=self.num_channels,
-            out_channels=self.num_channels,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            groups=self.num_channels,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=dict(type='ReLU')
-        )
-        self.sigmoid_spatial = nn.Sigmoid()
-
-    def forward(self, x):
-        _, _, h, w = x.size()
-
-        y = self.dwconv1(x)
-        y = self.dwconv2(y)
-        y = self.dwconv3(y)
-        y = F.interpolate(y, size=(h, w), mode='bilinear', align_corners=True)
-        mask = self.sigmoid_spatial(y)
-
-        out = x + x * mask
-
-        return out
-
-
-class PSPModule(nn.Module):
-    """Reference: https://github.com/MendelXu/ANN
-    """
-
-    def __init__(self, sizes=(1, 3, 6, 8)):
-        super().__init__()
-
-        self.stages = nn.ModuleList([
-            nn.AdaptiveMaxPool2d(output_size=(size, size))
-            for size in sizes
-        ])
-
-    def forward(self, feats):
-        n, c, _, _ = feats.size()
-
-        priors = [stage(feats).view(n, c, -1) for stage in self.stages]
-        out = torch.cat(priors, -1)
 
         return out
 
