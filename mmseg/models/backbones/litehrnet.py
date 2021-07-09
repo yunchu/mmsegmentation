@@ -954,7 +954,7 @@ class LiteHRNet(nn.Module):
             out = self.aggregator(out)
 
         if self.extra.get('add_input', False):
-            y_list = [x] + y_list
+            out = [x] + out
 
         return out
 
