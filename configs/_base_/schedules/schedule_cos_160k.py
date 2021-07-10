@@ -28,14 +28,14 @@ lr_config = dict(
     policy='customcos',
     by_epoch=False,
     periods=[156000],
-    min_lr_ratio=1e-2,
+    min_lr_ratio=1e-3,
     alpha=1.2,
     # fixed='constant',
     # fixed_iters=5,
     # fixed_ratio=10.0,
     warmup='cos',
     warmup_iters=4000,
-    warmup_ratio=1e-2,
+    warmup_ratio=1e-3,
 )
 
 # runtime settings
