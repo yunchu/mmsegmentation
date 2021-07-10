@@ -1,7 +1,7 @@
 # optimizer
 optimizer = dict(
     type='SGD',
-    lr=1e-3,
+    lr=1e-2,
     momentum=0.9,
     weight_decay=0.0005
 )
@@ -28,14 +28,14 @@ lr_config = dict(
     policy='customcos',
     by_epoch=False,
     periods=[156000],
-    min_lr_ratio=1e-3,
-    alpha=1.5,
+    min_lr_ratio=1e-2,
+    alpha=1.2,
     # fixed='constant',
     # fixed_iters=5,
     # fixed_ratio=10.0,
     warmup='cos',
     warmup_iters=4000,
-    warmup_ratio=1e-3,
+    warmup_ratio=1e-2,
 )
 
 # runtime settings
