@@ -23,9 +23,25 @@ model = dict(
                     (40, 80, 160, 320),
                 )
             ),
+            out_modules=dict(
+                conv=dict(
+                    enable=False,
+                    channels=320
+                ),
+                position_att=dict(
+                    enable=False,
+                    key_channels=128,
+                    value_channels=320,
+                    psp_size=(1, 3, 6, 8),
+                ),
+                local_att=dict(
+                    enable=False
+                )
+            ),
             out_aggregator=dict(
                 enable=True
-            )
+            ),
+            add_input=False
         )
     )
 )

@@ -30,29 +30,25 @@ model = dict(
                     (40, 80, 160, 320),
                 )
             ),
+            out_modules=dict(
+                conv=dict(
+                    enable=False,
+                    channels=320
+                ),
+                position_att=dict(
+                    enable=False,
+                    key_channels=128,
+                    value_channels=320,
+                    psp_size=(1, 3, 6, 8),
+                ),
+                local_att=dict(
+                    enable=False
+                )
+            ),
             out_aggregator=dict(
                 enable=True
-            )
+            ),
+            add_input=False
         )
-    ),
-    decode_head=dict(
-        type='FCNHead',
-        in_channels=40,
-        in_index=0,
-        channels=40,
-        input_transform=None,
-        kernel_size=1,
-        num_convs=0,
-        concat_input=False,
-        dropout_ratio=-1,
-        num_classes=19,
-        norm_cfg=norm_cfg,
-        align_corners=False,
-        sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-        loss_decode=dict(
-            type='CrossEntropyLoss',
-            use_sigmoid=False,
-            loss_weight=1.0
-        )
-    ),
+    )
 )

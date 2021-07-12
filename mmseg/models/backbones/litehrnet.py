@@ -783,7 +783,7 @@ class LiteHRNet(nn.Module):
                 self.out_modules = nn.Sequential(*out_modules)
                 num_channels_last.append(in_modules_channels)
 
-        self.with_aggregator = self.extra['out_aggregator'] and self.extra['out_aggregator']['enable']
+        self.with_aggregator = self.extra.get('out_aggregator') and self.extra['out_aggregator']['enable']
         if self.with_aggregator:
             self.aggregator = IterativeAggregator(
                 in_channels=num_channels_last,
@@ -955,6 +955,11 @@ class LiteHRNet(nn.Module):
 
         if self.extra.get('add_input', False):
             out = [x] + out
+
+        # print('Outputs:')
+        # for _y in out:
+        #     print(f'   * {_y.size()}')
+        # exit()
 
         return out
 

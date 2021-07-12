@@ -30,7 +30,7 @@ model = dict(
             ),
             out_modules=dict(
                 conv=dict(
-                    enable=False,
+                    enable=True,
                     channels=320
                 ),
                 position_att=dict(
@@ -44,23 +44,29 @@ model = dict(
                 )
             ),
             out_aggregator=dict(
-                enable=True
+                enable=False
             ),
-            add_input=False
+            add_input=True
         )
     ),
     decode_head=dict(
-        type='FCNHead',
-        in_channels=40,
-        in_index=0,
-        channels=40,
-        input_transform=None,
-        kernel_size=1,
-        num_convs=0,
-        concat_input=False,
-        dropout_ratio=-1,
+        type='HyperSegHead',
+        in_channels=(3, 40, 80, 160, 320, 320),
+        in_index=(0, 1, 2, 3, 4, 5),
+        channels=None,
+        weight_levels=2,
+        kernel_sizes=[1, 1, 1, 3, 3],
+        level_channels=[32, 16, 8, 8, 8],
+        expand_ratio=2,
+        with_out_fc=False,
+        decoder_dropout=None,
+        weight_groups=[32, 16, 8, 16, 4],
+        decoder_groups=1,
+        unify_level=4,
+        coords_res=[(768, 768), (768, 1536)],
         num_classes=19,
         norm_cfg=norm_cfg,
+        act_cfg=dict(type='ReLU6'),
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         loss_decode=dict(

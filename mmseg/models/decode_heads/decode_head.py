@@ -65,6 +65,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         super(BaseDecodeHead, self).__init__()
 
         self._init_inputs(in_channels, in_index, input_transform)
+
         self.channels = channels
         self.num_classes = num_classes
         self.dropout_ratio = dropout_ratio
@@ -119,8 +120,10 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         if input_transform is not None:
             assert input_transform in ['resize_concat', 'multiple_select']
+
         self.input_transform = input_transform
         self.in_index = in_index
+
         if input_transform is not None:
             assert isinstance(in_channels, (list, tuple))
             assert isinstance(in_index, (list, tuple))
