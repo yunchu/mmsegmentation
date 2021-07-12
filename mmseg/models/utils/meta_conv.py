@@ -6,8 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
-from .meta_sequential import MetaSequential
-
 
 class MetaConv2d(nn.Module):
     r"""Applies a dynamic 2D convolution over an input signal composed of several input
@@ -141,17 +139,21 @@ class MetaConv2d(nn.Module):
     .. _link:
         https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
     """
+
+    padding_modes = ['zeros', 'reflect', 'replicate', 'circular']
+
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1,
                  padding_mode='zeros'):
-        super(MetaConv2d, self).__init__()
+        super().__init__()
+
         if in_channels % groups != 0:
             raise ValueError('in_channels must be divisible by groups')
         if out_channels % groups != 0:
             raise ValueError('out_channels must be divisible by groups')
-        valid_padding_modes = {'zeros', 'reflect', 'replicate', 'circular'}
-        if padding_mode not in valid_padding_modes:
+        if padding_mode not in self.padding_modes:
             raise ValueError(
-                f"padding_mode must be one of {valid_padding_modes}, but got padding_mode='{padding_mode}'")
+                f"padding_mode must be one of {self.padding_modes}, but got padding_mode='{padding_mode}'")
+
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = _pair(kernel_size)
@@ -173,24 +175,34 @@ class MetaConv2d(nn.Module):
         Returns:
             torch.Tensor: Dynamic convolution result.
         """
-        assert x.shape[0] == w.shape[0]
+
         batch_size = x.shape[0]
+        assert w.shape[0] == batch_size
+
         x = x.view(1, -1, *x.shape[2:])
-        w = w.view(w.shape[0] * self.out_channels, self.in_channels // self.groups, *self.kernel_size)
         if self.padding_mode != 'zeros' and np.any(self._padding_repeated_twice):
             x = F.pad(x, self._padding_repeated_twice, mode=self.padding_mode)
             padding = _pair(0)
         else:
             padding = self.padding
-        x = F.conv2d(x, w, bias=None, stride=self.stride, dilation=self.dilation, padding=padding,
-                     groups=batch_size * self.groups)
-        x = x.view(batch_size, -1, *x.shape[2:])
 
-        return x
+        w = w.view(w.shape[0] * self.out_channels, self.in_channels // self.groups, *self.kernel_size)
+
+        y = F.conv2d(
+            input=x,
+            weight=w,
+            bias=None,
+            stride=self.stride,
+            dilation=self.dilation,
+            padding=padding,
+            groups=batch_size * self.groups
+        )
+        y = y.view(batch_size, -1, *y.shape[2:])
+
+        return y
 
     def extra_repr(self):
-        s = ('{in_channels}, {out_channels}, kernel_size={kernel_size}'
-             ', stride={stride}')
+        s = '{in_channels}, {out_channels}, kernel_size={kernel_size}, stride={stride}'
         if self.padding != (0,) * len(self.padding):
             s += ', padding={padding}'
         if self.dilation != (1,) * len(self.dilation):
@@ -199,35 +211,7 @@ class MetaConv2d(nn.Module):
             s += ', groups={groups}'
         if self.padding_mode != 'zeros':
             s += ', padding_mode={padding_mode}'
-        return s.format(**self.__dict__)
 
+        out = s.format(**self.__dict__)
 
-def make_meta_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, padding=None, dilation=1, groups=1,
-                           padding_mode='reflect', norm_layer=nn.BatchNorm2d, act_layer=nn.ReLU(True), dropout=None):
-    """ Defines a Hyper convolution block with a normalization layer, an activation layer, and an optional
-    dropout layer.
-
-    Args:
-        in_nc (int): Input number of channels
-        out_nc (int): Output number of channels
-        kernel_size (int): Convolution kernel size
-        stride (int): Convolution stride
-        padding (int, optional): The amount of padding for the height and width dimensions
-        dilation (int or tuple, optional): Spacing between kernel elements. Default: 1
-        groups (int, optional): Number of blocked connections from input channels to output channels. Default: 1
-        padding_mode (str, optional): ``'zeros'``, ``'reflect'``, ``'replicate'`` or ``'circular'``. Default: ``'zeros'``
-        norm_layer (nn.Module): Type of feature normalization layer
-        act_layer (nn.Module): Type of activation layer
-        dropout (float): If specified, enables dropout with the given probability
-    """
-    assert dropout is None or isinstance(dropout, float)
-    padding = kernel_size // 2 if padding is None else padding
-    layers = [MetaConv2d(in_nc, out_nc, kernel_size, stride, padding, dilation, groups, padding_mode)]
-    if norm_layer is not None:
-        layers.append(norm_layer(out_nc))
-    if act_layer is not None:
-        layers.append(act_layer)
-    if dropout is not None:
-        layers.append(nn.Dropout(dropout))
-
-    return MetaSequential(*layers)
+        return out

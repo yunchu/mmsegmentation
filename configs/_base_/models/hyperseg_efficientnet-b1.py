@@ -30,6 +30,7 @@ model = dict(
         coords_res=[(768, 768), (768, 1536)],
         num_classes=19,
         norm_cfg=norm_cfg,
+        act_cfg=dict(type='ReLU6'),
         align_corners=False,
         loss_decode=dict(
             type='CrossEntropyLoss',

@@ -10,9 +10,11 @@ class MetaSequential(nn.Sequential):
     Alternatively, an ordered dict of modules can also be passed in.
     """
     def __init__(self, *args):
-        super(MetaSequential, self).__init__(*args)
+        super().__init__(*args)
+
         self.hyper_params = 0
         self._ranges = [0]
+
         for module in self:
             if hasattr(module, 'hyper_params'):
                 self.hyper_params += module.hyper_params
@@ -28,6 +30,7 @@ class MetaSequential(nn.Sequential):
         Returns:
             torch.Tensor: Dynamic convolution result.
         """
+
         w_count = 0
         for i, module in enumerate(self):
             if self._ranges[i] < self._ranges[i + 1]:
@@ -35,6 +38,7 @@ class MetaSequential(nn.Sequential):
                     x = module(x, w[w_count])
                 else:
                     x = module(x, w[:, self._ranges[i]:self._ranges[i + 1]].contiguous())
+
                 w_count += 1
             else:
                 x = module(x)

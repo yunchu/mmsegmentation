@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
+from mmcv.cnn import build_norm_layer, build_activation_layer
 
 from mmseg.models.utils import MetaConv2d, MetaSequential
 from ..builder import HEADS
@@ -24,8 +25,8 @@ class MultiScaleDecoder(nn.Module):
         kernel_sizes (int): the kernel size of the layers.
         level_layers (int): number of layers in each level.
         level_channels (list of int, optional): If specified, sets the output channels of each level.
-        norm_layer (nn.Module): Type of feature normalization layer
-        act_layer (nn.Module): Type of activation layer
+        norm_cfg (dict): Type of feature normalization layer
+        act_cfg (dict): Type of activation layer
         out_kernel_size (int): kernel size of the final output layer.
         expand_ratio (int): inverted residual block's expansion ratio.
         groups (int, optional): number of blocked connections from input channels to output channels.
@@ -35,11 +36,12 @@ class MultiScaleDecoder(nn.Module):
         coords_res (list of tuple of int, optional): list of inference resolutions for caching positional embedding.
         unify_level (int, optional): the starting level to unify the signal to weights operation from.
     """
+
     def __init__(self, feat_channels, signal_channels, num_classes=3, kernel_sizes=3, level_layers=1,
-                 level_channels=None, norm_layer=nn.BatchNorm2d, act_layer=nn.ReLU6(inplace=True), out_kernel_size=1,
-                 expand_ratio=1, groups=1, weight_groups=1, with_out_fc=False, dropout=None,
+                 level_channels=None, norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU6'),
+                 out_kernel_size=1, expand_ratio=1, groups=1, weight_groups=1, with_out_fc=False, dropout=None,
                  coords_res=None, unify_level=None):  # must be a list of tuples
-        super(MultiScaleDecoder, self).__init__()
+        super().__init__()
 
         if isinstance(kernel_sizes, numbers.Number):
             kernel_sizes = (kernel_sizes,) * len(level_channels)
@@ -73,38 +75,57 @@ class MultiScaleDecoder(nn.Module):
             curr_ngf = feat_channels[level]
             curr_out_ngf = curr_ngf if level_channels is None else level_channels[level]
             prev_channels += curr_ngf  # Accommodate the previous number of channels
-            curr_layers = []
             kernel_size = kernel_sizes[level]
 
             # For each layer in the current level
+            curr_layers = []
             for layer in range(self.level_layers[level]):
                 if (not with_out_fc) and (level == (self.levels - 1) and (layer == (self.level_layers[level] - 1))):
                     curr_out_ngf = num_classes
+
                 if kernel_size > 1:
                     curr_layers.append(HyperPatchInvertedResidual(
-                        prev_channels + 2, curr_out_ngf, kernel_size, expand_ratio=expand_ratio[level],
-                        norm_layer=norm_layer, act_layer=act_layer))
+                        prev_channels + 2,
+                        curr_out_ngf,
+                        kernel_size,
+                        expand_ratio=expand_ratio[level],
+                        norm_cfg=norm_cfg,
+                        act_cfg=act_cfg
+                    ))
                 else:
                     group = groups[level] if isinstance(groups, (list, tuple)) else groups
-                    curr_layers.append(make_hyper_patch_conv2d_block(prev_channels + 2, curr_out_ngf,
-                                                                     kernel_size, groups=group))
+                    curr_layers.append(make_hyper_patch_conv2d_block(
+                        prev_channels + 2,
+                        curr_out_ngf,
+                        kernel_size,
+                        groups=group,
+                        norm_cfg=norm_cfg,
+                    ))
                 prev_channels = curr_out_ngf
 
             # Add level layers to module
             self.level_blocks.append(MetaSequential(*curr_layers))
             if level < (unify_level - 1):
-                self.weight_blocks.append(WeightLayer(self.level_blocks[-1].hyper_params))
+                self.weight_blocks.append(WeightLayer(
+                    self.level_blocks[-1].hyper_params
+                ))
             else:
                 self._ranges.append(self._ranges[-1] + self.level_blocks[-1].hyper_params)
                 if level == (self.levels - 1):
                     hyper_params = sum([b.hyper_params for b in self.level_blocks[unify_level - 1:]])
-                    self.weight_blocks.append(WeightLayer(hyper_params))
+                    self.weight_blocks.append(WeightLayer(
+                        hyper_params
+                    ))
 
         # Add the last layer
         if with_out_fc:
             out_fc_layers = [nn.Dropout2d(dropout, True)] if dropout is not None else []
-            out_fc_layers.append(
-                HyperPatchConv2d(prev_channels, num_classes, out_kernel_size, padding=out_kernel_size // 2))
+            out_fc_layers.append(HyperPatchConv2d(
+                prev_channels,
+                num_classes,
+                out_kernel_size,
+                padding=out_kernel_size // 2
+            ))
             self.out_fc = MetaSequential(*out_fc_layers)
         else:
             self.out_fc = None
@@ -114,8 +135,10 @@ class MultiScaleDecoder(nn.Module):
             for res in coords_res:
                 res_pyd = [(res[0] // 2 ** i, res[1] // 2 ** i) for i in range(self.levels)]
                 for level_res in res_pyd:
-                    self.register_buffer(f'coord{level_res[0]}_{level_res[1]}',
-                                         self.cache_image_coordinates(*level_res))
+                    self.register_buffer(
+                        f'coord{level_res[0]}_{level_res[1]}',
+                        self.cache_image_coordinates(*level_res)
+                    )
 
         # Initialize signal to weights
         self.param_groups = get_hyper_params(self)
@@ -223,21 +246,19 @@ class WeightLayer(nn.Module):
         weight_channels = next_multiply(self.target_params, groups)
         self.signal2weights = nn.Conv2d(signal_channels, weight_channels, 1, bias=False, groups=groups)
 
-    def apply_signal2weights(self, s):
+    def forward(self, s):
         if self.signal2weights is None:
             return s
 
-        w = self.signal2weights(s[:, self.signal_index:self.signal_index + self.signal_channels])[:, :self.target_params]
+        weights = self.signal2weights(s[:, self.signal_index:self.signal_index + self.signal_channels])
+        out = weights[:, :self.target_params]
 
-        return w
-
-    def forward(self, s):
-        return self.apply_signal2weights(s)
+        return out
 
 
 class HyperPatchInvertedResidual(nn.Module):
-    def __init__(self, in_nc, out_nc, kernel_size=3, stride=1, expand_ratio=1, norm_layer=nn.BatchNorm2d,
-                 act_layer=nn.ReLU6(inplace=True), padding_mode='reflect'):
+    def __init__(self, in_nc, out_nc, kernel_size=3, stride=1, expand_ratio=1, padding_mode='reflect',
+                 norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU6')):
         super().__init__()
 
         self.stride = stride
@@ -252,10 +273,11 @@ class HyperPatchInvertedResidual(nn.Module):
         self.hidden_dim = int(round(in_nc * expand_ratio))
         self.use_res_connect = self.stride == 1 and in_nc == out_nc
 
-        self.act_layer = act_layer
-        self.bn1 = norm_layer(self.hidden_dim)
-        self.bn2 = norm_layer(self.hidden_dim)
-        self.bn3 = norm_layer(self.out_nc)
+        self.bn1 = build_norm_layer(norm_cfg, self.hidden_dim)[1]
+        self.bn2 = build_norm_layer(norm_cfg, self.hidden_dim)[1]
+        self.bn3 = build_norm_layer(norm_cfg, self.out_nc)[1]
+        self.act1 = build_activation_layer(act_cfg)
+        self.act2 = build_activation_layer(act_cfg)
 
         # Calculate hyper params and weight ranges
         self.hyper_params = 0
@@ -289,7 +311,7 @@ class HyperPatchInvertedResidual(nn.Module):
         weight1 = weight1.reshape(b * fh * fw * self.hidden_dim, self.in_nc, 1, 1)
         x = F.conv2d(x, weight1, bias=None, groups=b * fh * fw)
         x = self.bn1(x.view(b * fh * fw, -1, kh, kw)).view(1, -1, kh, kw)
-        x = self.act_layer(x)
+        x = self.act1(x)
 
         # Conv2
 
@@ -297,7 +319,7 @@ class HyperPatchInvertedResidual(nn.Module):
         weight2 = weight2.reshape(b * fh * fw * self.hidden_dim, 1, *self.kernel_size)
         x = F.conv2d(x, weight2, bias=None, stride=self.stride, groups=b * fh * fw * self.hidden_dim)
         x = self.bn2(x.view(b * fh * fw, -1, ph, pw)).view(1, -1, ph, pw)
-        x = self.act_layer(x)
+        x = self.act2(x)
 
         # Conv3
         weight3 = weight[:, self._ranges[2]:self._ranges[3]]
@@ -430,13 +452,14 @@ class HyperPatchNoPadding(nn.Module):
 
 
 class HyperPatch(nn.Module):
+    padding_modes = ['zeros', 'reflect', 'replicate', 'circular']
+
     def __init__(self, module: nn.Module, padding=0, padding_mode='reflect'):
         super().__init__()
 
-        valid_padding_modes = {'zeros', 'reflect', 'replicate', 'circular'}
-        if padding_mode not in valid_padding_modes:
+        if padding_mode not in self.padding_modes:
             raise ValueError(
-                f"padding_mode must be one of {valid_padding_modes}, but got padding_mode='{padding_mode}'")
+                f"padding_mode must be one of {self.padding_modes}, but got padding_mode='{padding_mode}'")
 
         self.hyper_module = module
         self.padding = _pair(padding)
@@ -508,8 +531,7 @@ class HyperPatchConv2d(HyperPatch):
 
 
 def make_hyper_patch_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, padding=None, dilation=1, groups=1,
-                                  padding_mode='reflect', norm_layer=nn.BatchNorm2d, act_layer=nn.ReLU(True),
-                                  dropout=None):
+                                  padding_mode='reflect', norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU')):
     """ Defines a Hyper patch-wise convolution block with a normalization layer, an activation layer, and an optional
     dropout layer.
 
@@ -522,12 +544,9 @@ def make_hyper_patch_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, paddin
         dilation (int or tuple, optional): Spacing between kernel elements. Default: 1
         groups (int, optional): Number of blocked connections from input channels to output channels. Default: 1
         padding_mode (str, optional): ``'zeros'``, ``'reflect'``, ``'replicate'`` or ``'circular'``. Default: ``'zeros'``
-        norm_layer (nn.Module): Type of feature normalization layer
-        act_layer (nn.Module): Type of activation layer
-        dropout (float): If specified, enables dropout with the given probability
+        norm_cfg (dict): Type of feature normalization layer
+        act_cfg (dict): Type of activation layer
     """
-
-    assert dropout is None or isinstance(dropout, float)
 
     padding = kernel_size // 2 if padding is None else padding
     if padding == 0:
@@ -535,14 +554,11 @@ def make_hyper_patch_conv2d_block(in_nc, out_nc, kernel_size=3, stride=1, paddin
     else:
         layers = [HyperPatchConv2d(in_nc, out_nc, kernel_size, stride, padding, dilation, groups, padding_mode)]
 
-    if norm_layer is not None:
-        layers.append(norm_layer(out_nc))
+    if norm_cfg is not None:
+        layers.append(build_norm_layer(norm_cfg, out_nc)[1])
 
-    if act_layer is not None:
-        layers.append(act_layer)
-
-    if dropout is not None:
-        layers.append(nn.Dropout(dropout))
+    if act_cfg is not None:
+        layers.append(build_activation_layer(act_cfg))
 
     return MetaSequential(*layers)
 
@@ -627,14 +643,19 @@ class HyperSegHead(BaseDecodeHead):
         super().__init__(input_transform='multiple_select', enable_out_seg=False, **kwargs)
 
         feat_channels = self.in_channels[:-1]
-        self.decoder = MultiScaleDecoder(feat_channels, self.in_channels[-1], self.num_classes,
-                                         kernel_sizes, level_layers, level_channels,
-                                         with_out_fc=with_out_fc, out_kernel_size=1,
-                                         expand_ratio=expand_ratio, groups=decoder_groups,
-                                         weight_groups=weight_groups, dropout=decoder_dropout,
-                                         coords_res=coords_res, unify_level=unify_level)
-        self.weight_mapper = WeightMapper(self.in_channels[-1], self.decoder.param_groups,
-                                          levels=weight_levels)
+        self.decoder = MultiScaleDecoder(
+            feat_channels, self.in_channels[-1], self.num_classes,
+            kernel_sizes, level_layers, level_channels,
+            with_out_fc=with_out_fc, out_kernel_size=1,
+            expand_ratio=expand_ratio, groups=decoder_groups,
+            weight_groups=weight_groups, dropout=decoder_dropout,
+            coords_res=coords_res, unify_level=unify_level,
+            norm_cfg=self.norm_cfg, act_cfg=self.act_cfg
+        )
+        self.weight_mapper = WeightMapper(
+            self.in_channels[-1], self.decoder.param_groups,
+            levels=weight_levels
+        )
 
     def forward(self, inputs):
         features = self._transform_inputs(inputs)
