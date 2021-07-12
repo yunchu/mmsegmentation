@@ -27,7 +27,7 @@ model = dict(
         weight_groups=[32, 16, 8, 16, 4],
         decoder_groups=1,
         unify_level=4,
-        coords_res=[(768, 768), (768, 1536)],
+        coords_res=[(1024, 1024), (1024, 2048)],
         num_classes=19,
         norm_cfg=norm_cfg,
         act_cfg=dict(type='ReLU6'),

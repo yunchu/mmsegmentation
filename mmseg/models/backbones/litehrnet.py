@@ -757,7 +757,7 @@ class LiteHRNet(nn.Module):
                     out_channels=out_modules_channels,
                     kernel_size=1,
                     stride=1,
-                    padding=1,
+                    padding=0,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg,
                     act_cfg=dict(type='ReLU')
@@ -927,9 +927,9 @@ class LiteHRNet(nn.Module):
     def forward(self, x):
         """Forward function."""
 
-        x = self.stem(x)
+        y = self.stem(x)
 
-        y_list = [x]
+        y_list = [y]
         for i in range(self.num_stages):
             transition_modules = getattr(self, 'transition{}'.format(i))
 
@@ -954,12 +954,7 @@ class LiteHRNet(nn.Module):
             out = self.aggregator(out)
 
         if self.extra.get('add_input', False):
-            out = [x] + out
-
-        # print('Outputs:')
-        # for _y in out:
-        #     print(f'   * {_y.size()}')
-        # exit()
+            out = [x, y] + out
 
         return out
 
