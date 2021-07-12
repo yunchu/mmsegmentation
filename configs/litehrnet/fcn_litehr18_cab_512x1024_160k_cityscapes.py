@@ -33,7 +33,7 @@ model = dict(
             out_modules=dict(
                 conv=dict(
                     enable=True,
-                    channels=320
+                    channels=576
                 ),
                 position_att=dict(
                     enable=True,
@@ -47,7 +47,8 @@ model = dict(
             ),
             out_aggregator=dict(
                 enable=True
-            )
+            ),
+            add_input=False
         )
     )
 )

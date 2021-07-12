@@ -33,7 +33,7 @@ model = dict(
             out_modules=dict(
                 conv=dict(
                     enable=False,
-                    channels=320
+                    channels=576
                 ),
                 position_att=dict(
                     enable=False,
