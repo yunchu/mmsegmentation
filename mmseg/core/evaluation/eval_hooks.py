@@ -83,7 +83,8 @@ class DistEvalHook(_DistEvalHook):
             runner.model,
             self.dataloader,
             tmpdir=tmpdir,
-            gpu_collect=self.gpu_collect)
+            gpu_collect=self.gpu_collect
+        )
 
         if runner.rank == 0:
             print('\n')

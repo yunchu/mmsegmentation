@@ -11,23 +11,25 @@ TRAINING_LEN = 5
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Convert HRF dataset to mmsegmentation format')
-    parser.add_argument('healthy_path', help='the path of healthy.zip')
-    parser.add_argument(
-        'healthy_manualsegm_path', help='the path of healthy_manualsegm.zip')
-    parser.add_argument('glaucoma_path', help='the path of glaucoma.zip')
-    parser.add_argument(
-        'glaucoma_manualsegm_path', help='the path of glaucoma_manualsegm.zip')
-    parser.add_argument(
-        'diabetic_retinopathy_path',
-        help='the path of diabetic_retinopathy.zip')
-    parser.add_argument(
-        'diabetic_retinopathy_manualsegm_path',
-        help='the path of diabetic_retinopathy_manualsegm.zip')
-    parser.add_argument('--tmp_dir', help='path of the temporary directory')
-    parser.add_argument('-o', '--out_dir', help='output path')
+    parser = argparse.ArgumentParser(description='Convert HRF dataset to mmsegmentation format')
+    parser.add_argument('healthy_path',
+                        help='the path of healthy.zip')
+    parser.add_argument('healthy_manualsegm_path',
+                        help='the path of healthy_manualsegm.zip')
+    parser.add_argument('glaucoma_path',
+                        help='the path of glaucoma.zip')
+    parser.add_argument('glaucoma_manualsegm_path',
+                        help='the path of glaucoma_manualsegm.zip')
+    parser.add_argument('diabetic_retinopathy_path',
+                        help='the path of diabetic_retinopathy.zip')
+    parser.add_argument('diabetic_retinopathy_manualsegm_path',
+                        help='the path of diabetic_retinopathy_manualsegm.zip')
+    parser.add_argument('--tmp_dir',
+                        help='path of the temporary directory')
+    parser.add_argument('-o', '--out_dir',
+                        help='output path')
     args = parser.parse_args()
+
     return args
 
 

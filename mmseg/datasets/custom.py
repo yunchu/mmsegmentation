@@ -109,16 +109,20 @@ class CustomDataset(Dataset):
                 self.split = osp.join(self.data_root, self.split)
 
         # load annotations
-        self.img_infos = self.load_annotations(self.img_dir, self.img_suffix,
-                                               self.ann_dir,
-                                               self.seg_map_suffix, self.split)
+        self.img_infos = self.load_annotations(
+            self.img_dir,
+            self.img_suffix,
+            self.ann_dir,
+            self.seg_map_suffix,
+            self.split
+        )
 
     def __len__(self):
         """Total number of samples of data."""
         return len(self.img_infos)
 
-    def load_annotations(self, img_dir, img_suffix, ann_dir, seg_map_suffix,
-                         split):
+    @staticmethod
+    def load_annotations(img_dir, img_suffix, ann_dir, seg_map_suffix, split):
         """Load annotation from directory.
 
         Args:
@@ -343,7 +347,8 @@ class CustomDataset(Dataset):
             self.ignore_index,
             metric,
             label_map=self.label_map,
-            reduce_zero_label=self.reduce_zero_label)
+            reduce_zero_label=self.reduce_zero_label
+        )
 
         # summary table
         ret_metrics_summary = OrderedDict({

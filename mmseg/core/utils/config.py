@@ -5,8 +5,15 @@ def propagate_root_dir(cfg, root_dir=None):
 
     assert cfg.data_root is not None and cfg.data_root != ''
 
-    cfg.data.train.data_root = cfg.data_root
-    cfg.data.val.data_root = cfg.data_root
-    cfg.data.test.data_root = cfg.data_root
+    _add2dataset(cfg.data.train, cfg.data_root)
+    _add2dataset(cfg.data.val, cfg.data_root)
+    _add2dataset(cfg.data.test, cfg.data_root)
 
     return cfg
+
+
+def _add2dataset(cfg, root_dir):
+    if 'dataset' in cfg:
+        cfg.dataset.data_root = root_dir
+    else:
+        cfg.data_root = root_dir
