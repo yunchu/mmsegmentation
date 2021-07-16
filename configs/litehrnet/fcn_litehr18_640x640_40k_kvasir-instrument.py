@@ -27,5 +27,5 @@ model = dict(
     ),
 )
 evaluation = dict(
-    metric=['mDice', 'mFscore']
+    metric='mDice'
 )
