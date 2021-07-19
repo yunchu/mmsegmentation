@@ -9,7 +9,7 @@ from .hrf import HRFDataset
 from .pascal_context import PascalContextDataset, PascalContextDataset59
 from .stare import STAREDataset
 from .voc import PascalVOCDataset
-from .kvasir_instrument import KvasirInstrumentDataset
+from .kvasir import KvasirDataset
 
 __all__ = [
     'CustomDataset',
@@ -28,5 +28,5 @@ __all__ = [
     'DRIVEDataset',
     'HRFDataset',
     'STAREDataset',
-    'KvasirInstrumentDataset',
+    'KvasirDataset',
 ]

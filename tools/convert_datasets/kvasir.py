@@ -6,7 +6,7 @@ import mmcv
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Convert Kvasir-Instrument dataset to mmsegmentation format')
+    parser = argparse.ArgumentParser(description='Convert Kvasir dataset to mmsegmentation format')
     parser.add_argument('images_path',
                         help='the path to images folder')
     parser.add_argument('masks_path',
@@ -15,6 +15,10 @@ def parse_args():
                         help='the path to train.txt')
     parser.add_argument('test_path',
                         help='the path to test.txt')
+    parser.add_argument('--image_ext', type=str, default='jpg',
+                        help='the extension of input images')
+    parser.add_argument('--mask_ext', type=str, default='jpg',
+                        help='the extension of input masks')
     parser.add_argument('-o', '--out_dir',
                         help='output path')
     args = parser.parse_args()
@@ -33,18 +37,15 @@ def read_records(data_path):
     return instances
 
 
-def process_instances(mode, instances, images_path, masks_path, out_dir):
+def process_instances(mode, instances, images_path, masks_path, image_ext, mask_ext, out_dir):
     assert mode in ['training', 'validation']
 
     for instance in instances:
-        image_name = f'{instance}.jpg'
-        mask_name = f'{instance}.png'
+        in_image_path = join(images_path, f'{instance}.{image_ext}')
+        in_mask_path = join(masks_path, f'{instance}.{mask_ext}')
 
-        in_image_path = join(images_path, image_name)
-        in_mask_path = join(masks_path, mask_name)
-
-        out_image_path = join(out_dir, 'images', mode, image_name)
-        out_mask_path = join(out_dir, 'annotations', mode, mask_name)
+        out_image_path = join(out_dir, 'images', mode, f'{instance}.jpg')
+        out_mask_path = join(out_dir, 'annotations', mode, f'{instance}.png')
 
         copyfile(in_image_path, out_image_path)
 
@@ -71,11 +72,17 @@ def main():
 
     print('Generating training dataset...')
     train_instances = read_records(args.train_path)
-    process_instances('training', train_instances, args.images_path, args.masks_path, out_dir)
+    process_instances('training', train_instances,
+                      args.images_path, args.masks_path,
+                      args.image_ext, args.mask_ext,
+                      out_dir)
 
     print('Generating validation dataset...')
     val_instances = read_records(args.test_path)
-    process_instances('validation', val_instances, args.images_path, args.masks_path, out_dir)
+    process_instances('validation', val_instances,
+                      args.images_path, args.masks_path,
+                      args.image_ext, args.mask_ext,
+                      out_dir)
 
     print('Done!')
 
