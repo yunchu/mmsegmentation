@@ -2,10 +2,10 @@
 dataset_type = 'KvasirDataset'
 data_root = 'data/kvasir'
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-img_scale = (768, 768)
-crop_size = (640, 640)
-# img_scale = (544, 544)
-# crop_size = (512, 512)
+# img_scale = (768, 768)
+# crop_size = (640, 640)
+img_scale = (544, 544)
+crop_size = (512, 512)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
