@@ -13,7 +13,7 @@ class KvasirDataset(CustomDataset):
     fixed to '.jpg' and ``seg_map_suffix`` is fixed to'.png'.
     """
 
-    CLASSES = ('background', 'instrument')
+    CLASSES = ('background', 'target')
 
     PALETTE = [[120, 120, 120], [6, 230, 230]]
 
