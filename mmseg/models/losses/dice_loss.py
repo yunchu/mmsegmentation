@@ -1,5 +1,6 @@
 """Modified from https://github.com/LikeLy-Journey/SegmenTron/blob/master/
 segmentron/solver/loss.py (Apache-2.0 License)"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -39,15 +40,18 @@ def dice_loss(pred,
 
 
 @weighted_loss
-def binary_dice_loss(pred, target, valid_mask, smooth=1, exponent=2, **kwards):
+def binary_dice_loss(pred, target, valid_mask, smooth=1, exponent=2):
     assert pred.shape[0] == target.shape[0]
 
     pred = pred.reshape(pred.shape[0], -1)
     target = target.reshape(target.shape[0], -1)
     valid_mask = valid_mask.reshape(valid_mask.shape[0], -1)
 
-    num = torch.sum(torch.mul(pred, target) * valid_mask, dim=1) * 2 + smooth
-    den = torch.sum(pred.pow(exponent) + target.pow(exponent), dim=1) + smooth
+    valid_pred = torch.mul(pred, valid_mask)
+    valid_target = torch.mul(target, valid_mask)
+
+    num = torch.sum(torch.mul(valid_pred, valid_target), dim=1) * 2 + smooth
+    den = torch.sum(valid_pred.pow(exponent) + valid_target.pow(exponent), dim=1) + smooth
 
     return 1 - num / den
 
@@ -72,7 +76,6 @@ class DiceLoss(nn.Module):
         class_weight (list[float] | str, optional): Weight of each class. If in
             str format, read them from a file. Defaults to None.
         loss_weight (float, optional): Weight of the loss. Default to 1.0.
-        ignore_index (int | None): The label index to be ignored. Default: 255.
     """
 
     def __init__(self,
@@ -80,9 +83,7 @@ class DiceLoss(nn.Module):
                  exponent=2,
                  reduction='mean',
                  class_weight=None,
-                 loss_weight=1.0,
-                 ignore_index=255,
-                 **kwards):
+                 loss_weight=1.0):
         super(DiceLoss, self).__init__()
 
         self.smooth = smooth
@@ -90,14 +91,14 @@ class DiceLoss(nn.Module):
         self.reduction = reduction
         self.class_weight = get_class_weight(class_weight)
         self.loss_weight = loss_weight
-        self.ignore_index = ignore_index
 
     def forward(self,
                 pred,
                 target,
                 avg_factor=None,
                 reduction_override=None,
-                **kwards):
+                ignore_index=255,
+                **kwargs):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
 
@@ -113,7 +114,7 @@ class DiceLoss(nn.Module):
             num_classes=num_classes
         )
 
-        valid_mask = (target != self.ignore_index).long()
+        valid_mask = (target != ignore_index).long()
 
         loss = self.loss_weight * dice_loss(
             pred,
@@ -124,7 +125,8 @@ class DiceLoss(nn.Module):
             smooth=self.smooth,
             exponent=self.exponent,
             class_weight=class_weight,
-            ignore_index=self.ignore_index
+            ignore_index=ignore_index,
+            **kwargs
         )
 
         return loss
