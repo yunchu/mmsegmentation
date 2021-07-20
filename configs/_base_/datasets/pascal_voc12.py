@@ -27,6 +27,7 @@ test_pipeline = [
             dict(type='Resize', keep_ratio=True),
             dict(type='RandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
+            dict(type='Pad', size_divisor=32, pad_val=0, seg_pad_val=255),
             dict(type='ImageToTensor', keys=['img']),
             dict(type='Collect', keys=['img']),
         ]

@@ -667,9 +667,10 @@ class LiteHRModule(nn.Module):
                 y = out[0] if i == 0 else self.fuse_layers[i][0](out[0])
                 for j in range(self.num_branches):
                     if i == j:
-                        y += out[j]
+                        fuse_y = out[j]
                     else:
-                        y += self.fuse_layers[i][j](out[j])
+                        fuse_y = self.fuse_layers[i][j](out[j])
+                    y += fuse_y
                 out_fuse.append(self.relu(y))
             out = out_fuse
         elif not self.multiscale_output:
