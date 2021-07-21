@@ -20,14 +20,9 @@ model = dict(
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
-        # loss_decode=dict(
-        #     type='CrossEntropyLoss',
-        #     use_sigmoid=False,
-        #     loss_weight=1.0
-        # )
         loss_decode=[
-            dict(type='CrossEntropyLoss', loss_weight=1.0),
-            dict(type='TverskyLoss', alpha=0.3, beta=0.7, loss_weight=0.5)
+            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+            # dict(type='TverskyLoss', alpha=0.3, beta=0.7, loss_weight=0.5)
         ]
     ),
 )
