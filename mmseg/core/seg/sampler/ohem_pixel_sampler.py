@@ -65,7 +65,8 @@ class OHEMPixelSampler(BasePixelSampler):
 
                 valid_seg_weight[seg_prob[valid_mask] < threshold] = 1.
             else:
-                losses = self.context.loss_decode(
+                main_loss_idx = self.context.sampler_loss_idx
+                losses = self.context.loss_modules[main_loss_idx](
                     seg_logit,
                     seg_label,
                     weight=None,

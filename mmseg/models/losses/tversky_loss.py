@@ -5,10 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..builder import LOSSES
-from .utils import get_class_weight, weighted_loss
+from .utils import get_class_weight
 
 
-@weighted_loss
 def tversky_loss(pred,
                  target,
                  valid_mask,
@@ -16,7 +15,10 @@ def tversky_loss(pred,
                  beta,
                  eps=1e-6,
                  class_weight=None,
-                 ignore_index=255):
+                 reduction='mean',
+                 avg_factor=None,
+                 ignore_index=255,
+                 **kwargs):
     assert pred.shape[0] == target.shape[0]
 
     num_classes = pred.shape[1]
@@ -28,7 +30,7 @@ def tversky_loss(pred,
         class_ids = [i for i in range(num_classes) if i != ignore_index]
     assert len(class_ids) >= 1
 
-    total_loss = 0.0
+    class_losses = []
     for i in class_ids:
         tversky_loss_value = binary_tversky_loss(
             pred[:, i],
@@ -42,12 +44,26 @@ def tversky_loss(pred,
         if class_weight is not None:
             tversky_loss_value *= class_weight[i]
 
-        total_loss += tversky_loss_value
+        class_losses.append(tversky_loss_value)
 
-    return total_loss / float(len(class_ids))
+    if avg_factor is None:
+        if reduction == 'mean':
+            loss = sum(class_losses) / float(len(class_losses))
+        elif reduction == 'sum':
+            loss = sum(class_losses)
+        elif reduction == 'none':
+            loss = class_losses
+        else:
+            raise ValueError(f'unknown reduction type: {reduction}')
+    else:
+        if reduction == 'mean':
+            loss = sum(class_losses) / avg_factor
+        elif reduction != 'none':
+            raise ValueError('avg_factor can not be used with reduction="sum"')
+
+    return loss
 
 
-@weighted_loss
 def binary_tversky_loss(pred, target, valid_mask, alpha, beta, eps=1e-6):
     assert pred.shape[0] == target.shape[0]
 
@@ -92,6 +108,10 @@ class TverskyLoss(nn.Module):
         self.class_weight = get_class_weight(class_weight)
         self.loss_weight = loss_weight
 
+    @property
+    def name(self):
+        return 'tversky'
+
     def forward(self,
                 pred,
                 target,
@@ -120,12 +140,12 @@ class TverskyLoss(nn.Module):
             pred,
             one_hot_target,
             valid_mask=valid_mask,
-            reduction=reduction,
-            avg_factor=avg_factor,
             alpha=self.alpha,
             beta=self.beta,
             eps=self.eps,
             class_weight=class_weight,
+            reduction=reduction,
+            avg_factor=avg_factor,
             ignore_index=ignore_index,
             **kwargs
         )

@@ -34,7 +34,8 @@ class MaxPoolingPixelSampler(BasePixelSampler):
             valid_mask = seg_label != self.context.ignore_index
             seg_weight = seg_logit.new_zeros(size=seg_label.size())
 
-            losses = self.context.loss_decode(
+            main_loss_idx = self.context.sampler_loss_idx
+            losses = self.context.loss_modules[main_loss_idx](
                 seg_logit,
                 seg_label,
                 weight=None,

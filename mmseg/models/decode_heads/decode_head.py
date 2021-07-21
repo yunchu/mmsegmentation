@@ -58,6 +58,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                      type='CrossEntropyLoss',
                      use_sigmoid=False,
                      loss_weight=1.0),
+                 sampler_loss_idx=0,
                  ignore_index=255,
                  sampler=None,
                  align_corners=False,
@@ -73,10 +74,15 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
         self.in_index = in_index
-        self.loss_decode = build_loss(loss_decode)
         self.ignore_index = ignore_index
         self.align_corners = align_corners
         self.fp16_enabled = False
+
+        loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
+        assert len(loss_configs) > 0
+        self.loss_modules = nn.ModuleList([build_loss(loss_cfg) for loss_cfg in loss_configs])
+        assert 0 <= sampler_loss_idx < len(self.loss_modules)
+        self.sampler_loss_idx = sampler_loss_idx
 
         self.sampler = None
         if sampler is not None:
@@ -230,6 +236,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         """Compute segmentation loss."""
 
         loss = dict()
+
         seg_logit = resize(
             input=seg_logit,
             size=seg_label.shape[2:],
@@ -243,12 +250,20 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             seg_weight = None
 
         seg_label = seg_label.squeeze(1)
-        loss['loss_seg'] = self.loss_decode(
-            seg_logit,
-            seg_label,
-            weight=seg_weight,
-            ignore_index=self.ignore_index
-        )
+
+        loss_values = []
+        for loss_module in self.loss_modules:
+            loss_value = loss_module(
+                seg_logit,
+                seg_label,
+                weight=seg_weight,
+                ignore_index=self.ignore_index
+            )
+
+            loss_values.append(loss_value)
+            loss[loss_module.name] = loss_value
+
+        loss['loss_seg'] = sum(loss_values)
         loss['acc_seg'] = accuracy(seg_logit, seg_label)
 
         return loss

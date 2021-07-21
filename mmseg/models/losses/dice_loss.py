@@ -92,6 +92,10 @@ class DiceLoss(nn.Module):
         self.class_weight = get_class_weight(class_weight)
         self.loss_weight = loss_weight
 
+    @property
+    def name(self):
+        return 'dice'
+
     def forward(self,
                 pred,
                 target,

@@ -180,6 +180,10 @@ class CrossEntropyLoss(nn.Module):
         else:
             self.cls_criterion = cross_entropy
 
+    @property
+    def name(self):
+        return 'ce'
+
     def forward(self,
                 cls_score,
                 label,

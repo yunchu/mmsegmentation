@@ -272,6 +272,10 @@ class LovaszLoss(nn.Module):
         self.loss_weight = loss_weight
         self.class_weight = get_class_weight(class_weight)
 
+    @property
+    def name(self):
+        return 'lovasz'
+
     def forward(self,
                 cls_score,
                 label,
