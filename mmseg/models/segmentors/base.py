@@ -133,7 +133,7 @@ class BaseSegmentor(nn.Module):
         this method, such as GAN.
 
         Args:
-            data (dict): The output of dataloader.
+            data_batch (dict): The output of dataloader.
             optimizer (:obj:`torch.optim.Optimizer` | dict): The optimizer of
                 runner is passed to ``train_step()``. This argument is unused
                 and reserved.
@@ -149,13 +149,15 @@ class BaseSegmentor(nn.Module):
                 DDP, it means the batch size on each GPU), which is used for
                 averaging the logs.
         """
+
         losses = self(**data_batch)
         loss, log_vars = self._parse_losses(losses)
 
         outputs = dict(
             loss=loss,
             log_vars=log_vars,
-            num_samples=len(data_batch['img_metas']))
+            num_samples=len(data_batch['img_metas'])
+        )
 
         return outputs
 
@@ -166,7 +168,9 @@ class BaseSegmentor(nn.Module):
         during val epochs. Note that the evaluation after training epochs is
         not implemented with this method, but an evaluation hook.
         """
+
         output = self(**data_batch, **kwargs)
+
         return output
 
     @staticmethod

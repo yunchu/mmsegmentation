@@ -127,6 +127,72 @@ class EncoderDecoder(BaseSegmentor):
 
         return losses
 
+    @staticmethod
+    def _augment_batch(img, gt_semantic_seg, prob):
+        assert 0.0 < prob <= 1.0
+
+        b, _, h, w = img.size()
+        assert b > 1
+
+        aug_mask = torch.rand(b, device=img.device) < prob
+
+        num_pairs = aug_mask.sum().item()
+        if num_pairs == 0:
+            return img, gt_semantic_seg
+
+        aug_img = img[aug_mask]
+        aug_gt = gt_semantic_seg[aug_mask]
+        aug_ind = torch.arange(b, device=img.device)[aug_mask]
+
+        batch_ind = torch.randperm(b - 1, device=img.device)[:num_pairs]
+        opposite_ind = torch.where(batch_ind < aug_ind, batch_ind, batch_ind + 1)
+
+        num_vertical_pairs = int(num_pairs * torch.rand(1).item())
+        num_horizontal_pairs = num_pairs - num_vertical_pairs
+
+        cat_img_list, cat_gt_list = [], []
+
+        if num_vertical_pairs > 0:
+            aug_subset_img = aug_img[:num_vertical_pairs]
+            aug_subset_gt = aug_gt[:num_vertical_pairs]
+
+            opposite_subset_ind = opposite_ind[:num_vertical_pairs]
+            opposite_img = img[opposite_subset_ind]
+            opposite_gt = gt_semantic_seg[opposite_subset_ind]
+
+            vertical_half = h // 2
+            cat_img_list.append(torch.cat(
+                [aug_subset_img[:, :, :vertical_half], opposite_img[:, :, vertical_half:]], dim=2
+            ))
+            cat_gt_list.append(torch.cat(
+                [aug_subset_gt[:, :, :vertical_half], opposite_gt[:, :, vertical_half:]], dim=2
+            ))
+
+        if num_horizontal_pairs > 0:
+            aug_subset_img = aug_img[num_vertical_pairs:]
+            aug_subset_gt = aug_gt[num_vertical_pairs:]
+
+            opposite_subset_ind = opposite_ind[num_vertical_pairs:]
+            opposite_img = img[opposite_subset_ind]
+            opposite_gt = gt_semantic_seg[opposite_subset_ind]
+
+            horizontal_half = w // 2
+            cat_img_list.append(torch.cat(
+                [aug_subset_img[:, :, :, :horizontal_half], opposite_img[:, :, :, horizontal_half:]], dim=3
+            ))
+            cat_gt_list.append(torch.cat(
+                [aug_subset_gt[:, :, :, :horizontal_half], opposite_gt[:, :, :, horizontal_half:]], dim=3
+            ))
+
+        hold_mask = ~aug_mask
+        cat_img_list.append(img[hold_mask])
+        cat_gt_list.append(gt_semantic_seg[hold_mask])
+
+        out_img = torch.cat(cat_img_list, dim=0)
+        out_gt = torch.cat(cat_gt_list, dim=0)
+
+        return out_img, out_gt
+
     def forward_dummy(self, img):
         """Dummy forward function."""
         seg_logit = self.encode_decode(img, None)
@@ -151,6 +217,10 @@ class EncoderDecoder(BaseSegmentor):
         """
 
         losses = dict()
+
+        if self.train_cfg.get('batch_mix') and self.train_cfg.batch_mix['enable']:
+            pair_mix_prob = self.train_cfg.batch_mix['prob']
+            img, gt_semantic_seg = self._augment_batch(img, gt_semantic_seg, prob=pair_mix_prob)
 
         x = self.extract_feat(img)
 

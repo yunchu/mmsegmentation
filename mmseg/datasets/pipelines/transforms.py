@@ -596,7 +596,8 @@ class RandomRotate(object):
                  center=None,
                  auto_bound=False):
         self.prob = prob
-        assert prob >= 0 and prob <= 1
+        assert 0 <= prob <= 1
+
         if isinstance(degree, (float, int)):
             assert degree > 0, f'degree {degree} should be positive'
             self.degree = (-degree, degree)
@@ -620,15 +621,17 @@ class RandomRotate(object):
         """
 
         rotate = True if np.random.rand() < self.prob else False
-        degree = np.random.uniform(min(*self.degree), max(*self.degree))
         if rotate:
+            degree = np.random.uniform(min(*self.degree), max(*self.degree))
+
             # rotate image
             results['img'] = mmcv.imrotate(
                 results['img'],
                 angle=degree,
                 border_value=self.pal_val,
                 center=self.center,
-                auto_bound=self.auto_bound)
+                auto_bound=self.auto_bound
+            )
 
             # rotate segs
             for key in results.get('seg_fields', []):
@@ -638,7 +641,9 @@ class RandomRotate(object):
                     border_value=self.seg_pad_val,
                     center=self.center,
                     auto_bound=self.auto_bound,
-                    interpolation='nearest')
+                    interpolation='nearest'
+                )
+
         return results
 
     def __repr__(self):
@@ -649,6 +654,7 @@ class RandomRotate(object):
                     f'seg_pad_val={self.seg_pad_val}, ' \
                     f'center={self.center}, ' \
                     f'auto_bound={self.auto_bound})'
+
         return repr_str
 
 
