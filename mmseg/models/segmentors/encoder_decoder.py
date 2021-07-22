@@ -137,7 +137,7 @@ class EncoderDecoder(BaseSegmentor):
         aug_mask = torch.rand(b, device=img.device) < prob
 
         num_pairs = aug_mask.sum().item()
-        if num_pairs == 0:
+        if num_pairs == 0 or num_pairs == b:
             return img, gt_semantic_seg
 
         aug_img = img[aug_mask]
