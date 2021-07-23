@@ -24,9 +24,6 @@ model = dict(
             dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             # dict(type='TverskyLoss', alpha=0.3, beta=0.7, loss_weight=0.5)
         ]
-    ),
-    train_cfg=dict(
-        batch_mix=dict(enable=True, prob=0.25)
     )
 )
 evaluation = dict(
