@@ -3,6 +3,7 @@ from .cross_entropy_loss import CrossEntropyLoss, binary_cross_entropy, cross_en
 from .dice_loss import DiceLoss
 from .lovasz_loss import LovaszLoss
 from .tversky_loss import TverskyLoss
+from .boundary_loss import BoundaryLoss
 from .utils import reduce_loss, weight_reduce_loss, weighted_loss
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     'LovaszLoss',
     'DiceLoss',
     'TverskyLoss',
+    'BoundaryLoss',
 ]
