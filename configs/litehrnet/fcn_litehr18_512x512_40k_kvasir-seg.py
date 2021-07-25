@@ -22,7 +22,7 @@ model = dict(
         sampler_loss_idx=0,
         loss_decode=[
             dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-            dict(type='BoundaryLoss', loss_weight=0.01)
+            dict(type='BoundaryLoss', loss_weight=0.05)
         ]
     )
 )
