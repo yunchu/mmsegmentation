@@ -1,3 +1,5 @@
+import re
+
 from mmcv.runner.hooks import Hook
 
 from ..builder import PARAMS_MANAGERS
@@ -43,7 +45,7 @@ class FreezeLayers(Hook):
     @staticmethod
     def open_specified_layers(model, open_layers):
         for name, module in model.named_modules():
-            if any([open_substring in name for open_substring in open_layers]):
+            if any(re.match(open_substring, name) for open_substring in open_layers):
                 module.train()
                 for p in module.parameters():
                     p.requires_grad = True

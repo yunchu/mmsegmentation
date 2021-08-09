@@ -20,7 +20,7 @@ params_config = dict(
     type='FreezeLayers',
     by_epoch=False,
     iters=0,
-    open_layers=['cls_head']
+    open_layers=[r'neck\.', r'decode_head\.', r'auxiliary_head\.']
 )
 
 # learning policy
