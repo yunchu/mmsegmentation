@@ -130,7 +130,6 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg')
     )
-
     logger.info(model)
 
     datasets = [build_dataset(cfg.data.train)]
@@ -145,7 +144,8 @@ def main():
             mmseg_version=f'{__version__}+{get_git_hash()[:7]}',
             config=cfg.pretty_text,
             CLASSES=datasets[0].CLASSES,
-            PALETTE=datasets[0].PALETTE)
+            PALETTE=datasets[0].PALETTE
+        )
 
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
@@ -159,7 +159,8 @@ def main():
         distributed=distributed,
         validate=(not args.no_validate),
         timestamp=timestamp,
-        meta=meta)
+        meta=meta
+    )
 
 
 if __name__ == '__main__':

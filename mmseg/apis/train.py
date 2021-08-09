@@ -7,7 +7,7 @@ from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import build_optimizer, build_runner
 from mmcv.runner.hooks import EMAHook
 
-from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook
+from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook, load_checkpoint
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.utils import get_root_logger
 from mmseg.models import build_params_manager
@@ -23,10 +23,12 @@ def set_random_seed(seed, deterministic=False):
             to True and `torch.backends.cudnn.benchmark` to False.
             Default: False.
     """
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
     if deterministic:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
@@ -53,7 +55,8 @@ def train_segmentor(model,
             len(cfg.gpu_ids),
             dist=distributed,
             seed=cfg.seed,
-            drop_last=True) for ds in dataset
+            drop_last=True)
+        for ds in dataset
     ]
 
     # put model on gpus
@@ -65,20 +68,24 @@ def train_segmentor(model,
             model.cuda(),
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False,
-            find_unused_parameters=find_unused_parameters)
+            find_unused_parameters=find_unused_parameters
+        )
     else:
         model = MMDataParallel(
-            model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
+            model.cuda(cfg.gpu_ids[0]),
+            device_ids=cfg.gpu_ids
+        )
 
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
 
+    # build runner
     if cfg.get('runner') is None:
         cfg.runner = {'type': 'IterBasedRunner', 'max_iters': cfg.total_iters}
         warnings.warn(
             'config is now expected to have a `runner` section, '
-            'please set `runner` in your config.', UserWarning)
-
+            'please set `runner` in your config.', UserWarning
+        )
     runner = build_runner(
         cfg.runner,
         default_args=dict(
@@ -87,27 +94,36 @@ def train_segmentor(model,
             optimizer=optimizer,
             work_dir=cfg.work_dir,
             logger=logger,
-            meta=meta))
+            meta=meta
+        )
+    )
 
+    # prepare optimizer config
     if distributed and 'type' not in cfg.optimizer_config:
         optimizer_config = DistOptimizerHook(**cfg.optimizer_config)
     else:
         optimizer_config = cfg.optimizer_config
 
+    # register EMA hook
     ema_cfg = cfg.get('ema_config', None)
     if ema_cfg:
         runner.register_hook(EMAHook(**ema_cfg))
 
-    # register hooks
-    runner.register_training_hooks(cfg.lr_config, optimizer_config,
-                                   cfg.checkpoint_config, cfg.log_config,
-                                   cfg.get('momentum_config', None))
+    # register training hooks
+    runner.register_training_hooks(
+        cfg.lr_config,
+        optimizer_config,
+        cfg.checkpoint_config,
+        cfg.log_config,
+        cfg.get('momentum_config', None)
+    )
 
+    # register parameters manager hook
     params_manager_cfg = cfg.get('params_config', None)
     if params_manager_cfg is not None:
         runner.register_hook(build_params_manager(params_manager_cfg))
 
-    # an ugly walkaround to make the .log and .log.json filenames the same
+    # an ugly workaround to make the .log and .log.json filenames the same
     runner.timestamp = timestamp
 
     # register eval hooks
@@ -118,14 +134,24 @@ def train_segmentor(model,
             samples_per_gpu=1,
             workers_per_gpu=cfg.data.workers_per_gpu,
             dist=distributed,
-            shuffle=False)
+            shuffle=False
+        )
         eval_cfg = cfg.get('evaluation', {})
         eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
         eval_hook = DistEvalHook if distributed else EvalHook
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
 
+    # load weights
     if cfg.resume_from:
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
-        runner.load_checkpoint(cfg.load_from)
+        load_checkpoint(
+            model, cfg.load_from,
+            logger=logger,
+            force_matching=True,
+            show_converted=True,
+            ignore_keys=cfg.get('ignore_keys', None)
+        )
+
+    # run training
     runner.run(data_loaders, cfg.workflow)
