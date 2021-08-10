@@ -1,6 +1,7 @@
 import collections
 
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from mmcv.utils import build_from_cfg
 
 from ..builder import PIPELINES
@@ -86,6 +87,79 @@ class ProbCompose(object):
         data = transform(data)
 
         return data
+
+    def __repr__(self):
+        format_string = self.__class__.__name__ + '('
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
+
+        return format_string
+
+
+@PIPELINES.register_module()
+class MaskCompose(object):
+    def __init__(self, transforms, prob, lambda_limits):
+        self.prob = prob
+        assert 0.0 <= self.prob <= 1.0
+
+        assert isinstance(lambda_limits, collections.abc.Sequence)
+        assert len(lambda_limits) == 2
+        assert 0.0 < lambda_limits[0] < lambda_limits[1]
+        self.lambda_limits = lambda_limits
+
+        assert isinstance(transforms, collections.abc.Sequence)
+        self.transforms = []
+        for transform in transforms:
+            if isinstance(transform, dict):
+                transform = build_from_cfg(transform, PIPELINES)
+                self.transforms.append(transform)
+            elif callable(transform):
+                self.transforms.append(transform)
+            else:
+                raise TypeError(f'transform must be callable or a dict, '
+                                f'but got {type(transform)}')
+
+    @staticmethod
+    def _apply_transforms(data, transforms):
+        for t in transforms:
+            data = t(data)
+            if data is None:
+                return None
+
+        return data
+
+    @staticmethod
+    def _generate_mask(shape, lambda_limits):
+        noise = np.random.randn(shape)
+
+        sigma = np.exp(np.log10(np.random.uniform(lambda_limits[0], lambda_limits[1])))
+        soft_mask = gaussian_filter(noise, sigma=sigma)
+
+        threshold = np.median(soft_mask)
+        hard_mask = soft_mask > threshold
+
+        return hard_mask
+
+    @staticmethod
+    def _mix_data(main_data, aux_data, mask):
+        main_data['img'] = np.where(mask, main_data['img'], aux_data['img'])
+
+        return main_data
+
+    def __call__(self, data):
+        main_data = self._apply_transforms(data, self.transforms)
+        if np.random.rand() > self.prob:
+            return main_data
+
+        aux_data = self._apply_transforms(data, self.transforms)
+        assert main_data['img'].shape == aux_data['img'].shape
+
+        mask = self._generate_mask(main_data['img'].shape[:2], self.lambda_limits)
+        out_data = self._mix_data(main_data, aux_data, mask)
+
+        return out_data
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
