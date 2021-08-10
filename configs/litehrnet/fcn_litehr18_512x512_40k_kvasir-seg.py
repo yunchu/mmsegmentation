@@ -29,7 +29,7 @@ model = dict(
 
 checkpoint_config = dict(
     by_epoch=False,
-    interval=1000
+    interval=1000,
 )
 evaluation = dict(
     interval=1000,
@@ -44,17 +44,24 @@ params_config = dict(
     open_layers=[r'neck\.', r'decode_head\.', r'auxiliary_head\.']
 )
 
+# optimizer
+optimizer = dict(
+    lr=1e-3,
+)
+
 # learning policy
 lr_config = dict(
     policy='customcos',
     by_epoch=False,
     periods=[36000],
-    min_lr_ratio=1e-3,
+    min_lr_ratio=1e-2,
     alpha=1.2,
     # fixed='constant',
-    # fixed_iters=5,
+    # fixed_iters=40000,
     # fixed_ratio=10.0,
     warmup='cos',
     warmup_iters=4000,
-    warmup_ratio=1e-3,
+    warmup_ratio=1e-2,
 )
+
+# find_unused_parameters = True

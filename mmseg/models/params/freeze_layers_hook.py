@@ -27,9 +27,10 @@ class FreezeLayers(Hook):
 
         model = runner.model.module
         if cur_iter < self.iters:
-            runner.logger.info('* Only train {} ({} {}/{})'.format(
-                self.open_layers, 'epoch' if self.by_epoch else 'iter', cur_iter + 1, self.iters)
-            )
+            if cur_iter % 1000 == 0:
+                runner.logger.info('* Only train {} ({} {}/{})'.format(
+                    self.open_layers, 'epoch' if self.by_epoch else 'iter', cur_iter + 1, self.iters)
+                )
 
             self.open_specified_layers(model, self.open_layers)
         else:
