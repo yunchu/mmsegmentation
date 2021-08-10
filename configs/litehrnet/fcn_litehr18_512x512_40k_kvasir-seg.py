@@ -40,7 +40,7 @@ evaluation = dict(
 params_config = dict(
     type='FreezeLayers',
     by_epoch=False,
-    iters=4000,
+    iters=2000,
     open_layers=[r'backbone\.aggregator\.', r'neck\.', r'decode_head\.', r'auxiliary_head\.']
 )
 
@@ -53,11 +53,11 @@ optimizer = dict(
 lr_config = dict(
     policy='customcos',
     by_epoch=False,
-    periods=[32000],
+    periods=[34000],
     min_lr_ratio=1e-2,
     alpha=1.2,
     fixed='constant',
-    fixed_iters=4000,
+    fixed_iters=2000,
     fixed_ratio=10.0,
     warmup='cos',
     warmup_iters=4000,

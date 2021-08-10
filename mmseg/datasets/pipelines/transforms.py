@@ -810,7 +810,8 @@ class PhotoMetricDistortion(object):
         self.saturation_lower, self.saturation_upper = saturation_range
         self.hue_delta = hue_delta
 
-    def convert(self, img, alpha=1, beta=0):
+    @staticmethod
+    def convert(img, alpha=1, beta=0):
         """Multiple with alpha and add beat with clip."""
         img = img.astype(np.float32) * alpha + beta
         img = np.clip(img, 0, 255)
@@ -865,6 +866,7 @@ class PhotoMetricDistortion(object):
         """
 
         img = results['img']
+
         # random brightness
         img = self.brightness(img)
 
@@ -885,6 +887,7 @@ class PhotoMetricDistortion(object):
             img = self.contrast(img)
 
         results['img'] = img
+
         return results
 
     def __repr__(self):
