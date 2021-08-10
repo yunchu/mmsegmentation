@@ -15,7 +15,8 @@ train_pipeline = [
          transforms=[
              dict(type='Empty'),
              dict(type='PhotoMetricDistortion'),
-             dict(type='CrossNorm', mean_std_file='mean_std_list.txt'),
+             # dict(type='CrossNorm', mean_std_file='mean_std_list.txt'),
+             dict(type='MixUp',  annot='imagenet_train_list.txt', imgs_root='imagenet/train', alpha=0.7, beta=10.0),
          ],
          probs=[0.1, 0.45, 0.45]),
     dict(type='Normalize', **img_norm_cfg),

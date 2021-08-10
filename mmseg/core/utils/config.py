@@ -1,5 +1,5 @@
 COMPOSE_TYPES = ['ProbCompose']
-TARGET_TYPES = ['CrossNorm']
+TARGET_TYPES = ['CrossNorm', 'MixUp']
 
 
 def _propagate_data_pipeline(pipeline, root_dir):

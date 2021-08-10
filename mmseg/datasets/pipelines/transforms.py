@@ -904,6 +904,94 @@ class PhotoMetricDistortion(object):
 
 
 @PIPELINES.register_module()
+class MixUp(object):
+    def __init__(self, root_dir, annot, imgs_root, alpha=0.2, beta=None, prob=1.0):
+        if not isinstance(alpha, (int, float)):
+            raise TypeError(f'Alpha must be an int or float, but got {type(alpha)}')
+        self.alpha = float(alpha)
+
+        if beta is None:
+            self.beta = self.alpha
+        else:
+            if not isinstance(beta, (int, float)):
+                raise TypeError(f'Beta must be an int or float, but got {type(beta)}')
+
+            self.beta = float(beta)
+
+        annot = osp.join(root_dir, annot)
+        if not osp.exists(annot):
+            raise ValueError(f'Annot does not exist: {annot}')
+        imgs_root = osp.join(root_dir, imgs_root)
+        if not osp.exists(imgs_root):
+            raise ValueError(f'Annot does not exist: {imgs_root}')
+        self.image_paths = self._parse_image_paths(annot, imgs_root)
+        if len(self.image_paths) == 0:
+            raise ValueError('Found no images for MixUp')
+
+        self.prob = prob
+        assert 0.0 <= self.prob <= 1.0
+
+    @staticmethod
+    def _parse_image_paths(annot, imgs_root):
+        return [osp.join(imgs_root, x.strip().split(' ')[0]) for x in open(annot)]
+
+    @staticmethod
+    def _prepare_mixup_image(image_path, trg_size, scale=1.15):
+        image = mmcv.imread(image_path)
+
+        scale_factor = scale * float(min(trg_size)) / float(min(image.shape[:2]))
+        scaled_image = mmcv.imrescale(image, scale_factor)
+
+        h_offset = random.randint(0, scaled_image.shape[0] - trg_size[0])
+        w_offset = random.randint(0, scaled_image.shape[1] - trg_size[1])
+        cropped_image = scaled_image[h_offset:h_offset + trg_size[0],
+                                     w_offset:w_offset + trg_size[1]]
+
+        if np.random.randint(2):
+            cropped_image = mmcv.imflip(cropped_image)
+
+        return cropped_image
+
+    @staticmethod
+    def _generate_weight(alpha, beta):
+        weight = np.random.beta(alpha, beta)
+        if weight > 0.5:
+            weight -= 0.5
+
+        return weight
+
+    def __call__(self, results):
+        if np.random.rand() > self.prob:
+            return results
+
+        img = results['img']
+
+        mixup_image_idx = np.random.randint(len(self.image_paths))
+        mixup_image_path = self.image_paths[mixup_image_idx]
+        mixup_image = self._prepare_mixup_image(mixup_image_path, img.shape[:2])
+
+        alpha = self._generate_weight(self.alpha, self.beta)
+        scaled_mixup_image = alpha * mixup_image.astype(np.float32)
+
+        float_img = img.astype(np.float32)
+        mixed_image = (1.0 - alpha) * float_img + scaled_mixup_image
+
+        img = mixed_image.clip(0.0, 255.0).astype(np.uint8)
+
+        results['img'] = img
+
+        return results
+
+    def __repr__(self):
+        repr_str = f'{self.__class__.__name__}(' \
+                   f'alpha={self.alpha}, ' \
+                   f'beta={self.beta}, ' \
+                   f'size={len(self.image_paths)}, ' \
+                   f'prob={self.prob})'
+        return repr_str
+
+
+@PIPELINES.register_module()
 class CrossNorm(object):
     def __init__(self, root_dir, mean_std_file, prob=1.0):
         mean_std_file = osp.join(root_dir, mean_std_file)
