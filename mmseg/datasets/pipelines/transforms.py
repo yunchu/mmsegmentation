@@ -1,3 +1,5 @@
+import os.path as osp
+
 import mmcv
 import numpy as np
 from mmcv.utils import deprecated_api_warning, is_tuple_of
@@ -898,4 +900,86 @@ class PhotoMetricDistortion(object):
                      f'saturation_range=({self.saturation_lower}, '
                      f'{self.saturation_upper}), '
                      f'hue_delta={self.hue_delta})')
+        return repr_str
+
+
+@PIPELINES.register_module()
+class CrossNorm(object):
+    def __init__(self, root_dir, mean_std_file, prob=1.0):
+        mean_std_file = osp.join(root_dir, mean_std_file)
+        self.enable = osp.exists(mean_std_file)
+
+        if self.enable:
+            self.cross_mean, self.cross_std = self._parse_data(mean_std_file)
+            self.num_tuples = len(self.cross_mean)
+            if self.num_tuples == 0:
+                raise ValueError('Found no mean (or std) tuples for CrossNorm')
+        else:
+            self.cross_mean, self.cross_std, self.num_tuples = None, None, 0
+
+        self.prob = prob
+        assert 0.0 <= self.prob <= 1.0
+
+    @staticmethod
+    def _parse_data(data_file):
+        mean_data, std_data = [], []
+        with open(data_file) as input_stream:
+            for line in input_stream:
+                line_parts = line.strip().split(' ')
+                if len(line_parts) != 2:
+                    continue
+
+                mean_str, std_str = line_parts
+                mean_value = [float(v) for v in mean_str.split(',')]
+                std_value = [float(v) for v in std_str.split(',')]
+
+                assert len(mean_value) == 3
+                assert len(std_value) == 3
+
+                mean_data.append(mean_value)
+                std_data.append(std_value)
+
+        mean_data = np.array(mean_data, dtype=np.float32)
+        std_data = np.array(std_data, dtype=np.float32)
+
+        return mean_data.reshape([-1, 1, 1, 3]), std_data.reshape([-1, 1, 1, 3])
+
+    def __call__(self, results):
+        if not self.enable or np.random.rand() > self.prob:
+            return results
+
+        tuple_idx = np.random.randint(self.num_tuples)
+        cross_mean_value = self.cross_mean[tuple_idx]
+        cross_std_value = self.cross_std[tuple_idx]
+
+        img = results['img']
+        float_img = img.astype(np.float32)
+
+        mean_x = np.mean(float_img, axis=(0, 1))
+        mean_sqr_x = np.mean(float_img ** 2, axis=(0, 1))
+        std_x = np.sqrt((mean_sqr_x - mean_x ** 2).clip(0.0))
+
+        if np.all(std_x > 1e-3):
+            norm_img = (float_img - mean_x) / std_x
+            cross_img = cross_std_value * norm_img + cross_mean_value
+            img = cross_img.clip(0.0, 255.0).astype(np.uint8)
+
+        results['img'] = img
+
+        return results
+
+    def __repr__(self):
+        repr_str = f'{self.__class__.__name__}(' \
+                   f'size={self.num_tuples}, ' \
+                   f'prob={self.prob})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class Empty(object):
+    def __call__(self, results):
+        return results
+
+    def __repr__(self):
+        repr_str = f'{self.__class__.__name__}'
         return repr_str
