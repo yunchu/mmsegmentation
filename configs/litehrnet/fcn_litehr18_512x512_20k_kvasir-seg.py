@@ -21,7 +21,7 @@ model = dict(
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
         loss_decode=[
-            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_sigma=0.1),
+            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_sigma=0.05),
         ]
     )
 )
