@@ -162,7 +162,8 @@ class CrossEntropyLoss(nn.Module):
                  use_mask=False,
                  reduction='mean',
                  class_weight=None,
-                 loss_weight=1.0):
+                 loss_weight=1.0,
+                 loss_jitter_sigma=None):
         assert (use_sigmoid is False) or (use_mask is False)
 
         super(CrossEntropyLoss, self).__init__()
@@ -171,6 +172,7 @@ class CrossEntropyLoss(nn.Module):
         self.use_mask = use_mask
         self.reduction = reduction
         self.loss_weight = loss_weight
+        self.jitter_sigma = loss_jitter_sigma
         self.class_weight = get_class_weight(class_weight)
 
         if self.use_sigmoid:
@@ -200,7 +202,7 @@ class CrossEntropyLoss(nn.Module):
         else:
             class_weight = None
 
-        loss_cls = self.loss_weight * self.cls_criterion(
+        loss_cls = self.cls_criterion(
             cls_score,
             label,
             weight,
@@ -210,4 +212,11 @@ class CrossEntropyLoss(nn.Module):
             **kwargs
         )
 
-        return loss_cls
+        if self.jitter_sigma is not None and self.jitter_sigma > 0.0:
+            jitter_point = torch.normal(0.0, self.jitter_sigma, [],
+                                        device=loss_cls.device, dtype=loss_cls.dtype)
+            out_loss = (loss_cls - jitter_point).abs() + jitter_point
+        else:
+            out_loss = loss_cls
+
+        return self.loss_weight * out_loss

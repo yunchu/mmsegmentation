@@ -11,10 +11,11 @@ train_pipeline = [
     dict(type='RandomCrop', crop_size=crop_size, cat_max_ratio=0.75),
     dict(type='RandomFlip', prob=0.5, direction='horizontal'),
     dict(type='RandomFlip', prob=0.5, direction='vertical'),
-    dict(type='MaskCompose', prob=0.5, lambda_limits=(4, 16),
-         transforms=[
-             dict(type='PhotoMetricDistortion'),
-         ]),
+    # dict(type='MaskCompose', prob=0.5, lambda_limits=(4, 16),
+    #      transforms=[
+    #          dict(type='PhotoMetricDistortion'),
+    #      ]),
+    dict(type='PhotoMetricDistortion'),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size=crop_size, pad_val=0, seg_pad_val=255),
     dict(type='RandomRotate', prob=0.5, degree=90, pad_val=0, seg_pad_val=255),
