@@ -1,4 +1,4 @@
-from .compose import Compose, ProbCompose
+from .compose import Compose, ProbCompose, MaskCompose
 from .formating import (Collect, ImageToTensor, ToDataContainer, ToTensor,
                         Transpose, to_tensor)
 from .loading import LoadAnnotations, LoadImageFromFile
@@ -11,6 +11,7 @@ from .transforms import (CLAHE, AdjustGamma, Normalize, Pad,
 __all__ = [
     'Compose',
     'ProbCompose',
+    'MaskCompose',
     'to_tensor',
     'ToTensor',
     'ImageToTensor',

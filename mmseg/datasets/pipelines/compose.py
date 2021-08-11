@@ -1,4 +1,5 @@
 import collections
+from copy import deepcopy
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
@@ -132,7 +133,7 @@ class MaskCompose(object):
 
     @staticmethod
     def _generate_mask(shape, lambda_limits):
-        noise = np.random.randn(shape)
+        noise = np.random.randn(*shape)
 
         sigma = np.exp(np.log10(np.random.uniform(lambda_limits[0], lambda_limits[1])))
         soft_mask = gaussian_filter(noise, sigma=sigma)
@@ -144,16 +145,19 @@ class MaskCompose(object):
 
     @staticmethod
     def _mix_data(main_data, aux_data, mask):
-        main_data['img'] = np.where(mask, main_data['img'], aux_data['img'])
+        main_data['img'] = np.where(np.expand_dims(mask, axis=2), main_data['img'], aux_data['img'])
 
         return main_data
 
     def __call__(self, data):
-        main_data = self._apply_transforms(data, self.transforms)
+        main_data = self._apply_transforms(deepcopy(data), self.transforms)
         if np.random.rand() > self.prob:
             return main_data
 
-        aux_data = self._apply_transforms(data, self.transforms)
+        aux_data = self._apply_transforms(deepcopy(data), self.transforms)
+        if main_data is None or aux_data is None:
+            return main_data
+
         assert main_data['img'].shape == aux_data['img'].shape
 
         mask = self._generate_mask(main_data['img'].shape[:2], self.lambda_limits)
