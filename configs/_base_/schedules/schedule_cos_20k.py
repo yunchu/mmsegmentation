@@ -27,7 +27,7 @@ params_config = dict(
 lr_config = dict(
     policy='customcos',
     by_epoch=False,
-    periods=[36000],
+    periods=[16000],
     min_lr_ratio=1e-3,
     alpha=1.2,
     # fixed='constant',
@@ -41,7 +41,7 @@ lr_config = dict(
 # runtime settings
 runner = dict(
     type='IterBasedRunner',
-    max_iters=40000
+    max_iters=20000
 )
 checkpoint_config = dict(
     by_epoch=False,
