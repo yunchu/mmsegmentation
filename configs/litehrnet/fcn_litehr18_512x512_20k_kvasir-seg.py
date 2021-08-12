@@ -25,7 +25,7 @@ model = dict(
         ]
     ),
     train_cfg=dict(
-        mix_loss=dict(enable=True, weight=1.0)
+        mix_loss=dict(enable=True, weight=0.1)
     ),
 )
 evaluation = dict(
