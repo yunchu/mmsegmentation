@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from scipy.special import erfinv
 
 from ..builder import LOSSES
 from .utils import get_class_weight, weight_reduce_loss
@@ -163,7 +164,8 @@ class CrossEntropyLoss(nn.Module):
                  reduction='mean',
                  class_weight=None,
                  loss_weight=1.0,
-                 loss_jitter_sigma=None):
+                 loss_jitter_prob=None,
+                 loss_jitter_momentum=0.1):
         assert (use_sigmoid is False) or (use_mask is False)
 
         super(CrossEntropyLoss, self).__init__()
@@ -172,8 +174,15 @@ class CrossEntropyLoss(nn.Module):
         self.use_mask = use_mask
         self.reduction = reduction
         self.loss_weight = loss_weight
-        self.jitter_sigma = loss_jitter_sigma
         self.class_weight = get_class_weight(class_weight)
+
+        self.smooth_loss = None
+        self.jitter_sigma_factor = None
+        self.loss_jitter_momentum = loss_jitter_momentum
+        assert 0.0 < self.loss_jitter_momentum < 1.0
+        if loss_jitter_prob is not None:
+            assert 0.0 < loss_jitter_prob < 1.0
+            self.jitter_sigma_factor = 1.0 / ((2.0 ** 0.5) * erfinv(1.0 - 2.0 * loss_jitter_prob))
 
         if self.use_sigmoid:
             self.cls_criterion = binary_cross_entropy
@@ -212,9 +221,15 @@ class CrossEntropyLoss(nn.Module):
             **kwargs
         )
 
-        if self.jitter_sigma is not None and self.jitter_sigma > 0.0:
-            jitter_point = torch.normal(0.0, self.jitter_sigma, [],
-                                        device=loss_cls.device, dtype=loss_cls.dtype)
+        if self.jitter_sigma_factor is not None and loss_cls.numel() == 1:
+            if self.smooth_loss is None:
+                self.smooth_loss = loss_cls.item()
+            else:
+                self.smooth_loss = (1.0 - self.loss_jitter_momentum) * self.smooth_loss + \
+                                   self.loss_jitter_momentum * loss_cls.item()
+
+            jitter_sigma = self.jitter_sigma_factor * abs(self.smooth_loss)
+            jitter_point = torch.normal(0.0, jitter_sigma, [], device=loss_cls.device, dtype=loss_cls.dtype)
             out_loss = (loss_cls - jitter_point).abs() + jitter_point
         else:
             out_loss = loss_cls
