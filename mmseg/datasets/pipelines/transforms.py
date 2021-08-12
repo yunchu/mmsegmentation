@@ -319,30 +319,38 @@ class Pad(object):
         self.size_divisor = size_divisor
         self.pad_val = pad_val
         self.seg_pad_val = seg_pad_val
+
         # only one of size and size_divisor should be valid
         assert size is not None or size_divisor is not None
         assert size is None or size_divisor is None
 
-    def _pad_img(self, results):
+    def _pad_img(self, results, target):
         """Pad images according to ``self.size``."""
+
+        if target not in results:
+            return
+
         if self.size is not None:
-            padded_img = mmcv.impad(
-                results['img'], shape=self.size, pad_val=self.pad_val)
+            padded_img = mmcv.impad(results[target], shape=self.size, pad_val=self.pad_val)
         elif self.size_divisor is not None:
-            padded_img = mmcv.impad_to_multiple(
-                results['img'], self.size_divisor, pad_val=self.pad_val)
-        results['img'] = padded_img
+            padded_img = mmcv.impad_to_multiple(results[target], self.size_divisor, pad_val=self.pad_val)
+
+        results[target] = padded_img
         results['pad_shape'] = padded_img.shape
         results['pad_fixed_size'] = self.size
         results['pad_size_divisor'] = self.size_divisor
 
-    def _pad_seg(self, results):
+    def _pad_seg(self, results, target):
         """Pad masks according to ``results['pad_shape']``."""
-        for key in results.get('seg_fields', []):
-            results[key] = mmcv.impad(
-                results[key],
-                shape=results['pad_shape'][:2],
-                pad_val=self.seg_pad_val)
+
+        if target not in results:
+            return
+
+        results[target] = mmcv.impad(
+            results[target],
+            shape=results['pad_shape'][:2],
+            pad_val=self.seg_pad_val
+        )
 
     def __call__(self, results):
         """Call function to pad images, masks, semantic segmentation maps.
@@ -354,8 +362,11 @@ class Pad(object):
             dict: Updated result dict.
         """
 
-        self._pad_img(results)
-        self._pad_seg(results)
+        for target in ['img', 'aux_img']:
+            self._pad_img(results, target)
+        for target in results.get('seg_fields', []):
+            self._pad_seg(results, target)
+
         return results
 
     def __repr__(self):
@@ -394,10 +405,11 @@ class Normalize(object):
                 result dict.
         """
 
-        results['img'] = mmcv.imnormalize(results['img'], self.mean, self.std,
-                                          self.to_rgb)
-        results['img_norm_cfg'] = dict(
-            mean=self.mean, std=self.std, to_rgb=self.to_rgb)
+        for target in ['img', 'aux_img']:
+            if target in results:
+                results[target] = mmcv.imnormalize(results[target], self.mean, self.std, self.to_rgb)
+        results['img_norm_cfg'] = dict(mean=self.mean, std=self.std, to_rgb=self.to_rgb)
+
         return results
 
     def __repr__(self):
@@ -627,13 +639,14 @@ class RandomRotate(object):
             degree = np.random.uniform(min(*self.degree), max(*self.degree))
 
             # rotate image
-            results['img'] = mmcv.imrotate(
-                results['img'],
-                angle=degree,
-                border_value=self.pal_val,
-                center=self.center,
-                auto_bound=self.auto_bound
-            )
+            for target in ['img', 'aux_img']:
+                results[target] = mmcv.imrotate(
+                    results[target],
+                    angle=degree,
+                    border_value=self.pal_val,
+                    center=self.center,
+                    auto_bound=self.auto_bound
+                )
 
             # rotate segs
             for key in results.get('seg_fields', []):

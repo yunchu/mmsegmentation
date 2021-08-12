@@ -23,7 +23,10 @@ model = dict(
         loss_decode=[
             dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=None),
         ]
-    )
+    ),
+    train_cfg=dict(
+        mix_loss=dict(enable=True, weight=1.0)
+    ),
 )
 evaluation = dict(
     metric='mDice',

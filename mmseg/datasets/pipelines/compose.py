@@ -101,7 +101,8 @@ class ProbCompose(object):
 
 @PIPELINES.register_module()
 class MaskCompose(object):
-    def __init__(self, transforms, prob, lambda_limits):
+    def __init__(self, transforms, prob, lambda_limits=(4, 16), keep_original=False):
+        self.keep_original = keep_original
         self.prob = prob
         assert 0.0 <= self.prob <= 1.0
 
@@ -144,26 +145,29 @@ class MaskCompose(object):
         return hard_mask
 
     @staticmethod
-    def _mix_data(main_data, aux_data, mask):
-        main_data['img'] = np.where(np.expand_dims(mask, axis=2), main_data['img'], aux_data['img'])
-
-        return main_data
+    def _mix_img(main_img, aux_img, mask):
+        return np.where(np.expand_dims(mask, axis=2), main_img, aux_img)
 
     def __call__(self, data):
         main_data = self._apply_transforms(deepcopy(data), self.transforms)
-        if np.random.rand() > self.prob:
+        assert main_data is not None
+        if not self.keep_original and np.random.rand() > self.prob:
             return main_data
 
         aux_data = self._apply_transforms(deepcopy(data), self.transforms)
-        if main_data is None or aux_data is None:
-            return main_data
+        assert aux_data is not None
 
         assert main_data['img'].shape == aux_data['img'].shape
 
         mask = self._generate_mask(main_data['img'].shape[:2], self.lambda_limits)
-        out_data = self._mix_data(main_data, aux_data, mask)
+        mixed_img = self._mix_img(main_data['img'], aux_data['img'], mask)
 
-        return out_data
+        if self.keep_original:
+            main_data['aux_img'] = mixed_img
+        else:
+            main_data['img'] = mixed_img
+
+        return main_data
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
