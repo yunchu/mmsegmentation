@@ -3,7 +3,6 @@ from functools import partial
 
 import mmcv
 import numpy as np
-import onnxruntime as rt
 import torch
 import torch._C
 import torch.serialization
@@ -146,6 +145,7 @@ def pytorch2onnx(model,
         dynamic_export (bool): Whether to export ONNX with dynamic axis.
             Default: False.
     """
+
     model.cpu().eval()
     test_mode = model.test_cfg.mode
 
@@ -168,7 +168,9 @@ def pytorch2onnx(model,
         model.forward,
         img_metas=img_meta_list,
         return_loss=False,
-        rescale=True)
+        rescale=True
+    )
+
     dynamic_axes = None
     if dynamic_export:
         if test_mode == 'slide':
@@ -188,6 +190,7 @@ def pytorch2onnx(model,
             }
 
     register_extra_symbolics(opset_version)
+
     with torch.no_grad():
         torch.onnx.export(
             model, (img_list, ),
@@ -198,132 +201,130 @@ def pytorch2onnx(model,
             keep_initializers_as_inputs=False,
             verbose=show,
             opset_version=opset_version,
-            dynamic_axes=dynamic_axes)
+            dynamic_axes=dynamic_axes
+        )
         print(f'Successfully exported ONNX model: {output_file}')
-    model.forward = origin_forward
 
+    model.forward = origin_forward
     if verify:
-        # check by onnx
         import onnx
+        # import onnxruntime as rt
+
+        # check by onnx
         onnx_model = onnx.load(output_file)
         onnx.checker.check_model(onnx_model)
 
-        if dynamic_export and test_mode == 'whole':
-            # scale image for dynamic shape test
-            img_list = [
-                nn.functional.interpolate(_, scale_factor=1.5)
-                for _ in img_list
-            ]
-            # concate flip image for batch test
-            flip_img_list = [_.flip(-1) for _ in img_list]
-            img_list = [
-                torch.cat((ori_img, flip_img), 0)
-                for ori_img, flip_img in zip(img_list, flip_img_list)
-            ]
-
-            # update img_meta
-            img_list, img_meta_list = _update_input_img(
-                img_list, img_meta_list, test_mode == 'whole')
-
-        # check the numerical value
-        # get pytorch output
-        with torch.no_grad():
-            pytorch_result = model(img_list, img_meta_list, return_loss=False)
-            pytorch_result = np.stack(pytorch_result, 0)
-
-        # get onnx output
-        input_all = [node.name for node in onnx_model.graph.input]
-        input_initializer = [
-            node.name for node in onnx_model.graph.initializer
-        ]
-        net_feed_input = list(set(input_all) - set(input_initializer))
-        assert (len(net_feed_input) == 1)
-        sess = rt.InferenceSession(output_file)
-        onnx_result = sess.run(
-            None, {net_feed_input[0]: img_list[0].detach().numpy()})[0][0]
-        # show segmentation results
-        if show:
-            import cv2
-            import os.path as osp
-            img = img_meta_list[0][0]['filename']
-            if not osp.exists(img):
-                img = imgs[0][:3, ...].permute(1, 2, 0) * 255
-                img = img.detach().numpy().astype(np.uint8)
-                ori_shape = img.shape[:2]
-            else:
-                ori_shape = LoadImage()({'img': img})['ori_shape']
-
-            # resize onnx_result to ori_shape
-            onnx_result_ = cv2.resize(onnx_result[0].astype(np.uint8),
-                                      (ori_shape[1], ori_shape[0]))
-            show_result_pyplot(
-                model,
-                img, (onnx_result_, ),
-                palette=model.PALETTE,
-                block=False,
-                title='ONNXRuntime',
-                opacity=0.5)
-
-            # resize pytorch_result to ori_shape
-            pytorch_result_ = cv2.resize(pytorch_result[0].astype(np.uint8),
-                                         (ori_shape[1], ori_shape[0]))
-            show_result_pyplot(
-                model,
-                img, (pytorch_result_, ),
-                title='PyTorch',
-                palette=model.PALETTE,
-                opacity=0.5)
-        # compare results
-        np.testing.assert_allclose(
-            pytorch_result.astype(np.float32) / num_classes,
-            onnx_result.astype(np.float32) / num_classes,
-            rtol=1e-5,
-            atol=1e-5,
-            err_msg='The outputs are different between Pytorch and ONNX')
-        print('The outputs are same between Pytorch and ONNX')
+        # if dynamic_export and test_mode == 'whole':
+        #     # scale image for dynamic shape test
+        #     img_list = [
+        #         nn.functional.interpolate(_, scale_factor=1.5)
+        #         for _ in img_list
+        #     ]
+        #
+        #     # concate flip image for batch test
+        #     flip_img_list = [_.flip(-1) for _ in img_list]
+        #     img_list = [
+        #         torch.cat((ori_img, flip_img), 0)
+        #         for ori_img, flip_img in zip(img_list, flip_img_list)
+        #     ]
+        #
+        #     # update img_meta
+        #     img_list, img_meta_list = _update_input_img(
+        #         img_list, img_meta_list, test_mode == 'whole')
+        #
+        # # check the numerical value
+        # # get pytorch output
+        # with torch.no_grad():
+        #     pytorch_result = model(img_list, img_meta_list, return_loss=False)
+        #     pytorch_result = np.stack(pytorch_result, 0)
+        #
+        # # get onnx output
+        # input_all = [node.name for node in onnx_model.graph.input]
+        # input_initializer = [
+        #     node.name for node in onnx_model.graph.initializer
+        # ]
+        # net_feed_input = list(set(input_all) - set(input_initializer))
+        # assert (len(net_feed_input) == 1)
+        #
+        # sess = rt.InferenceSession(output_file)
+        # onnx_result = sess.run(None, {net_feed_input[0]: img_list[0].detach().numpy()})[0][0]
+        #
+        # # show segmentation results
+        # if show:
+        #     import cv2
+        #     import os.path as osp
+        #     img = img_meta_list[0][0]['filename']
+        #     if not osp.exists(img):
+        #         img = imgs[0][:3, ...].permute(1, 2, 0) * 255
+        #         img = img.detach().numpy().astype(np.uint8)
+        #         ori_shape = img.shape[:2]
+        #     else:
+        #         ori_shape = LoadImage()({'img': img})['ori_shape']
+        #
+        #     # resize onnx_result to ori_shape
+        #     onnx_result_ = cv2.resize(onnx_result[0].astype(np.uint8),
+        #                               (ori_shape[1], ori_shape[0]))
+        #     show_result_pyplot(
+        #         model,
+        #         img, (onnx_result_, ),
+        #         palette=model.PALETTE,
+        #         block=False,
+        #         title='ONNXRuntime',
+        #         opacity=0.5
+        #     )
+        #
+        #     # resize pytorch_result to ori_shape
+        #     pytorch_result_ = cv2.resize(pytorch_result[0].astype(np.uint8),
+        #                                  (ori_shape[1], ori_shape[0]))
+        #     show_result_pyplot(
+        #         model,
+        #         img, (pytorch_result_, ),
+        #         title='PyTorch',
+        #         palette=model.PALETTE,
+        #         opacity=0.5
+        #     )
+        #
+        # # compare results
+        # np.testing.assert_allclose(
+        #     pytorch_result.astype(np.float32) / num_classes,
+        #     onnx_result.astype(np.float32) / num_classes,
+        #     rtol=1e-5,
+        #     atol=1e-5,
+        #     err_msg='The outputs are different between Pytorch and ONNX'
+        # )
+        # print('The outputs are same between Pytorch and ONNX')
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Convert MMSeg to ONNX')
-    parser.add_argument('config', help='test config file path')
-    parser.add_argument('--checkpoint', help='checkpoint file', default=None)
-    parser.add_argument(
-        '--input-img', type=str, help='Images for input', default=None)
-    parser.add_argument(
-        '--show',
-        action='store_true',
-        help='show onnx graph and segmentation results')
-    parser.add_argument(
-        '--verify', action='store_true', help='verify the onnx model')
+    parser.add_argument('config',
+                        help='test config file path')
+    parser.add_argument('--checkpoint', default=None,
+                        help='checkpoint file')
+    parser.add_argument('--input-img', type=str, default=None,
+                        help='Images for input')
+    parser.add_argument('--show', action='store_true',
+                        help='show onnx graph and segmentation results')
+    parser.add_argument('--verify', action='store_true',
+                        help='verify the onnx model')
     parser.add_argument('--output-file', type=str, default='tmp.onnx')
     parser.add_argument('--opset-version', type=int, default=11)
-    parser.add_argument(
-        '--shape',
-        type=int,
-        nargs='+',
-        default=None,
-        help='input image height and width.')
-    parser.add_argument(
-        '--rescale_shape',
-        type=int,
-        nargs='+',
-        default=None,
-        help='output image rescale height and width, work for slide mode.')
-    parser.add_argument(
-        '--cfg-options',
-        nargs='+',
-        action=DictAction,
-        help='Override some settings in the used config, the key-value pair '
-        'in xxx=yyy format will be merged into config file. If the value to '
-        'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
-        'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
-        'Note that the quotation marks are necessary and that no white space '
-        'is allowed.')
-    parser.add_argument(
-        '--dynamic-export',
-        action='store_true',
-        help='Whether to export onnx with dynamic axis.')
+    parser.add_argument('--shape', type=int, nargs='+', default=None,
+                        help='input image height and width.')
+    parser.add_argument('--rescale_shape', type=int, nargs='+', default=None,
+                        help='output image rescale height and width, work for slide mode.')
+    parser.add_argument('--cfg-options', nargs='+', action=DictAction,
+                        help='Override some settings in the used config, the key-value pair '
+                             'in xxx=yyy format will be merged into config file. If the value to '
+                             'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
+                             'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
+                             'Note that the quotation marks are necessary and that no white space '
+                             'is allowed.')
+    parser.add_argument('--dynamic-export', action='store_true',
+                        help='Whether to export onnx with dynamic axis.')
+
     args = parser.parse_args()
+
     return args
 
 
@@ -341,10 +342,7 @@ if __name__ == '__main__':
     elif len(args.shape) == 1:
         input_shape = (1, 3, args.shape[0], args.shape[0])
     elif len(args.shape) == 2:
-        input_shape = (
-            1,
-            3,
-        ) + tuple(args.shape)
+        input_shape = (1, 3,) + tuple(args.shape)
     else:
         raise ValueError('invalid input shape')
 
@@ -352,8 +350,8 @@ if __name__ == '__main__':
 
     # build the model and load checkpoint
     cfg.model.train_cfg = None
-    segmentor = build_segmentor(
-        cfg.model, train_cfg=None, test_cfg=cfg.get('test_cfg'))
+    segmentor = build_segmentor(cfg.model, train_cfg=None, test_cfg=cfg.get('test_cfg'))
+
     # convert SyncBN to BN
     segmentor = _convert_batchnorm(segmentor)
 
@@ -363,7 +361,7 @@ if __name__ == '__main__':
         segmentor.CLASSES = checkpoint['meta']['CLASSES']
         segmentor.PALETTE = checkpoint['meta']['PALETTE']
 
-    # read input or create dummpy input
+    # read input or create dummy input
     if args.input_img is not None:
         preprocess_shape = (input_shape[2], input_shape[3])
         rescale_shape = None
@@ -389,4 +387,5 @@ if __name__ == '__main__':
         show=args.show,
         output_file=args.output_file,
         verify=args.verify,
-        dynamic_export=args.dynamic_export)
+        dynamic_export=args.dynamic_export
+    )

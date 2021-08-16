@@ -88,9 +88,9 @@ class CrossResolutionWeighting(nn.Module):
             act_cfg=act_cfg[1])
 
     def forward(self, x):
-        mini_size = x[-1].size()[-2:]
+        min_size = [int(_) for _ in x[-1].size()[-2:]]
 
-        out = [F.adaptive_avg_pool2d(s, mini_size) for s in x[:-1]] + [x[-1]]
+        out = [F.adaptive_avg_pool2d(s, min_size) for s in x[:-1]] + [x[-1]]
         out = torch.cat(out, dim=1)
         out = self.conv1(out)
         out = self.conv2(out)
