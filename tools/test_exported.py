@@ -30,7 +30,9 @@ def update_config(cfg):
         torch.backends.cudnn.benchmark = True
 
     cfg.model.pretrained = None
-    cfg.data.test.test_mode = True
+
+    img_norm_cfg = dict(mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0], to_rgb=False)
+    cfg.data.test.pipeline[1].transforms[2] = dict(type='Normalize', **img_norm_cfg)
 
     return cfg
 
