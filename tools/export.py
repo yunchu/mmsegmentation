@@ -10,14 +10,94 @@ import torch
 import torch._C
 import torch.serialization
 import mmcv
+import numpy as np
+from mmcv import DictAction
 from mmcv.onnx import register_extra_symbolics
 from mmcv.runner import load_checkpoint
 from torch import nn
 
 from mmseg.models import build_segmentor
-from .pytorch2onnx import _convert_batchnorm, _demo_mm_inputs, _update_input_img
 
 torch.manual_seed(3)
+
+
+def _convert_batchnorm(module):
+    module_output = module
+    if isinstance(module, torch.nn.SyncBatchNorm):
+        module_output = torch.nn.BatchNorm2d(module.num_features, module.eps,
+                                             module.momentum, module.affine,
+                                             module.track_running_stats)
+        if module.affine:
+            module_output.weight.data = module.weight.data.clone().detach()
+            module_output.bias.data = module.bias.data.clone().detach()
+            # keep requires_grad unchanged
+            module_output.weight.requires_grad = module.weight.requires_grad
+            module_output.bias.requires_grad = module.bias.requires_grad
+        module_output.running_mean = module.running_mean
+        module_output.running_var = module.running_var
+        module_output.num_batches_tracked = module.num_batches_tracked
+    for name, child in module.named_children():
+        module_output.add_module(name, _convert_batchnorm(child))
+    del module
+    return module_output
+
+
+def _demo_mm_inputs(input_shape, num_classes):
+    """Create a superset of inputs needed to run test or train batches.
+
+    Args:
+        input_shape (tuple):
+            input batch dimensions
+        num_classes (int):
+            number of semantic classes
+    """
+    (N, C, H, W) = input_shape
+    rng = np.random.RandomState(0)
+    imgs = rng.rand(*input_shape)
+    segs = rng.randint(
+        low=0, high=num_classes - 1, size=(N, 1, H, W)).astype(np.uint8)
+    img_metas = [{
+        'img_shape': (H, W, C),
+        'ori_shape': (H, W, C),
+        'pad_shape': (H, W, C),
+        'filename': '<demo>.png',
+        'scale_factor': 1.0,
+        'flip': False,
+    } for _ in range(N)]
+    mm_inputs = {
+        'imgs': torch.FloatTensor(imgs).requires_grad_(True),
+        'img_metas': img_metas,
+        'gt_semantic_seg': torch.LongTensor(segs)
+    }
+    return mm_inputs
+
+
+def _update_input_img(img_list, img_meta_list, update_ori_shape=False):
+    # update img and its meta list
+    N, C, H, W = img_list[0].shape
+    img_meta = img_meta_list[0][0]
+    img_shape = (H, W, C)
+    if update_ori_shape:
+        ori_shape = img_shape
+    else:
+        ori_shape = img_meta['ori_shape']
+    pad_shape = img_shape
+    new_img_meta_list = [[{
+        'img_shape':
+        img_shape,
+        'ori_shape':
+        ori_shape,
+        'pad_shape':
+        pad_shape,
+        'filename':
+        img_meta['filename'],
+        'scale_factor':
+        (img_shape[1] / ori_shape[1], img_shape[0] / ori_shape[0]) * 2,
+        'flip':
+        False,
+    } for _ in range(N)]]
+
+    return img_list, new_img_meta_list
 
 
 def pytorch2onnx(model,
@@ -145,8 +225,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Export the MMSeg model to ONNX/IR')
     parser.add_argument('config', help='test config file path')
     parser.add_argument('checkpoint', help="path to file with model's weights")
-    parser.add_argument('output-dir', help='path to directory to save exported models in')
+    parser.add_argument('output_dir', help='path to directory to save exported models in')
     parser.add_argument('--opset', type=int, default=11, help='ONNX opset')
+    parser.add_argument('--cfg-options', nargs='+', action=DictAction,
+                        help='Override some settings in the used config, the key-value pair '
+                             'in xxx=yyy format will be merged into config file. If the value to '
+                             'be overwritten is a list, it should be like key="[a,b]" or key=a,b '
+                             'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
+                             'Note that the quotation marks are necessary and that no white space '
+                             'is allowed.')
 
     subparsers = parser.add_subparsers(title='target', dest='target', help='target model format')
     subparsers.required = True
@@ -164,15 +251,8 @@ def main(args):
         cfg.merge_from_dict(args.cfg_options)
     cfg.model.pretrained = None
 
-    if args.shape is None:
-        img_scale = cfg.test_pipeline[1]['img_scale']
-        input_shape = (1, 3, img_scale[1], img_scale[0])
-    elif len(args.shape) == 1:
-        input_shape = (1, 3, args.shape[0], args.shape[0])
-    elif len(args.shape) == 2:
-        input_shape = (1, 3,) + tuple(args.shape)
-    else:
-        raise ValueError('invalid input shape')
+    img_scale = cfg.test_pipeline[1]['img_scale']
+    input_shape = (1, 3, img_scale[1], img_scale[0])
 
     # build the model and load checkpoint
     cfg.model.train_cfg = None
