@@ -1,4 +1,5 @@
 import argparse
+import sys
 from functools import partial
 
 import mmcv
@@ -129,6 +130,7 @@ def pytorch2onnx(model,
                  show=False,
                  output_file='tmp.onnx',
                  verify=False,
+                 validate=False,
                  dynamic_export=False):
     """Export Pytorch model to ONNX model and verify the outputs are same
     between Pytorch and ONNX.
@@ -140,7 +142,9 @@ def pytorch2onnx(model,
         show (bool): Whether print the computation graph. Default: False.
         output_file (string): The path to where we store the output ONNX model.
             Default: `tmp.onnx`.
-        verify (bool): Whether compare the outputs between Pytorch and ONNX.
+        verify (bool): Whether run ONNX check.
+            Default: False.
+        validate (bool): Whether compare the outputs between Pytorch and ONNX.
             Default: False.
         dynamic_export (bool): Whether to export ONNX with dynamic axis.
             Default: False.
@@ -206,93 +210,100 @@ def pytorch2onnx(model,
         print(f'Successfully exported ONNX model: {output_file}')
 
     model.forward = origin_forward
+
+    onnx_model = None
     if verify:
         import onnx
-        # import onnxruntime as rt
 
-        # check by onnx
         onnx_model = onnx.load(output_file)
         onnx.checker.check_model(onnx_model)
 
-        # if dynamic_export and test_mode == 'whole':
-        #     # scale image for dynamic shape test
-        #     img_list = [
-        #         nn.functional.interpolate(_, scale_factor=1.5)
-        #         for _ in img_list
-        #     ]
-        #
-        #     # concate flip image for batch test
-        #     flip_img_list = [_.flip(-1) for _ in img_list]
-        #     img_list = [
-        #         torch.cat((ori_img, flip_img), 0)
-        #         for ori_img, flip_img in zip(img_list, flip_img_list)
-        #     ]
-        #
-        #     # update img_meta
-        #     img_list, img_meta_list = _update_input_img(
-        #         img_list, img_meta_list, test_mode == 'whole')
-        #
-        # # check the numerical value
-        # # get pytorch output
-        # with torch.no_grad():
-        #     pytorch_result = model(img_list, img_meta_list, return_loss=False)
-        #     pytorch_result = np.stack(pytorch_result, 0)
-        #
-        # # get onnx output
-        # input_all = [node.name for node in onnx_model.graph.input]
-        # input_initializer = [
-        #     node.name for node in onnx_model.graph.initializer
-        # ]
-        # net_feed_input = list(set(input_all) - set(input_initializer))
-        # assert (len(net_feed_input) == 1)
-        #
-        # sess = rt.InferenceSession(output_file)
-        # onnx_result = sess.run(None, {net_feed_input[0]: img_list[0].detach().numpy()})[0][0]
-        #
-        # # show segmentation results
-        # if show:
-        #     import cv2
-        #     import os.path as osp
-        #     img = img_meta_list[0][0]['filename']
-        #     if not osp.exists(img):
-        #         img = imgs[0][:3, ...].permute(1, 2, 0) * 255
-        #         img = img.detach().numpy().astype(np.uint8)
-        #         ori_shape = img.shape[:2]
-        #     else:
-        #         ori_shape = LoadImage()({'img': img})['ori_shape']
-        #
-        #     # resize onnx_result to ori_shape
-        #     onnx_result_ = cv2.resize(onnx_result[0].astype(np.uint8),
-        #                               (ori_shape[1], ori_shape[0]))
-        #     show_result_pyplot(
-        #         model,
-        #         img, (onnx_result_, ),
-        #         palette=model.PALETTE,
-        #         block=False,
-        #         title='ONNXRuntime',
-        #         opacity=0.5
-        #     )
-        #
-        #     # resize pytorch_result to ori_shape
-        #     pytorch_result_ = cv2.resize(pytorch_result[0].astype(np.uint8),
-        #                                  (ori_shape[1], ori_shape[0]))
-        #     show_result_pyplot(
-        #         model,
-        #         img, (pytorch_result_, ),
-        #         title='PyTorch',
-        #         palette=model.PALETTE,
-        #         opacity=0.5
-        #     )
-        #
-        # # compare results
-        # np.testing.assert_allclose(
-        #     pytorch_result.astype(np.float32) / num_classes,
-        #     onnx_result.astype(np.float32) / num_classes,
-        #     rtol=1e-5,
-        #     atol=1e-5,
-        #     err_msg='The outputs are different between Pytorch and ONNX'
-        # )
-        # print('The outputs are same between Pytorch and ONNX')
+    if validate:
+        import onnxruntime as rt
+
+        if onnx_model is None:
+            import onnx
+            onnx_model = onnx.load(output_file)
+
+        if dynamic_export and test_mode == 'whole':
+            # scale image for dynamic shape test
+            img_list = [
+                nn.functional.interpolate(_, scale_factor=1.5)
+                for _ in img_list
+            ]
+
+            # concate flip image for batch test
+            flip_img_list = [_.flip(-1) for _ in img_list]
+            img_list = [
+                torch.cat((ori_img, flip_img), 0)
+                for ori_img, flip_img in zip(img_list, flip_img_list)
+            ]
+
+            # update img_meta
+            img_list, img_meta_list = _update_input_img(
+                img_list, img_meta_list, test_mode == 'whole')
+
+        # check the numerical value
+        # get pytorch output
+        with torch.no_grad():
+            pytorch_result = model(img_list, img_meta_list, return_loss=False)
+            pytorch_result = np.stack(pytorch_result, 0)
+
+        # get onnx output
+        input_all = [node.name for node in onnx_model.graph.input]
+        input_initializer = [
+            node.name for node in onnx_model.graph.initializer
+        ]
+        net_feed_input = list(set(input_all) - set(input_initializer))
+        assert (len(net_feed_input) == 1)
+
+        sess = rt.InferenceSession(output_file)
+        onnx_result = sess.run(None, {net_feed_input[0]: img_list[0].detach().numpy()})[0][0]
+
+        # show segmentation results
+        if show:
+            import cv2
+            import os.path as osp
+            img = img_meta_list[0][0]['filename']
+            if not osp.exists(img):
+                img = imgs[0][:3, ...].permute(1, 2, 0) * 255
+                img = img.detach().numpy().astype(np.uint8)
+                ori_shape = img.shape[:2]
+            else:
+                ori_shape = LoadImage()({'img': img})['ori_shape']
+
+            # resize onnx_result to ori_shape
+            onnx_result_ = cv2.resize(onnx_result[0].astype(np.uint8),
+                                      (ori_shape[1], ori_shape[0]))
+            show_result_pyplot(
+                model,
+                img, (onnx_result_, ),
+                palette=model.PALETTE,
+                block=False,
+                title='ONNXRuntime',
+                opacity=0.5
+            )
+
+            # resize pytorch_result to ori_shape
+            pytorch_result_ = cv2.resize(pytorch_result[0].astype(np.uint8),
+                                         (ori_shape[1], ori_shape[0]))
+            show_result_pyplot(
+                model,
+                img, (pytorch_result_, ),
+                title='PyTorch',
+                palette=model.PALETTE,
+                opacity=0.5
+            )
+
+        # compare results
+        np.testing.assert_allclose(
+            pytorch_result.astype(np.float32) / num_classes,
+            onnx_result.astype(np.float32) / num_classes,
+            rtol=1e-5,
+            atol=1e-5,
+            err_msg='The outputs are different between Pytorch and ONNX'
+        )
+        print('The outputs are same between Pytorch and ONNX')
 
 
 def parse_args():
@@ -306,7 +317,9 @@ def parse_args():
     parser.add_argument('--show', action='store_true',
                         help='show onnx graph and segmentation results')
     parser.add_argument('--verify', action='store_true',
-                        help='verify the onnx model')
+                        help='run the onnx check')
+    parser.add_argument('--validate', action='store_true',
+                        help='validate the onnx model')
     parser.add_argument('--output-file', type=str, default='tmp.onnx')
     parser.add_argument('--opset-version', type=int, default=11)
     parser.add_argument('--shape', type=int, nargs='+', default=None,
@@ -328,9 +341,7 @@ def parse_args():
     return args
 
 
-if __name__ == '__main__':
-    args = parse_args()
-
+def main(args):
     cfg = mmcv.Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
@@ -387,5 +398,11 @@ if __name__ == '__main__':
         show=args.show,
         output_file=args.output_file,
         verify=args.verify,
+        validate=args.validate,
         dynamic_export=args.dynamic_export
     )
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    sys.exit(main(args) or 0)
