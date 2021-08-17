@@ -357,8 +357,6 @@ def main(args):
     else:
         raise ValueError('invalid input shape')
 
-    test_mode = cfg.model.test_cfg.mode
-
     # build the model and load checkpoint
     cfg.model.train_cfg = None
     segmentor = build_segmentor(cfg.model, train_cfg=None, test_cfg=cfg.get('test_cfg'))
