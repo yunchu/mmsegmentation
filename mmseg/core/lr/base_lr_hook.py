@@ -150,3 +150,5 @@ class BaseLrUpdaterHook(Hook, metaclass=ABCMeta):
         else:
             fixed_lr = self.get_fixed_lr(cur_iter, regular_lr)
             self._set_lr(runner, fixed_lr)
+
+        runner.model.train_iter = cur_iter
