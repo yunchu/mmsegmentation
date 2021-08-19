@@ -52,7 +52,7 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
     def _regularization(self, cos_theta, scale):
         probs = F.softmax(scale * cos_theta, dim=1)
         entropy_values = entropy(probs, dim=1)
-        out_values = self._conf_penalty_weight * entropy_values
+        out_values = -self._conf_penalty_weight * entropy_values
 
         return out_values
 
@@ -72,7 +72,7 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
 
         if self.with_regularization:
             regularization = self._regularization(output, self._last_scale)
-            losses = losses - regularization
+            losses = losses + regularization
 
         valid_mask = labels != ignore_index
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))

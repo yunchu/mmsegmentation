@@ -33,7 +33,7 @@ model = dict(
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
-                 # conf_penalty_weight=0.085,
+                 conf_penalty_weight=0.085,
                  loss_jitter_prob=None,
                  loss_weight=1.0),
         ]
