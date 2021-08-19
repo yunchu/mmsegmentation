@@ -640,6 +640,9 @@ class RandomRotate(object):
 
             # rotate image
             for target in ['img', 'aux_img']:
+                if target not in results:
+                    continue
+
                 results[target] = mmcv.imrotate(
                     results[target],
                     angle=degree,

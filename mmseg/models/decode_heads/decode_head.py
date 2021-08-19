@@ -8,6 +8,7 @@ from mmcv.runner import auto_fp16, force_fp32
 
 from mmseg.core import build_pixel_sampler
 from mmseg.ops import resize
+from mmseg.core.utils import normalize
 from ..builder import build_loss
 from ..losses import accuracy
 
@@ -63,7 +64,8 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  ignore_index=255,
                  sampler=None,
                  align_corners=False,
-                 enable_out_seg=True):
+                 enable_out_seg=True,
+                 enable_out_norm=False):
         super(BaseDecodeHead, self).__init__()
 
         self._init_inputs(in_channels, in_index, input_transform)
@@ -78,6 +80,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.ignore_index = ignore_index
         self.align_corners = align_corners
         self.fp16_enabled = False
+        self.enable_out_norm = enable_out_norm
 
         loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
         assert len(loss_configs) > 0
@@ -228,6 +231,9 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         if self.dropout is not None:
             feat = self.dropout(feat)
+
+        if self.enable_out_norm:
+            feat = normalize(feat, dim=1, p=2)
 
         output = self.conv_seg(feat)
 

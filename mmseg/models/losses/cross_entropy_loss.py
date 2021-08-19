@@ -165,7 +165,8 @@ class CrossEntropyLoss(nn.Module):
                  class_weight=None,
                  loss_weight=1.0,
                  loss_jitter_prob=None,
-                 loss_jitter_momentum=0.1):
+                 loss_jitter_momentum=0.1,
+                 scale=None):
         assert (use_sigmoid is False) or (use_mask is False)
 
         super(CrossEntropyLoss, self).__init__()
@@ -175,6 +176,7 @@ class CrossEntropyLoss(nn.Module):
         self.reduction = reduction
         self.loss_weight = loss_weight
         self.class_weight = get_class_weight(class_weight)
+        self.scale = scale
 
         self.smooth_loss = None
         self.jitter_sigma_factor = None
@@ -210,6 +212,9 @@ class CrossEntropyLoss(nn.Module):
             class_weight = cls_score.new_tensor(self.class_weight)
         else:
             class_weight = None
+
+        if self.scale is not None and self.scale > 0.0:
+            cls_score = self.scale * cls_score
 
         loss_cls = self.cls_criterion(
             cls_score,

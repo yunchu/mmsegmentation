@@ -20,12 +20,13 @@ model = dict(
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
+        enable_out_norm=True,
         loss_decode=[
-            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=0.01),
+            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=None, scale=15.0),
         ]
     ),
     train_cfg=dict(
-        mix_loss=dict(enable=True, weight=0.1)
+        mix_loss=dict(enable=False, weight=0.1)
     ),
 )
 evaluation = dict(
