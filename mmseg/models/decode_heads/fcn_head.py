@@ -26,43 +26,38 @@ class FCNHead(BaseDecodeHead):
                  concat_input=True,
                  dilation=1,
                  **kwargs):
-        assert num_convs >= 0 and dilation > 0 and isinstance(dilation, int)
+        assert num_convs >= 0
+        assert isinstance(dilation, int) and dilation > 0
+
         self.num_convs = num_convs
         self.concat_input = concat_input
         self.kernel_size = kernel_size
+
         super(FCNHead, self).__init__(**kwargs)
+
         if num_convs == 0:
             assert self.in_channels == self.channels
 
         conv_padding = (kernel_size // 2) * dilation
-        convs = [ConvModule(
-            self.in_channels,
-            self.channels,
-            kernel_size=kernel_size,
-            padding=conv_padding,
-            dilation=dilation,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg
-        )]
-        for i in range(num_convs - 1):
-            convs.append(ConvModule(
-                self.channels,
-                self.channels,
-                kernel_size=kernel_size,
-                padding=conv_padding,
-                dilation=dilation,
-                conv_cfg=self.conv_cfg,
-                norm_cfg=self.norm_cfg,
-                act_cfg=self.act_cfg
-            ))
-        if num_convs == 0:
-            self.convs = nn.Identity()
-        else:
+
+        self.convs = None
+        if num_convs > 0:
+            convs = []
+            for i in range(num_convs):
+                convs.append(self._build_conv_module(
+                    self.in_channels if i == 0 else self.channels,
+                    self.channels,
+                    kernel_size=kernel_size,
+                    padding=conv_padding,
+                    dilation=dilation,
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg,
+                    act_cfg=self.act_cfg
+                ))
             self.convs = nn.Sequential(*convs)
 
         if self.concat_input:
-            self.conv_cat = ConvModule(
+            self.conv_cat = self._build_conv_module(
                 self.in_channels + self.channels,
                 self.channels,
                 kernel_size=kernel_size,
@@ -72,14 +67,22 @@ class FCNHead(BaseDecodeHead):
                 act_cfg=self.act_cfg
             )
 
+    def _build_conv_module(self, in_channels, out_channels, **kwargs):
+        return ConvModule(
+            in_channels,
+            out_channels,
+            **kwargs
+        )
+
     def forward(self, inputs):
         """Forward function."""
+
         x = self._transform_inputs(inputs)
 
-        output = self.convs(x)
+        y = self.convs(x) if self.convs is not None else x
         if self.concat_input:
-            output = self.conv_cat(torch.cat([x, output], dim=1))
+            y = self.conv_cat(torch.cat([x, y], dim=1))
 
-        output = self.cls_seg(output)
+        logits = self.cls_seg(y)
 
-        return output
+        return logits
