@@ -20,8 +20,25 @@ model = dict(
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
+        enable_out_norm=True,
         loss_decode=[
-            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=None, scale=15.0),
+            dict(type='AMSoftmaxLoss',
+                 scale_cfg=dict(
+                     type='PolyScalarScheduler',
+                     start_scale=30.0,
+                     end_scale=5.0,
+                     power=1.2,
+                     num_epochs=40.0,
+                 ),
+                 margin_type='cos',
+                 margin=0.5,
+                 gamma=0.0,
+                 t=1.0,
+                 target_loss='ce',
+                 pr_product=False,
+                 conf_penalty_weight=0.085,
+                 loss_jitter_prob=None,
+                 loss_weight=1.0),
         ]
     ),
     train_cfg=dict(

@@ -11,6 +11,7 @@ HEADS = MODELS
 LOSSES = MODELS
 SEGMENTORS = MODELS
 PARAMS_MANAGERS = MODELS
+SCALAR_SCHEDULERS = MODELS
 
 
 def build_backbone(cfg):
@@ -49,3 +50,7 @@ def build_segmentor(cfg, train_cfg=None, test_cfg=None):
 
 def build_params_manager(cfg):
     return PARAMS_MANAGERS.build(cfg)
+
+
+def build_scheduler(cfg):
+    return SCALAR_SCHEDULERS.build(cfg)

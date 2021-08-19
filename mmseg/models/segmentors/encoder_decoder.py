@@ -27,6 +27,7 @@ class EncoderDecoder(BaseSegmentor):
                  test_cfg=None,
                  pretrained=None):
         super(EncoderDecoder, self).__init__()
+
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             self.neck = builder.build_neck(neck)
