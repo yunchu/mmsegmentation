@@ -29,7 +29,15 @@ class AMSoftmaxLoss(BaseMetricLearningLoss):
 
         self.target_loss = build_classification_loss(target_loss)
 
-    def _calculate(self, cos_theta, target, scale, ignore_index=-100):
+    @property
+    def name(self):
+        return 'am-softmax'
+
+    @staticmethod
+    def _one_hot_mask(target, num_classes):
+        return F.one_hot(target.detach(), num_classes).permute(0, 3, 1, 2).bool()
+
+    def _calculate(self, cos_theta, target, scale):
         if self.margin_type == 'cos':
             phi_theta = cos_theta - self.m
         else:
@@ -37,18 +45,16 @@ class AMSoftmaxLoss(BaseMetricLearningLoss):
             phi_theta = cos_theta * self.cos_m - sine * self.sin_m
             phi_theta = torch.where(cos_theta > self.th, phi_theta, cos_theta - self.sin_m * self.m)
 
-        print(phi_theta.size())
-        exit()
-
-        index = torch.zeros_like(cos_theta, dtype=torch.uint8).scatter_(1, target.detach().view(-1, 1), 1)
-        output = torch.where(index, phi_theta, cos_theta)
+        num_classes = cos_theta.size(1)
+        one_hot_mask = self._one_hot_mask(target, num_classes)
+        output = torch.where(one_hot_mask, phi_theta, cos_theta)
 
         if self.gamma == 0 and self.t == 1.:
             out_losses = self.target_loss(scale * output, target)
         elif self.t > 1:
             h_theta = self.t - 1 + self.t * cos_theta
-            support_vectors_mask = (1 - index) * \
-                torch.lt(torch.masked_select(phi_theta, index).view(-1, 1).repeat(1, h_theta.shape[1]) - cos_theta, 0)
+            support_vectors_mask = (~one_hot_mask) * \
+                torch.lt(torch.masked_select(phi_theta, one_hot_mask).view(-1, 1).repeat(1, h_theta.shape[1]) - cos_theta, 0)
             output = torch.where(support_vectors_mask, h_theta, output)
             out_losses = self.target_loss(scale * output, target)
         else:

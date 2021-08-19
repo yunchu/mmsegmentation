@@ -4,6 +4,7 @@ from .dice_loss import DiceLoss
 from .lovasz_loss import LovaszLoss
 from .tversky_loss import TverskyLoss
 from .boundary_loss import BoundaryLoss
+from .am_softmax import AMSoftmaxLoss
 from .utils import reduce_loss, weight_reduce_loss, weighted_loss
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     'DiceLoss',
     'TverskyLoss',
     'BoundaryLoss',
+    'AMSoftmaxLoss',
 ]

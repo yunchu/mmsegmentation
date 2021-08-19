@@ -64,6 +64,12 @@ class BaseSegmentor(nn.Module):
         """Placeholder for augmentation test."""
         pass
 
+    def set_train_iter(self, step):
+        assert step is not None
+        assert step >= 0
+
+        self.train_iter = step
+
     def init_weights(self, pretrained=None):
         """Initialize the weights in segmentor.
 

@@ -6,21 +6,22 @@ from .base import BaseScalarScheduler
 
 @SCALAR_SCHEDULERS.register_module()
 class StepScalarScheduler(BaseScalarScheduler):
-    def __init__(self, scales, epochs):
+    def __init__(self, scales, num_iters):
         super(StepScalarScheduler, self).__init__()
 
-        assert len(scales) == len(epochs) + 1
+        assert len(scales) == len(num_iters) + 1
         assert len(scales) > 0
 
         self._scales = list(scales)
-        self._epochs = list(epochs) + [np.iinfo(np.int32).max]
+        self._iter_ranges = list(num_iters) + [np.iinfo(np.int32).max]
 
-    def _get_scale(self, step, iters_per_epoch):
+    def get_scale(self, step):
+        if step is None:
+            return float(self._scales[-1])
+
         out_scale_idx = 0
-        for epoch in self._epochs:
-            end_step = iters_per_epoch * epoch
-
-            if step < end_step:
+        for iter_range in self._iter_ranges:
+            if step < iter_range:
                 break
 
             out_scale_idx += 1

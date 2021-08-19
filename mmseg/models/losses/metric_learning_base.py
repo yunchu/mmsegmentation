@@ -66,11 +66,16 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
         if self.with_pr_product:
             output = self._pr_product(output)
 
-        losses = self._calculate(output, labels, self._last_scale, ignore_index)
+        num_classes = output.size(1)
+        valid_labels = torch.clamp(labels, 0, num_classes - 1)
+        losses = self._calculate(output, valid_labels, self._last_scale)
 
         if self.with_regularization:
             regularization = self._regularization(output, self._last_scale)
             losses = losses - regularization
+
+        valid_mask = labels != ignore_index
+        losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 
         # apply weights and do the reduction
         if weight is not None:
@@ -97,5 +102,5 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
         return loss
 
     @abstractmethod
-    def _calculate(self, output, labels, scale, ignore_index=-100):
+    def _calculate(self, output, labels, scale):
         pass

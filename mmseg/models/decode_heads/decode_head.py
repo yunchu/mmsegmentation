@@ -6,9 +6,8 @@ import torch.nn.functional as F
 from mmcv.cnn import normal_init
 from mmcv.runner import auto_fp16, force_fp32
 
-from mmseg.core import build_pixel_sampler
+from mmseg.core import build_pixel_sampler, normalize
 from mmseg.ops import resize
-from mmseg.core.utils import normalize
 from ..builder import build_loss
 from ..losses import accuracy
 
@@ -188,7 +187,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg):
+    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg, train_iter=None):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -205,7 +204,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             dict[str, Tensor]: a dictionary of loss components
         """
         seg_logits = self.forward(inputs)
-        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg)
+        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, train_iter)
 
         return losses
 
@@ -259,7 +258,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         return valid_losses.mean()
 
     @force_fp32(apply_to=('seg_logit', ))
-    def losses(self, seg_logit, seg_label, train_cfg):
+    def losses(self, seg_logit, seg_label, train_cfg, train_iter=None):
         """Compute segmentation loss."""
 
         loss = dict()
@@ -284,7 +283,8 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                 seg_logit,
                 seg_label,
                 weight=seg_weight,
-                ignore_index=self.ignore_index
+                ignore_index=self.ignore_index,
+                train_iter=train_iter
             )
 
             loss_values.append(loss_value)
