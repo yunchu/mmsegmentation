@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/fcn_litehr18.py', '../_base_/datasets/cityscapes.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_cos_80k.py'
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_160k_ml.py'
 ]
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
@@ -20,8 +20,22 @@ model = dict(
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
+        enable_out_norm=True,
         loss_decode=[
-            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=None),
+            dict(type='AMSoftmaxLoss',
+                 scale_cfg=dict(
+                     type='ConstantScalarScheduler',
+                     scale=10.0
+                 ),
+                 margin_type='cos',
+                 margin=0.5,
+                 gamma=0.0,
+                 t=1.0,
+                 target_loss='ce',
+                 pr_product=False,
+                 conf_penalty_weight=0.085,
+                 loss_jitter_prob=None,
+                 loss_weight=1.0),
         ]
     ),
     train_cfg=dict(
