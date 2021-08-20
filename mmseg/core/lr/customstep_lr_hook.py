@@ -23,6 +23,10 @@ class CustomstepLrUpdaterHook(BaseLrUpdaterHook):
     def get_lr(self, runner, base_lr):
         progress = runner.epoch if self.by_epoch else runner.iter
 
+        skip_iters = self.fixed_iters + self.warmup_iters
+        if progress <= skip_iters:
+            return base_lr
+
         if isinstance(self.step, int):
             return base_lr * (self.gamma**(progress // self.step))
 
