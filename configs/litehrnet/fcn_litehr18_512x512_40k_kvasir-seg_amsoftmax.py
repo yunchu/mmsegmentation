@@ -34,7 +34,7 @@ model = dict(
                  target_loss='ce',
                  pr_product=False,
                  conf_penalty_weight=0.085,
-                 loss_jitter_prob=None,
+                 loss_jitter_prob=0.01,
                  loss_weight=1.0),
         ]
     ),
