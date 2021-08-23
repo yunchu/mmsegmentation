@@ -1,6 +1,6 @@
 _base_ = [
-    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/cityscapes.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_160k_ml.py'
+    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/pascal_voc12_aug.py',
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
 ]
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
@@ -15,7 +15,7 @@ model = dict(
         num_convs=0,
         concat_input=False,
         dropout_ratio=-1,
-        num_classes=19,
+        num_classes=21,
         norm_cfg=norm_cfg,
         align_corners=False,
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
@@ -41,6 +41,9 @@ model = dict(
     train_cfg=dict(
         mix_loss=dict(enable=False, weight=0.1)
     ),
+)
+evaluation = dict(
+    metric='mIoU'
 )
 
 find_unused_parameters = True
