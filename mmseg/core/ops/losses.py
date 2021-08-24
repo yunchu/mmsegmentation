@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 
 
-def entropy(p, dim=-1, keepdim=False):
+def entropy(p, dim=1, keepdim=False):
     return -torch.where(p > 0.0, p * p.log(), torch.zeros_like(p)).sum(dim=dim, keepdim=keepdim)
 
 
@@ -19,9 +19,9 @@ class MaxEntropyLoss:
         assert self.scale > 0.0
 
     def forward(self, cos_theta):
-        probs = F.softmax(self.scale * cos_theta, dim=-1)
+        probs = F.softmax(self.scale * cos_theta, dim=1)
 
-        entropy_values = entropy(probs, dim=-1)
+        entropy_values = entropy(probs, dim=1)
         losses = np.log(cos_theta.size(-1)) - entropy_values
 
         return losses.mean()
@@ -40,10 +40,16 @@ class NormalizedCrossEntropy:
         self.weight = weight
 
     def __call__(self, logits, target):
-        log_softmax = F.log_softmax(logits, dim=-1)
+        log_softmax = F.log_softmax(logits, dim=1)
+        b, c, h, w = log_softmax.size()
+
+        log_softmax = log_softmax.permute(0, 2, 3, 1).reshape(-1, c)
+        target = target.view(-1)
 
         target_log_softmax = log_softmax[torch.arange(target.size(0), device=target.device), target]
-        sum_log_softmax = log_softmax.sum(dim=-1)
+        target_log_softmax = target_log_softmax.view(b, h, w)
+
+        sum_log_softmax = log_softmax.sum(dim=1)
         losses = self.weight * target_log_softmax / sum_log_softmax
 
         return losses
@@ -54,8 +60,15 @@ class ReverseCrossEntropy:
         self.weight = weight * abs(float(scale))
 
     def __call__(self, logits, target):
-        all_probs = F.softmax(logits, dim=-1)
+        all_probs = F.softmax(logits, dim=1)
+        b, c, h, w = all_probs.size()
+
+        all_probs = all_probs.permute(0, 2, 3, 1).reshape(-1, c)
+        target = target.view(-1)
+
         target_probs = all_probs[torch.arange(target.size(0), device=target.device), target]
+        target_probs = target_probs.view(b, h, w)
+
         losses = self.weight * (1.0 - target_probs)
 
         return losses
