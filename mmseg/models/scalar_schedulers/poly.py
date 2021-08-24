@@ -18,7 +18,7 @@ class PolyScalarScheduler(BaseScalarScheduler):
         self._power = power
         assert self._power > 0.0
 
-    def get_scale(self, step):
+    def _get_scale(self, step):
         if step is None:
             return float(self._end_s)
 

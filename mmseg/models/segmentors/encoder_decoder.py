@@ -104,7 +104,6 @@ class EncoderDecoder(BaseSegmentor):
             img_metas,
             gt_semantic_seg,
             self.train_cfg,
-            train_iter=self.train_iter
         )
 
         losses = dict()

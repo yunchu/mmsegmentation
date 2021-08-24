@@ -71,7 +71,8 @@ class OHEMPixelSampler(BasePixelSampler):
                     seg_label,
                     weight=None,
                     ignore_index=self.context.ignore_index,
-                    reduction_override='none'
+                    reduction_override='none',
+                    increment_train_step=False,
                 )
 
                 # faster than topk according to https://github.com/pytorch/pytorch/issues/22812  # noqa

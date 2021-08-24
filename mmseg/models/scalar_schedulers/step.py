@@ -15,7 +15,7 @@ class StepScalarScheduler(BaseScalarScheduler):
         self._scales = list(scales)
         self._iter_ranges = list(num_iters) + [np.iinfo(np.int32).max]
 
-    def get_scale(self, step):
+    def _get_scale(self, step):
         if step is None:
             return float(self._scales[-1])
 

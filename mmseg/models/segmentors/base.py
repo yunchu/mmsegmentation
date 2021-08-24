@@ -20,7 +20,6 @@ class BaseSegmentor(nn.Module):
         super(BaseSegmentor, self).__init__()
 
         self.fp16_enabled = False
-        self.train_iter = None
 
     @property
     def with_neck(self):
@@ -63,12 +62,6 @@ class BaseSegmentor(nn.Module):
     def aug_test(self, imgs, img_metas, **kwargs):
         """Placeholder for augmentation test."""
         pass
-
-    def set_train_iter(self, step):
-        assert step is not None
-        assert step >= 0
-
-        self.train_iter = step
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in segmentor.
@@ -195,13 +188,15 @@ class BaseSegmentor(nn.Module):
                 all the variables to be sent to the logger.
         """
         log_vars = OrderedDict()
-        for loss_name, loss_value in losses.items():
-            if isinstance(loss_value, torch.Tensor):
-                log_vars[loss_name] = loss_value.mean()
-            elif isinstance(loss_value, list):
-                log_vars[loss_name] = sum(_loss.mean() for _loss in loss_value)
+        for var_name, var_value in losses.items():
+            if isinstance(var_value, torch.Tensor):
+                log_vars[var_name] = var_value.mean()
+            elif isinstance(var_value, list):
+                log_vars[var_name] = sum(_loss.mean() for _loss in var_value)
+            elif isinstance(var_value, (int, float)):
+                log_vars[var_name] = var_value
             else:
-                raise TypeError(f'{loss_name} is not a tensor or list of tensors')
+                raise TypeError(f'{var_name} is not a tensor or list of tensors')
 
         loss = sum(
             _value for _key, _value in log_vars.items()
@@ -209,12 +204,16 @@ class BaseSegmentor(nn.Module):
         )
 
         log_vars['loss'] = loss
-        for loss_name, loss_value in log_vars.items():
+        for var_name, var_value in log_vars.items():
+            if isinstance(var_value, (int, float)):
+                continue
+
             # reduce loss when distributed training
             if dist.is_available() and dist.is_initialized():
-                loss_value = loss_value.data.clone()
-                dist.all_reduce(loss_value.div_(dist.get_world_size()))
-            log_vars[loss_name] = loss_value.item()
+                var_value = var_value.data.clone()
+                dist.all_reduce(var_value.div_(dist.get_world_size()))
+
+            log_vars[var_name] = var_value.item()
 
         return loss, log_vars
 

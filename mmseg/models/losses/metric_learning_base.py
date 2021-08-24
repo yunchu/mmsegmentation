@@ -31,6 +31,10 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
         self._last_scale = None
 
     @property
+    def last_scale(self):
+        return self._last_scale
+
+    @property
     def with_regularization(self):
         return self._conf_penalty_weight is not None and self._conf_penalty_weight > 0.0
 
@@ -56,12 +60,15 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
 
         return out_values
 
-    def _forward(self, output, labels, train_iter=None, weight=None,
-                 ignore_index=-100, avg_factor=None, reduction_override=None):
+    def _forward(self, output, labels, weight=None, ignore_index=-100, avg_factor=None,
+                 reduction_override=None, increment_train_step=True):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self._reduction)
 
-        self._last_scale = self._scale_scheduler.get_scale(train_iter)
+        if increment_train_step:
+            self._last_scale = self._scale_scheduler.get_scale_and_increment_step()
+        else:
+            self._last_scale = self._scale_scheduler.get_scale()
 
         if self.with_pr_product:
             output = self._pr_product(output)

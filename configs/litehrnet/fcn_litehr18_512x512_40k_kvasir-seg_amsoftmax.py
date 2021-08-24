@@ -24,8 +24,11 @@ model = dict(
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(
-                     type='ConstantScalarScheduler',
-                     scale=10.0
+                     type='PolyScalarScheduler',
+                     start_scale=15.0,
+                     end_scale=5.0,
+                     power=1.2,
+                     num_iters=35000,
                  ),
                  margin_type='cos',
                  margin=0.5,
