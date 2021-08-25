@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import normal_init
+from mmcv.cnn import normal_init, ConvModule
 from mmcv.runner import auto_fp16, force_fp32
 
 from mmseg.core import build_pixel_sampler, normalize
@@ -64,6 +64,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  sampler=None,
                  align_corners=False,
                  enable_out_seg=True,
+                 enable_out_bias=False,
                  enable_out_norm=False):
         super(BaseDecodeHead, self).__init__()
 
@@ -97,7 +98,21 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         self.conv_seg = None
         if enable_out_seg:
-            self.conv_seg = nn.Conv2d(channels, num_classes, kernel_size=1)
+            if enable_out_bias:
+                self.conv_seg = ConvModule(
+                    channels,
+                    num_classes,
+                    kernel_size=1,
+                    act_cfg=None,
+                    conv_cfg=self.conv_cfg,
+                    norm_cfg=self.norm_cfg
+                )
+            else:
+                self.conv_seg = nn.Conv2d(
+                    channels,
+                    num_classes,
+                    kernel_size=1
+                )
 
     def extra_repr(self):
         """Extra repr."""

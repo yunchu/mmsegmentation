@@ -21,14 +21,10 @@ model = dict(
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
         enable_out_norm=True,
+        enable_out_bias=True,
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(
-                     # type='PolyScalarScheduler',
-                     # start_scale=10.0,
-                     # end_scale=5.0,
-                     # power=1.2,
-                     # num_iters=35000,
                      type='ConstantScalarScheduler',
                      scale=10.0
                  ),
@@ -37,7 +33,7 @@ model = dict(
                  gamma=0.0,
                  t=1.0,
                  target_loss='ce',
-                 pr_product=True,
+                 pr_product=False,
                  conf_penalty_weight=0.085,
                  loss_jitter_prob=0.01,
                  loss_weight=1.0),
