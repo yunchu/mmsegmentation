@@ -11,13 +11,21 @@ from .utils import weight_reduce_loss
 
 
 class BasePixelLoss(BaseWeightedLoss):
-    def __init__(self, scale_cfg, pr_product=False, conf_penalty_weight=None, reduction='mean',
-                 loss_jitter_prob=None, loss_jitter_momentum=0.1, **kwargs):
+    def __init__(self,
+                 scale_cfg,
+                 pr_product=False,
+                 conf_penalty_weight=None,
+                 reduction='mean',
+                 loss_jitter_prob=None,
+                 loss_jitter_momentum=0.1,
+                 border_reweighting=False,
+                 **kwargs):
         super(BasePixelLoss, self).__init__(**kwargs)
 
         self._enable_pr_product = pr_product
         self._conf_penalty_weight = conf_penalty_weight
         self._reduction = reduction
+        self._border_reweighting = border_reweighting
 
         self._smooth_loss = None
         self._jitter_sigma_factor = None
@@ -43,6 +51,10 @@ class BasePixelLoss(BaseWeightedLoss):
         return self._enable_pr_product
 
     @property
+    def with_border_reweighting(self):
+        return self._border_reweighting
+
+    @property
     def with_loss_jitter(self):
         return self._jitter_sigma_factor is not None
 
@@ -60,7 +72,7 @@ class BasePixelLoss(BaseWeightedLoss):
 
         return out_values
 
-    def _forward(self, output, labels, avg_factor=None,
+    def _forward(self, output, labels, avg_factor=None, pixel_weights=None,
                  reduction_override=None, increment_train_step=True):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self._reduction)
@@ -75,22 +87,29 @@ class BasePixelLoss(BaseWeightedLoss):
 
         num_classes = output.size(1)
         valid_labels = torch.clamp(labels, 0, num_classes - 1)
+        valid_mask = labels != self.ignore_index
+
         losses = self._calculate(output, valid_labels, self._last_scale)
+
+        if self.with_border_reweighting:
+            assert pixel_weights is not None
+            assert pixel_weights.size() == losses.size()
+
+            losses = pixel_weights * losses
+
+        weight = None
+        if self.sampler is not None:
+            weight = self.sampler(losses, output, valid_labels, valid_mask)
 
         if self.with_regularization:
             regularization = self._regularization(output, self._last_scale)
-            losses = losses + regularization
+            losses = torch.clamp_min(losses + regularization, 0.0)
 
-        valid_mask = labels != self.ignore_index
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
-
-        pixel_weights = None
-        if self.sampler is not None:
-            pixel_weights = self.sampler(losses, output, valid_labels, valid_mask)
 
         loss = weight_reduce_loss(
             losses,
-            weight=pixel_weights,
+            weight=weight,
             reduction=reduction,
             avg_factor=avg_factor
         )

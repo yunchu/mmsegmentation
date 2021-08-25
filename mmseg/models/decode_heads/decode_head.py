@@ -197,7 +197,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg):
+    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg, pixel_weights=None):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -209,12 +209,13 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             gt_semantic_seg (Tensor): Semantic segmentation masks
                 used if the architecture supports semantic segmentation task.
             train_cfg (dict): The training config.
+            pixel_weights (Tensor): Pixels weights.
 
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
         seg_logits = self.forward(inputs)
-        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg)
+        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, pixel_weights)
 
         return losses
 
@@ -268,7 +269,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         return valid_losses.mean()
 
     @force_fp32(apply_to=('seg_logit', ))
-    def losses(self, seg_logit, seg_label, train_cfg):
+    def losses(self, seg_logit, seg_label, train_cfg, pixel_weights=None):
         """Compute segmentation loss."""
 
         loss = dict()
@@ -284,7 +285,11 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         loss_values = []
         for loss_module in self.loss_modules:
-            loss_value = loss_module(seg_logit, seg_label)
+            loss_value = loss_module(
+                seg_logit,
+                seg_label,
+                pixel_weights=pixel_weights
+            )
 
             loss_values.append(loss_value)
             loss[loss_module.name] = loss_value

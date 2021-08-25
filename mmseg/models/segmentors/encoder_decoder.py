@@ -96,7 +96,7 @@ class EncoderDecoder(BaseSegmentor):
             align_corners=self.align_corners)
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg):
+    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg, pixel_weights=None):
         """Run forward function and calculate loss for decode head in training."""
 
         loss_decode = self.decode_head.forward_train(
@@ -104,6 +104,7 @@ class EncoderDecoder(BaseSegmentor):
             img_metas,
             gt_semantic_seg,
             self.train_cfg,
+            pixel_weights
         )
 
         losses = dict()
@@ -140,7 +141,7 @@ class EncoderDecoder(BaseSegmentor):
 
         return seg_logit
 
-    def forward_train(self, img, img_metas, gt_semantic_seg, aux_img=None):
+    def forward_train(self, img, img_metas, gt_semantic_seg, aux_img=None, pixel_weights=None):
         """Forward function for training.
 
         Args:
@@ -153,6 +154,7 @@ class EncoderDecoder(BaseSegmentor):
             gt_semantic_seg (Tensor): Semantic segmentation masks
                 used if the architecture supports semantic segmentation task.
             aux_img (Tensor): Auxiliary images.
+            pixel_weights (Tensor): Pixels weights.
 
         Returns:
             dict[str, Tensor]: a dictionary of loss components
@@ -168,7 +170,7 @@ class EncoderDecoder(BaseSegmentor):
 
         x = self.extract_feat(img)
 
-        loss_decode = self._decode_head_forward_train(x, img_metas, gt_semantic_seg)
+        loss_decode = self._decode_head_forward_train(x, img_metas, gt_semantic_seg, pixel_weights)
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
