@@ -68,10 +68,10 @@ model = dict(
         norm_cfg=norm_cfg,
         act_cfg=dict(type='ReLU6'),
         align_corners=False,
-        sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         loss_decode=dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,
+            sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
             loss_weight=1.0
         )
     ),
