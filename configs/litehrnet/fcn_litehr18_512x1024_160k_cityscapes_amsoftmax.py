@@ -18,8 +18,6 @@ model = dict(
         num_classes=19,
         norm_cfg=norm_cfg,
         align_corners=False,
-        sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-        sampler_loss_idx=0,
         enable_out_norm=True,
         loss_decode=[
             dict(type='AMSoftmaxLoss',
@@ -35,6 +33,7 @@ model = dict(
                  pr_product=False,
                  conf_penalty_weight=0.085,
                  loss_jitter_prob=0.01,
+                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  loss_weight=1.0),
         ]
     ),

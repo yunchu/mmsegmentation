@@ -18,10 +18,12 @@ model = dict(
         num_classes=2,
         norm_cfg=norm_cfg,
         align_corners=False,
-        sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-        sampler_loss_idx=0,
         loss_decode=[
-            dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0, loss_jitter_prob=0.01),
+            dict(type='CrossEntropyLoss',
+                 use_sigmoid=False,
+                 loss_jitter_prob=0.01,
+                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                 loss_weight=1.0),
         ]
     ),
     train_cfg=dict(
