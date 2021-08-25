@@ -86,7 +86,7 @@ class BasePixelLoss(BaseWeightedLoss):
 
         pixel_weights = None
         if self.sampler is not None:
-            pixel_weights = self.sampler(losses, valid_mask)
+            pixel_weights = self.sampler(losses, output, valid_labels, valid_mask)
 
         loss = weight_reduce_loss(
             losses,

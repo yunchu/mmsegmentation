@@ -11,8 +11,10 @@ class ClassWeightingPixelSampler(BasePixelSampler):
 
         self.eps = eps
 
-    def _sample(self, seg_logit, seg_label):
+    def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
         with torch.no_grad():
+            assert seg_logit is not None
+            assert seg_label is not None
             assert seg_logit.shape[2:] == seg_label.shape[2:]
             assert seg_label.shape[1] == 1
 

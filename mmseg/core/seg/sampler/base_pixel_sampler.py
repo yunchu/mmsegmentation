@@ -8,7 +8,7 @@ class BasePixelSampler(metaclass=ABCMeta):
         self.ignore_index = ignore_index
 
     @abstractmethod
-    def _sample(self, losses, valid_mask):
+    def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
         """Placeholder for sample function."""
 
     def __call__(self, *args, **kwargs):

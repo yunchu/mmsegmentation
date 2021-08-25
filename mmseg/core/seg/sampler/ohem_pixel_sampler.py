@@ -28,7 +28,7 @@ class OHEMPixelSampler(BasePixelSampler):
         self.thresh = thresh
         self.min_kept = min_kept
 
-    def _sample(self, seg_logit, seg_label):
+    def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
         """Sample pixels that have high loss or with low prediction confidence.
 
         Args:
@@ -40,20 +40,26 @@ class OHEMPixelSampler(BasePixelSampler):
         """
 
         with torch.no_grad():
-            assert seg_logit.shape[2:] == seg_label.shape[2:]
-            assert seg_label.shape[1] == 1
-
-            seg_label = seg_label.squeeze(1).long()
-            batch_kept = self.min_kept * seg_label.size(0)
-            valid_mask = seg_label != self.context.ignore_index
-            seg_weight = seg_logit.new_zeros(size=seg_label.size())
-            valid_seg_weight = seg_weight[valid_mask]
+            if valid_mask is None:
+                assert seg_label is not None
+                valid_mask = seg_label != self.ignore_index
 
             if self.thresh is not None:
+                assert seg_logit is not None
+                assert seg_label is not None
+
+                assert seg_logit.shape[2:] == seg_label.shape[2:]
+                assert seg_label.shape[1] == 1
+
+                seg_label = seg_label.squeeze(1).long()
+                batch_kept = self.min_kept * seg_label.size(0)
+                seg_weight = seg_logit.new_zeros(size=seg_label.size())
+                valid_seg_weight = seg_weight[valid_mask]
+
                 seg_prob = F.softmax(seg_logit, dim=1)
 
                 tmp_seg_label = seg_label.clone().unsqueeze(1)
-                tmp_seg_label[tmp_seg_label == self.context.ignore_index] = 0
+                tmp_seg_label[tmp_seg_label == self.ignore_index] = 0
                 seg_prob = seg_prob.gather(1, tmp_seg_label).squeeze(1)
                 sort_prob, sort_indices = seg_prob[valid_mask].sort()
 
@@ -65,15 +71,11 @@ class OHEMPixelSampler(BasePixelSampler):
 
                 valid_seg_weight[seg_prob[valid_mask] < threshold] = 1.
             else:
-                main_loss_idx = self.context.sampler_loss_idx
-                losses = self.context.loss_modules[main_loss_idx](
-                    seg_logit,
-                    seg_label,
-                    weight=None,
-                    ignore_index=self.context.ignore_index,
-                    reduction_override='none',
-                    increment_train_step=False,
-                )
+                assert losses is not None
+
+                batch_kept = self.min_kept * losses.size(0)
+                seg_weight = torch.zeros_like(losses)
+                valid_seg_weight = seg_weight[valid_mask]
 
                 # faster than topk according to https://github.com/pytorch/pytorch/issues/22812  # noqa
                 _, sort_indices = losses[valid_mask].sort(descending=True)

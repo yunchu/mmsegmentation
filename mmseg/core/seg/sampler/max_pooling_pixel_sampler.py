@@ -25,8 +25,14 @@ class MaxPoolingPixelSampler(BasePixelSampler):
         self.ratio = ratio
         self.p = p
 
-    def _sample(self, losses, valid_mask):
+    def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
+        assert losses is not None
+
         with torch.no_grad():
+            if valid_mask is None:
+                assert seg_label is not None
+                valid_mask = seg_label != self.ignore_index
+
             flat_losses = losses.view(-1)
             sort_losses, sort_indices = flat_losses[valid_mask.view(-1)].sort()
 
