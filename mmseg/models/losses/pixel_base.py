@@ -10,10 +10,10 @@ from .. import builder
 from .utils import weight_reduce_loss
 
 
-class BaseMetricLearningLoss(BaseWeightedLoss):
+class BasePixelLoss(BaseWeightedLoss):
     def __init__(self, scale_cfg, pr_product=False, conf_penalty_weight=None, reduction='mean',
                  loss_jitter_prob=None, loss_jitter_momentum=0.1, **kwargs):
-        super(BaseMetricLearningLoss, self).__init__(**kwargs)
+        super(BasePixelLoss, self).__init__(**kwargs)
 
         self._enable_pr_product = pr_product
         self._conf_penalty_weight = conf_penalty_weight
@@ -53,14 +53,14 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
 
         return out_prod
 
-    def _regularization(self, cos_theta, scale):
-        probs = F.softmax(scale * cos_theta, dim=1)
+    def _regularization(self, logits, scale):
+        probs = F.softmax(scale * logits, dim=1)
         entropy_values = entropy(probs, dim=1)
         out_values = -self._conf_penalty_weight * entropy_values
 
         return out_values
 
-    def _forward(self, output, labels, weight=None, ignore_index=-100, avg_factor=None,
+    def _forward(self, output, labels, avg_factor=None,
                  reduction_override=None, increment_train_step=True):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self._reduction)
@@ -81,16 +81,16 @@ class BaseMetricLearningLoss(BaseWeightedLoss):
             regularization = self._regularization(output, self._last_scale)
             losses = losses + regularization
 
-        valid_mask = labels != ignore_index
+        valid_mask = labels != self.ignore_index
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 
-        # apply weights and do the reduction
-        if weight is not None:
-            weight = weight.float()
+        pixel_weights = None
+        if self.sampler is not None:
+            pixel_weights = self.sampler(losses, valid_mask)
 
         loss = weight_reduce_loss(
             losses,
-            weight=weight,
+            weight=pixel_weights,
             reduction=reduction,
             avg_factor=avg_factor
         )

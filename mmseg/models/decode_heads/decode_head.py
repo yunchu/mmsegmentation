@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from mmcv.cnn import normal_init, ConvModule
 from mmcv.runner import auto_fp16, force_fp32
 
-from mmseg.core import build_pixel_sampler, normalize
+from mmseg.core import normalize
 from mmseg.ops import resize
 from ..builder import build_loss
 from ..losses import accuracy
@@ -59,9 +59,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                      type='CrossEntropyLoss',
                      use_sigmoid=False,
                      loss_weight=1.0),
-                 sampler_loss_idx=0,
                  ignore_index=255,
-                 sampler=None,
                  align_corners=False,
                  enable_out_seg=True,
                  enable_out_bn=False,
@@ -84,13 +82,10 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
         assert len(loss_configs) > 0
-        self.loss_modules = nn.ModuleList([build_loss(loss_cfg) for loss_cfg in loss_configs])
-        assert 0 <= sampler_loss_idx < len(self.loss_modules)
-        self.sampler_loss_idx = sampler_loss_idx
-
-        self.sampler = None
-        if sampler is not None:
-            self.sampler = build_pixel_sampler(sampler, context=self)
+        self.loss_modules = nn.ModuleList([
+            build_loss(loss_cfg, self.ignore_index)
+            for loss_cfg in loss_configs
+        ])
 
         self.dropout = None
         if dropout_ratio is not None and dropout_ratio > 0:
@@ -285,21 +280,11 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             align_corners=self.align_corners
         )
 
-        if self.sampler is not None:
-            seg_weight = self.sampler.sample(seg_logit, seg_label)
-        else:
-            seg_weight = None
-
         seg_label = seg_label.squeeze(1)
 
         loss_values = []
         for loss_module in self.loss_modules:
-            loss_value = loss_module(
-                seg_logit,
-                seg_label,
-                weight=seg_weight,
-                ignore_index=self.ignore_index
-            )
+            loss_value = loss_module(seg_logit, seg_label)
 
             loss_values.append(loss_value)
             loss[loss_module.name] = loss_value

@@ -21,14 +21,14 @@ class OHEMPixelSampler(BasePixelSampler):
     """
 
     def __init__(self, context, thresh=None, min_kept=100000):
-        assert min_kept > 1
-
         super(OHEMPixelSampler, self).__init__(context)
+
+        assert min_kept > 1
 
         self.thresh = thresh
         self.min_kept = min_kept
 
-    def sample(self, seg_logit, seg_label):
+    def _sample(self, seg_logit, seg_label):
         """Sample pixels that have high loss or with low prediction confidence.
 
         Args:

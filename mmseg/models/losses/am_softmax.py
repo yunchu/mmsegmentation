@@ -4,11 +4,11 @@ import torch.nn.functional as F
 
 from mmseg.core import build_classification_loss, focal_loss
 from ..builder import LOSSES
-from .metric_learning_base import BaseMetricLearningLoss
+from .pixel_base import BasePixelLoss
 
 
 @LOSSES.register_module()
-class AMSoftmaxLoss(BaseMetricLearningLoss):
+class AMSoftmaxLoss(BasePixelLoss):
     """Computes the AM-Softmax loss with cos or arc margin"""
     margin_types = ['cos', 'arc']
 

@@ -6,13 +6,12 @@ from .base_pixel_sampler import BasePixelSampler
 
 @PIXEL_SAMPLERS.register_module()
 class ClassWeightingPixelSampler(BasePixelSampler):
-
     def __init__(self, context, eps=1e-5):
         super().__init__(context)
 
         self.eps = eps
 
-    def sample(self, seg_logit, seg_label):
+    def _sample(self, seg_logit, seg_label):
         with torch.no_grad():
             assert seg_logit.shape[2:] == seg_label.shape[2:]
             assert seg_label.shape[1] == 1
