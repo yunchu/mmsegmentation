@@ -284,16 +284,17 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         seg_label = seg_label.squeeze(1)
 
         loss_values = []
-        for loss_module in self.loss_modules:
+        for loss_idx, loss_module in enumerate(self.loss_modules):
             loss_value = loss_module(
                 seg_logit,
                 seg_label,
                 pixel_weights=pixel_weights
             )
-
             loss_values.append(loss_value)
-            loss[loss_module.name] = loss_value
-            loss[loss_module.name + '_scale'] = loss_module.last_scale
+
+            loss_name = loss_module.name + f'-{loss_idx}'
+            loss[loss_name] = loss_value
+            loss[loss_name + '-scale'] = loss_module.last_scale
 
         loss['loss_seg'] = sum(loss_values)
         loss['acc_seg'] = accuracy(seg_logit, seg_label)

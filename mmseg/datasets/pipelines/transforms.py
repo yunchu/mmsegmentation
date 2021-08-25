@@ -1,9 +1,12 @@
 import os.path as osp
 
+import cv2
 import mmcv
 import numpy as np
 from mmcv.utils import deprecated_api_warning, is_tuple_of
 from numpy import random
+from scipy.signal import convolve2d
+from scipy.ndimage import distance_transform_edt
 
 from ..builder import PIPELINES
 
@@ -1076,6 +1079,49 @@ class CrossNorm(object):
         repr_str = f'{self.__class__.__name__}(' \
                    f'size={self.num_tuples}, ' \
                    f'prob={self.prob})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class BorderWeighting(object):
+    def __init__(self, sigma=8.0, eps=1e-2, ignore_index=255):
+        self.sigma = sigma
+        self.eps = eps
+        self.ignore_index = ignore_index
+
+    def _extract_edges(self, gt_labels):
+        invalid_mask = (gt_labels == self.ignore_index).astype(np.float32)
+        gt_labels = np.copy(gt_labels).astype(np.float32)
+
+        kernel = np.ones([3, 3], dtype=np.float32) / 8.0
+        kernel[1, 1] = 0.0
+
+        pos_conv = convolve2d(gt_labels, kernel, boundary='symm', mode='same')
+        neg_conv = convolve2d(invalid_mask, kernel, boundary='symm', mode='same')
+
+        out = gt_labels != pos_conv
+        out[invalid_mask != neg_conv] = False
+
+        return out
+
+    def __call__(self, results):
+        gt_labels = results['gt_semantic_seg']
+
+        edges = self._extract_edges(gt_labels)
+        dist = distance_transform_edt(~edges)
+
+        weights = np.exp(-dist / self.sigma)
+        weights[weights < self.eps] = 0.0
+
+        results['pixel_weights'] = weights
+
+        return results
+
+    def __repr__(self):
+        repr_str = f'{self.__class__.__name__}(' \
+                   f'sigma={self.sigma}, '\
+                   f'eps={self.eps}, '\
+                   f'ignore_index={self.ignore_index})'
         return repr_str
 
 

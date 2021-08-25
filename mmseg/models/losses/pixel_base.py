@@ -93,9 +93,8 @@ class BasePixelLoss(BaseWeightedLoss):
 
         if self.with_border_reweighting:
             assert pixel_weights is not None
-            assert pixel_weights.size() == losses.size()
 
-            losses = pixel_weights * losses
+            losses = pixel_weights.squeeze(1) * losses
 
         weight = None
         if self.sampler is not None:
