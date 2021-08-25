@@ -21,7 +21,7 @@ model = dict(
         sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
         sampler_loss_idx=0,
         enable_out_norm=True,
-        enable_out_bias=True,
+        enable_out_bn=False,
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(

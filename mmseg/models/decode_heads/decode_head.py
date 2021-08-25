@@ -64,7 +64,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  sampler=None,
                  align_corners=False,
                  enable_out_seg=True,
-                 enable_out_bias=False,
+                 enable_out_bn=False,
                  enable_out_norm=False):
         super(BaseDecodeHead, self).__init__()
 
@@ -98,7 +98,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         self.conv_seg = None
         if enable_out_seg:
-            if enable_out_bias:
+            if enable_out_bn:
                 self.conv_seg = ConvModule(
                     channels,
                     num_classes,
