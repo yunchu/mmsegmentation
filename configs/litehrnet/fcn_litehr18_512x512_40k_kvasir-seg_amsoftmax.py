@@ -52,7 +52,7 @@ model = dict(
                  loss_jitter_prob=0.01,
                  border_reweighting=True,
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
-                 loss_weight=1.0),
+                 loss_weight=0.1),
         ]
     ),
     train_cfg=dict(
