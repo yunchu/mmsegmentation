@@ -102,7 +102,8 @@ class BasePixelLoss(BaseWeightedLoss):
 
         if self.with_regularization:
             regularization = self._regularization(output, self._last_scale)
-            losses = torch.clamp_min(losses + regularization, 0.0)
+            losses = losses + regularization
+            # losses = torch.clamp_min(losses + regularization, 0.0)
 
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 
