@@ -37,22 +37,22 @@ model = dict(
                  border_reweighting=False,
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  loss_weight=1.0),
-            # dict(type='AMSoftmaxLoss',
-            #      scale_cfg=dict(
-            #          type='ConstantScalarScheduler',
-            #          scale=10.0
-            #      ),
-            #      margin_type='cos',
-            #      margin=0.5,
-            #      gamma=0.0,
-            #      t=1.0,
-            #      target_loss='ce',
-            #      pr_product=False,
-            #      conf_penalty_weight=0.085,
-            #      loss_jitter_prob=0.01,
-            #      border_reweighting=True,
-            #      sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
-            #      loss_weight=1.0),
+            dict(type='AMSoftmaxLoss',
+                 scale_cfg=dict(
+                     type='ConstantScalarScheduler',
+                     scale=10.0
+                 ),
+                 margin_type='cos',
+                 margin=0.5,
+                 gamma=0.0,
+                 t=1.0,
+                 target_loss='ce',
+                 pr_product=False,
+                 conf_penalty_weight=0.085,
+                 loss_jitter_prob=0.01,
+                 border_reweighting=True,
+                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
+                 loss_weight=1.0),
         ]
     ),
     train_cfg=dict(
