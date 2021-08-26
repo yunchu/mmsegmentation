@@ -4,11 +4,11 @@ Berman 2018 ESAT-PSI KU Leuven (MIT License)"""
 
 import mmcv
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-from ..builder import LOSSES
+from ..builder import LOSSES, build_scheduler
 from .utils import get_class_weight, weight_reduce_loss
+from .base import BaseWeightedLoss
 
 
 def lovasz_grad(gt_sorted):
@@ -38,11 +38,11 @@ def flatten_binary_logits(logits, labels, ignore_index=None):
     if ignore_index is None:
         return logits, labels
 
-    valid = (labels != ignore_index)
-    vlogits = logits[valid]
-    vlabels = labels[valid]
+    valid = labels != ignore_index
+    valid_logits = logits[valid]
+    valid_labels = labels[valid]
 
-    return vlogits, vlabels
+    return valid_logits, valid_labels
 
 
 def flatten_probs(probs, labels, ignore_index=None):
@@ -59,11 +59,11 @@ def flatten_probs(probs, labels, ignore_index=None):
     if ignore_index is None:
         return probs, labels
 
-    valid = (labels != ignore_index)
-    vprobs = probs[valid.nonzero().squeeze()]
-    vlabels = labels[valid]
+    valid = labels != ignore_index
+    valid_probs = probs[valid]
+    valid_labels = labels[valid]
 
-    return vprobs, vlabels
+    return valid_probs, valid_labels
 
 
 def lovasz_hinge_flat(logits, labels):
@@ -241,7 +241,7 @@ def lovasz_softmax(probs,
 
 
 @LOSSES.register_module()
-class LovaszLoss(nn.Module):
+class LovaszLoss(BaseWeightedLoss):
     """LovaszLoss.
 
     This loss is proposed in `The Lovasz-Softmax loss: A tractable surrogate
@@ -268,15 +268,15 @@ class LovaszLoss(nn.Module):
                  loss_type='multi_class',
                  classes='present',
                  per_image=False,
-                 reduction='mean',
                  class_weight=None,
-                 loss_weight=1.0):
-        super(LovaszLoss, self).__init__()
+                 scale_cfg=None,
+                 **kwargs):
+        super(LovaszLoss, self).__init__(**kwargs)
 
         assert loss_type in ('binary', 'multi_class'), "loss_type should be 'binary' or 'multi_class'."
         assert classes in ('all', 'present') or mmcv.is_list_of(classes, int)
         if not per_image:
-            assert reduction == 'none', "reduction should be 'none' when per_image is False."
+            assert self.reduction == 'none', "reduction should be 'none' when per_image is False."
 
         if loss_type == 'binary':
             self.cls_criterion = lovasz_hinge
@@ -285,21 +285,24 @@ class LovaszLoss(nn.Module):
 
         self.classes = classes
         self.per_image = per_image
-        self.reduction = reduction
-        self.loss_weight = loss_weight
         self.class_weight = get_class_weight(class_weight)
+
+        self.last_scale, self.scale_scheduler = None, None
+        if scale_cfg is not None:
+            self.scale_scheduler = build_scheduler(scale_cfg)
+        if self.cls_criterion == lovasz_softmax:
+            assert self.scale_scheduler is not None
 
     @property
     def name(self):
         return 'lovasz'
 
-    def forward(self,
-                cls_score,
-                label,
-                weight=None,
-                avg_factor=None,
-                reduction_override=None,
-                **kwargs):
+    def _forward(self,
+                 cls_score,
+                 label,
+                 pixel_weights=None,
+                 avg_factor=None,
+                 reduction_override=None):
         """Forward function."""
 
         assert reduction_override in (None, 'none', 'mean', 'sum')
@@ -312,7 +315,8 @@ class LovaszLoss(nn.Module):
 
         # if multi-class loss, transform logits to probs
         if self.cls_criterion == lovasz_softmax:
-            cls_score = F.softmax(cls_score, dim=1)
+            self.last_scale = self.scale_scheduler.get_scale_and_increment_step()
+            cls_score = F.softmax(self.last_scale * cls_score, dim=1)
 
         loss_cls = self.loss_weight * self.cls_criterion(
             cls_score,
@@ -322,7 +326,7 @@ class LovaszLoss(nn.Module):
             class_weight=class_weight,
             reduction=reduction,
             avg_factor=avg_factor,
-            **kwargs
+            ignore_index=self.ignore_index
         )
 
         return loss_cls

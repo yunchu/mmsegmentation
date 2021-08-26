@@ -89,18 +89,17 @@ class BasePixelLoss(BaseWeightedLoss):
 
         losses = self._calculate(output, valid_labels, self._last_scale)
 
+        if self.with_regularization:
+            regularization = self._regularization(output, self._last_scale)
+            losses = torch.clamp_min(losses + regularization, 0.0)
+
         if self.with_border_reweighting:
             assert pixel_weights is not None
-
             losses = pixel_weights.squeeze(1) * losses
 
         weight = None
         if self.sampler is not None:
             weight = self.sampler(losses, output, valid_labels, valid_mask)
-
-        if self.with_regularization:
-            regularization = self._regularization(output, self._last_scale)
-            losses = torch.clamp_min(losses + regularization, 0.0)
 
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 
