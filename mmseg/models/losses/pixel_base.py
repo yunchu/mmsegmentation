@@ -15,7 +15,6 @@ class BasePixelLoss(BaseWeightedLoss):
                  scale_cfg,
                  pr_product=False,
                  conf_penalty_weight=None,
-                 reduction='mean',
                  loss_jitter_prob=None,
                  loss_jitter_momentum=0.1,
                  border_reweighting=False,
@@ -24,7 +23,6 @@ class BasePixelLoss(BaseWeightedLoss):
 
         self._enable_pr_product = pr_product
         self._conf_penalty_weight = conf_penalty_weight
-        self._reduction = reduction
         self._border_reweighting = border_reweighting
 
         self._smooth_loss = None
@@ -75,7 +73,7 @@ class BasePixelLoss(BaseWeightedLoss):
     def _forward(self, output, labels, avg_factor=None, pixel_weights=None,
                  reduction_override=None, increment_train_step=True):
         assert reduction_override in (None, 'none', 'mean', 'sum')
-        reduction = (reduction_override if reduction_override else self._reduction)
+        reduction = (reduction_override if reduction_override else self.reduction)
 
         if increment_train_step:
             self._last_scale = self._scale_scheduler.get_scale_and_increment_step()
@@ -102,8 +100,7 @@ class BasePixelLoss(BaseWeightedLoss):
 
         if self.with_regularization:
             regularization = self._regularization(output, self._last_scale)
-            losses = losses + regularization
-            # losses = torch.clamp_min(losses + regularization, 0.0)
+            losses = torch.clamp_min(losses + regularization, 0.0)
 
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 

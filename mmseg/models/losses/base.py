@@ -16,9 +16,10 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
             Default: 1.0.
     """
 
-    def __init__(self, loss_weight=1.0, ignore_index=255, sampler=None, **kwargs):
+    def __init__(self, reduction='mean', loss_weight=1.0, ignore_index=255, sampler=None, **kwargs):
         super().__init__()
 
+        self.reduction = reduction
         self.loss_weight = loss_weight
         self.ignore_index = ignore_index
 

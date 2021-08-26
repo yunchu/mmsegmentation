@@ -29,16 +29,18 @@ void compute_weights(int size,
     }
 
     float q = p / (p - 1.0);
-    int c = m - n + 1;
-    float a[2] = {0.0};
+    int c = m - n;
+    float a[2] = {0.0, 0.0};
     int i = pos;
     float eta = 0.0;
-    for(; i < n && eta < std::numeric_limits<float>::epsilon(); ++i) {
+    for(; i < size && eta < std::numeric_limits<float>::epsilon(); ++i) {
         float loss_q = pow(losses_data[i] / losses_data[size - 1], q);
+
         a[0] = a[1];
         a[1] += loss_q;
+
         c += 1;
-        eta = c * loss_q - a[1];
+        eta = float(c) * loss_q - a[1];
     }
 
     // compute alpha
@@ -51,7 +53,7 @@ void compute_weights(int size,
 
     // compute weights
     float tau = 1.0 / (pow(n, 1.0 / q) * pow(m, 1.0 / p));
-    for (int k = i; k < n; ++k) {
+    for (int k = i; k < size; ++k) {
         weights_data[indices_data[k]] = tau;
     }
     if (alpha > -std::numeric_limits<float>::epsilon()) {

@@ -2,7 +2,7 @@ import functools
 
 import mmcv
 import numpy as np
-import torch.nn.functional as F
+import torch
 
 
 def get_class_weight(class_weight):
@@ -28,19 +28,22 @@ def reduce_loss(loss, reduction):
 
     Args:
         loss (Tensor): Elementwise loss tensor.
-        reduction (str): Options are "none", "mean" and "sum".
+        reduction (str): Options are "none", "mean", "valid_mean" and "sum".
 
     Return:
         Tensor: Reduced loss tensor.
     """
-    reduction_enum = F._Reduction.get_enum(reduction)
-    # none: 0, elementwise_mean:1, sum: 2
-    if reduction_enum == 0:
-        return loss
-    elif reduction_enum == 1:
+
+    if reduction == 'mean':
         return loss.mean()
-    elif reduction_enum == 2:
+    elif reduction == 'valid_mean':
+        valid_mask = loss > 0.0
+        num_valid = valid_mask.sum().float().clamp_min(1.0)
+        return loss.sum() / num_valid
+    elif reduction == 'sum':
         return loss.sum()
+    else:
+        return loss
 
 
 def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
@@ -50,7 +53,7 @@ def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
         loss (Tensor): Element-wise loss.
         weight (Tensor): Element-wise weights.
         reduction (str): Same as built-in losses of PyTorch.
-        avg_factor (float): Avarage factor when computing the mean of losses.
+        avg_factor (float): Average factor when computing the mean of losses.
 
     Returns:
         Tensor: Processed loss values.
@@ -71,7 +74,8 @@ def weight_reduce_loss(loss, weight=None, reduction='mean', avg_factor=None):
             loss = loss.sum() / avg_factor
         # if reduction is 'none', then do nothing, otherwise raise an error
         elif reduction != 'none':
-            raise ValueError('avg_factor can not be used with reduction="sum"')
+            raise ValueError(f'avg_factor can not be used with reduction="{reduction}"')
+
     return loss
 
 

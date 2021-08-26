@@ -35,8 +35,10 @@ class MaxPoolingPixelSampler(BasePixelSampler):
 
             flat_losses = losses.view(-1)
             sort_losses, sort_indices = flat_losses[valid_mask.view(-1)].sort()
+            sort_losses = sort_losses.contiguous()
+            sort_indices = sort_indices.contiguous()
 
-            weights = torch.zeros(sort_losses.size())
+            weights = torch.zeros(sort_losses.size()).contiguous()
             ext_module.compute_weights(
                 sort_losses.size(0),
                 sort_losses.cpu(),

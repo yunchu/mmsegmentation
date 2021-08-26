@@ -51,7 +51,7 @@ model = dict(
             #      conf_penalty_weight=0.085,
             #      loss_jitter_prob=0.01,
             #      border_reweighting=True,
-            #      # sampler=dict(type='MaxPoolingPixelSampler', ratio=0.05, p=1.7),
+            #      sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
             #      loss_weight=1.0),
         ]
     ),
