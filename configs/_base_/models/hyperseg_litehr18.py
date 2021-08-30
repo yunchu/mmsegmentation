@@ -30,7 +30,7 @@ model = dict(
             ),
             out_modules=dict(
                 conv=dict(
-                    enable=True,
+                    enable=False,
                     channels=576
                 ),
                 position_att=dict(
@@ -55,6 +55,7 @@ model = dict(
         in_index=(0, 1, 2, 3, 4, 5, 6),
         channels=None,
         weight_levels=2,
+        weight_same_last_level=True,
         kernel_sizes=[1, 1, 1, 3, 3],
         level_channels=[32, 16, 8, 8, 8],
         expand_ratio=2,
@@ -63,7 +64,6 @@ model = dict(
         weight_groups=[32, 16, 8, 16, 4],
         decoder_groups=1,
         unify_level=4,
-        coords_res=[(1024, 1024), (1024, 2048)],
         num_classes=19,
         norm_cfg=norm_cfg,
         act_cfg=dict(type='ReLU6'),

@@ -99,12 +99,12 @@ class MultiScaleDecoder(nn.Module):
                         curr_out_ngf,
                         kernel_size,
                         groups=group,
-                        norm_cfg=norm_cfg,
+                        norm_cfg=norm_cfg
                     ))
                 prev_channels = curr_out_ngf
 
-            # Add level layers to module
             self.level_blocks.append(MetaSequential(*curr_layers))
+
             if level < (unify_level - 1):
                 self.weight_blocks.append(WeightLayer(
                     self.level_blocks[-1].hyper_params
@@ -177,7 +177,6 @@ class MultiScaleDecoder(nn.Module):
             if p is None:
                 p = x[-level - 1]
             else:
-                # p = F.interpolate(p, scale_factor=2, mode='bilinear', align_corners=False)  # Upsample x2
                 if p.shape[2:] != x[-level - 1].shape[2:]:
                     p = F.interpolate(p, x[-level - 1].shape[2:], mode='bilinear', align_corners=False)  # Upsample
                 p = torch.cat((x[-level - 1], p), dim=1)
@@ -185,12 +184,12 @@ class MultiScaleDecoder(nn.Module):
             # Add image coordinates
             p = torch.cat([self.get_image_coordinates(p.shape[0], *p.shape[-2:], p.device), p], dim=1)
 
-            # Computer the output for the current level
-            if level < (self.unify_level - 1):
+            # Compute the output for the current level
+            if level < self.unify_level - 1:
                 w = weight_block(s)
                 p = level_block(p, w)
             else:
-                if level == (self.unify_level - 1):
+                if level == self.unify_level - 1:
                     w = weight_block(s)
                 i = level - self.unify_level + 1
                 p = level_block(p, w[:, self._ranges[i]:self._ranges[i + 1]])
@@ -348,23 +347,18 @@ class WeightMapper(nn.Module):
         out_channels (int): output number of channels.
         levels (int): number of levels operating on different strides.
         bias (bool): if True, enables bias in all convolution operations.
-        weight_groups (int): legacy parameter, no longer used.
     """
 
-    def __init__(self, in_channels, out_channels, levels=3, bias=False, weight_groups=1):
+    def __init__(self, in_channels, out_channels, levels=3, bias=False):
         super().__init__()
 
         assert levels > 0, 'levels must be greater than zero'
         assert in_channels % 2 == 0, 'in_channels must be divisible by 2'
-        if isinstance(weight_groups, (list, tuple)):
-            assert len(weight_groups) == len(out_channels), \
-                f'groups ({len(weight_groups)}) must be of size {len(out_channels)}'
 
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.levels = levels
         self.bias = bias
-        self.weight_groups = weight_groups
 
         self.in_conv = nn.Sequential(
             nn.Conv2d(in_channels, in_channels // 2, kernel_size=1, stride=1, bias=bias),
@@ -639,10 +633,12 @@ class HyperSegHead(BaseDecodeHead):
     def __init__(self, kernel_sizes=3, level_layers=1,
                  level_channels=None, expand_ratio=1, weight_groups=1,
                  with_out_fc=False, decoder_groups=1, decoder_dropout=None, coords_res=None,
-                 unify_level=None, weight_levels=3, **kwargs):
+                 unify_level=None, weight_levels=3, weight_same_last_level=False, **kwargs):
         super().__init__(input_transform='multiple_select', enable_out_seg=False, **kwargs)
 
-        feat_channels = self.in_channels[:-1]
+        self.weight_same_last_level = weight_same_last_level
+
+        feat_channels = self.in_channels if self.weight_same_last_level else self.in_channels[:-1]
         self.decoder = MultiScaleDecoder(
             feat_channels, self.in_channels[-1], self.num_classes,
             kernel_sizes, level_layers, level_channels,
@@ -658,9 +654,14 @@ class HyperSegHead(BaseDecodeHead):
         )
 
     def forward(self, inputs):
-        features = self._transform_inputs(inputs)
+        all_features = self._transform_inputs(inputs)
 
-        dynamic_weights = self.weight_mapper(features[-1])
-        out = self.decoder(features[:-1], dynamic_weights)
+        if self.weight_same_last_level:
+            main_features, weight_features = all_features, all_features[-1]
+        else:
+            main_features, weight_features = all_features[:-1], all_features[-1]
+
+        dynamic_weights = self.weight_mapper(weight_features)
+        out = self.decoder(main_features, dynamic_weights)
 
         return out
