@@ -32,10 +32,10 @@ model = dict(
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
-                 conf_penalty_weight=0.085,
+                 conf_penalty_weight=0.15,
                  loss_jitter_prob=0.01,
                  border_reweighting=False,
-                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.3, p=1.7),
                  loss_weight=1.0),
             # dict(type='LovaszLoss',
             #      scale_cfg=dict(
