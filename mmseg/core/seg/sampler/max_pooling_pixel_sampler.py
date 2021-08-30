@@ -16,7 +16,7 @@ class MaxPoolingPixelSampler(BasePixelSampler):
     https://arxiv.org/abs/1704.02966
     """
 
-    def __init__(self, ratio=0.3, p=1.7, **kwargs):
+    def __init__(self, ratio=0.3, p=1.7, skip_max_ratio=None, **kwargs):
         super().__init__(**kwargs)
 
         assert 0 < ratio <= 1, "ratio should be in range [0, 1]"
@@ -24,6 +24,10 @@ class MaxPoolingPixelSampler(BasePixelSampler):
 
         self.ratio = ratio
         self.p = p
+
+        self.skip_max_ratio = skip_max_ratio
+        if self.skip_max_ratio is not None:
+            assert 0.0 < self.skip_max_ratio < 1.0
 
     def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
         assert losses is not None
@@ -34,7 +38,20 @@ class MaxPoolingPixelSampler(BasePixelSampler):
                 valid_mask = seg_label != self.ignore_index
 
             flat_losses = losses.view(-1)
-            sort_losses, sort_indices = flat_losses[valid_mask.view(-1)].sort()
+            valid_losses = flat_losses[valid_mask.view(-1)]
+
+            if self.skip_max_ratio is not None:
+                max_skipped = max(1, int(valid_losses.size(0) * self.skip_max_ratio))
+                assert max_skipped < valid_losses.size(0)
+
+                num_skipped = torch.randint(1, max_skipped + 1, [])
+                _sort_losses, _ = valid_losses.sort()
+                ignore_threshold = _sort_losses[-num_skipped]
+                valid_losses = torch.where(valid_losses > ignore_threshold,
+                                           torch.zeros_like(valid_losses),
+                                           valid_losses)
+
+            sort_losses, sort_indices = valid_losses.sort()
             sort_losses = sort_losses.contiguous()
             sort_indices = sort_indices.contiguous()
 
