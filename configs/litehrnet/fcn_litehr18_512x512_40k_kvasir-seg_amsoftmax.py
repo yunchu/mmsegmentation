@@ -32,7 +32,13 @@ model = dict(
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
-                 conf_penalty_weight=0.005,
+                 conf_penalty_weight=dict(
+                     type='PolyScalarScheduler',
+                     start_scale=0.085,
+                     end_scale=0.0,
+                     num_iters=20000,
+                     power=1.2
+                 ),
                  loss_jitter_prob=0.01,
                  border_reweighting=False,
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),

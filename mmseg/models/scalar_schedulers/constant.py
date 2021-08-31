@@ -10,5 +10,5 @@ class ConstantScalarScheduler(BaseScalarScheduler):
         self._end_s = scale
         assert self._end_s > 0.0
 
-    def _get_scale(self, step):
+    def _get_value(self, step):
         return self._end_s

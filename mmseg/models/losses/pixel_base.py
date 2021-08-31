@@ -6,8 +6,8 @@ from scipy.special import erfinv
 
 from mmseg.core import entropy
 from .base import BaseWeightedLoss
-from .. import builder
 from .utils import weight_reduce_loss
+from .. import builder
 
 
 class BasePixelLoss(BaseWeightedLoss):
@@ -22,7 +22,6 @@ class BasePixelLoss(BaseWeightedLoss):
         super(BasePixelLoss, self).__init__(**kwargs)
 
         self._enable_pr_product = pr_product
-        self._conf_penalty_weight = conf_penalty_weight
         self._border_reweighting = border_reweighting
 
         self._smooth_loss = None
@@ -33,16 +32,23 @@ class BasePixelLoss(BaseWeightedLoss):
             assert 0.0 < loss_jitter_prob < 1.0
             self._jitter_sigma_factor = 1.0 / ((2.0 ** 0.5) * erfinv(1.0 - 2.0 * loss_jitter_prob))
 
-        self._scale_scheduler = builder.build_scheduler(scale_cfg)
-        self._last_scale = None
+        self._reg_weight_scheduler = builder.build_scheduler(conf_penalty_weight)
+        self._scale_scheduler = builder.build_scheduler(scale_cfg, default_value=1.0)
+
+        self._last_scale = 0.0
+        self._last_reg_weight = 0.0
 
     @property
     def last_scale(self):
         return self._last_scale
 
     @property
+    def last_reg_weight(self):
+        return self._last_reg_weight
+
+    @property
     def with_regularization(self):
-        return self._conf_penalty_weight is not None and self._conf_penalty_weight > 0.0
+        return self._reg_weight_scheduler is not None
 
     @property
     def with_pr_product(self):
@@ -63,22 +69,25 @@ class BasePixelLoss(BaseWeightedLoss):
 
         return out_prod
 
-    def _regularization(self, logits, scale):
+    @staticmethod
+    def _regularization(logits, scale, weight):
         probs = F.softmax(scale * logits, dim=1)
         entropy_values = entropy(probs, dim=1)
-        out_values = -self._conf_penalty_weight * entropy_values
+        out_values = -weight * entropy_values
 
         return out_values
 
+    @staticmethod
+    def _sparsity(losses, valid_mask):
+        with torch.no_grad():
+            return 1.0 - float(losses.count_nonzero().item()) / max(1.0, float(valid_mask.sum().item()))
+
     def _forward(self, output, labels, avg_factor=None, pixel_weights=None,
-                 reduction_override=None, increment_train_step=True):
+                 reduction_override=None):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
 
-        if increment_train_step:
-            self._last_scale = self._scale_scheduler.get_scale_and_increment_step()
-        else:
-            self._last_scale = self._scale_scheduler.get_scale()
+        self._last_scale = self._scale_scheduler(self.iter)
 
         if self.with_pr_product:
             output = self._pr_product(output)
@@ -90,7 +99,8 @@ class BasePixelLoss(BaseWeightedLoss):
         losses = self._calculate(output, valid_labels, self._last_scale)
 
         if self.with_regularization:
-            regularization = self._regularization(output, self._last_scale)
+            self._last_reg_weight = self._reg_weight_scheduler(self.iter)
+            regularization = self._regularization(output, self._last_scale, self._last_reg_weight)
             losses = torch.clamp_min(losses + regularization, 0.0)
 
         if self.with_border_reweighting:
@@ -98,6 +108,7 @@ class BasePixelLoss(BaseWeightedLoss):
             losses = pixel_weights.squeeze(1) * losses
 
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
+        valid_sparsity = self._sparsity(losses, valid_mask)
 
         weight = None
         if self.sampler is not None:
@@ -121,7 +132,12 @@ class BasePixelLoss(BaseWeightedLoss):
             jitter_point = torch.normal(0.0, jitter_sigma, [], device=loss.device, dtype=loss.dtype)
             loss = (loss - jitter_point).abs() + jitter_point
 
-        return loss
+        meta = dict(weight=self.last_loss_weight,
+                    reg_weight=self.last_reg_weight,
+                    scale=self.last_scale,
+                    sparsity=valid_sparsity)
+
+        return loss, meta
 
     @abstractmethod
     def _calculate(self, output, labels, scale):

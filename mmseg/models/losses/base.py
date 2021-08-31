@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 import torch.nn as nn
 
 from mmseg.core import build_pixel_sampler
+from .. import builder
 
 
 class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
@@ -12,7 +13,7 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
     normal loss without loss weights.
 
     Args:
-        loss_weight (float): Factor scalar multiplied on the loss.
+        loss_weight (float or dict): Factor scalar multiplied on the loss.
             Default: 1.0.
     """
 
@@ -20,12 +21,24 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
         super().__init__()
 
         self.reduction = reduction
-        self.loss_weight = loss_weight
         self.ignore_index = ignore_index
 
         self.sampler = None
         if sampler is not None:
             self.sampler = build_pixel_sampler(sampler, ignore_index=ignore_index)
+
+        self._loss_weight_scheduler = builder.build_scheduler(loss_weight, default_value=1.0)
+
+        self._iter = 0
+        self._last_loss_weight = 0
+
+    @property
+    def iter(self):
+        return self._iter
+
+    @property
+    def last_loss_weight(self):
+        return self._last_loss_weight
 
     @abstractmethod
     def _forward(self, *args, **kwargs):
@@ -44,7 +57,11 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
             torch.Tensor: The calculated loss.
         """
 
-        loss = self._forward(*args, **kwargs)
-        out = self.loss_weight * loss
+        self._last_loss_weight = self._loss_weight_scheduler(self.iter)
 
-        return out
+        loss, meta = self._forward(*args, **kwargs)
+        out_loss = self._last_loss_weight * loss
+
+        self._iter += 1
+
+        return out_loss, meta

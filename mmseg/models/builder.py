@@ -52,5 +52,14 @@ def build_params_manager(cfg):
     return PARAMS_MANAGERS.build(cfg)
 
 
-def build_scheduler(cfg):
+def build_scheduler(cfg, default_value=None):
+    if cfg is None:
+        if default_value is not None:
+            assert isinstance(default_value, (int, float))
+            cfg = dict(type='ConstantScalarScheduler', scale=float(default_value))
+        else:
+            return None
+    elif isinstance(cfg, (int, float)):
+        cfg = dict(type='ConstantScalarScheduler', scale=float(cfg))
+
     return SCALAR_SCHEDULERS.build(cfg)

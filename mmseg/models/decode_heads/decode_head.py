@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from mmcv.cnn import normal_init, ConvModule
 from mmcv.runner import auto_fp16, force_fp32
 
-from mmseg.core import normalize
+from mmseg.core import normalize, add_prefix
 from mmseg.ops import resize
 from ..builder import build_loss
 from ..losses import accuracy
@@ -285,7 +285,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         loss_values = []
         for loss_idx, loss_module in enumerate(self.loss_modules):
-            loss_value = loss_module(
+            loss_value, loss_meta = loss_module(
                 seg_logit,
                 seg_label,
                 pixel_weights=pixel_weights
@@ -294,7 +294,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
             loss_name = loss_module.name + f'-{loss_idx}'
             loss[loss_name] = loss_value
-            loss[loss_name + '-scale'] = loss_module.last_scale
+            loss.update(add_prefix(loss_meta, loss_name))
 
         loss['loss_seg'] = sum(loss_values)
         loss['acc_seg'] = accuracy(seg_logit, seg_label)

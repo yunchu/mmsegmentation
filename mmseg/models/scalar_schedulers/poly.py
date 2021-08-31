@@ -10,15 +10,15 @@ class PolyScalarScheduler(BaseScalarScheduler):
         super(PolyScalarScheduler, self).__init__()
 
         self._start_s = start_scale
-        assert self._start_s > 0.0
+        assert self._start_s >= 0.0
         self._end_s = end_scale
-        assert self._end_s > 0.0
+        assert self._end_s >= 0.0
         self._num_iters = num_iters
         assert self._num_iters > 0
         self._power = power
-        assert self._power > 0.0
+        assert self._power >= 0.0
 
-    def _get_scale(self, step):
+    def _get_value(self, step):
         if step is None:
             return float(self._end_s)
 
