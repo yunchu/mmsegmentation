@@ -97,11 +97,11 @@ class BasePixelLoss(BaseWeightedLoss):
             assert pixel_weights is not None
             losses = pixel_weights.squeeze(1) * losses
 
+        losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
+
         weight = None
         if self.sampler is not None:
             weight = self.sampler(losses, output, valid_labels, valid_mask)
-
-        losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
 
         loss = weight_reduce_loss(
             losses,
