@@ -78,9 +78,12 @@ class BasePixelLoss(BaseWeightedLoss):
         return out_values
 
     @staticmethod
-    def _sparsity(losses, valid_mask):
+    def _sparsity(values, valid_mask):
         with torch.no_grad():
-            return 1.0 - float(losses.count_nonzero().item()) / max(1.0, float(valid_mask.sum().item()))
+            valid_values = values[valid_mask]
+            sparsity = 1.0 - float(valid_values.count_nonzero().item()) / max(1.0, float(valid_mask.sum().item()))
+
+            return sparsity
 
     def _forward(self, output, labels, avg_factor=None, pixel_weights=None,
                  reduction_override=None):
@@ -108,11 +111,12 @@ class BasePixelLoss(BaseWeightedLoss):
             losses = pixel_weights.squeeze(1) * losses
 
         losses = torch.where(valid_mask, losses, torch.zeros_like(losses))
-        valid_sparsity = self._sparsity(losses, valid_mask)
+        raw_sparsity = self._sparsity(losses, valid_mask)
 
-        weight = None
+        weight, weight_sparsity = None, 0.0
         if self.sampler is not None:
             weight = self.sampler(losses, output, valid_labels, valid_mask)
+            weight_sparsity = self._sparsity(weight, valid_mask)
 
         loss = weight_reduce_loss(
             losses,
@@ -135,7 +139,8 @@ class BasePixelLoss(BaseWeightedLoss):
         meta = dict(weight=self.last_loss_weight,
                     reg_weight=self.last_reg_weight,
                     scale=self.last_scale,
-                    sparsity=valid_sparsity)
+                    raw_sparsity=raw_sparsity,
+                    weight_sparsity=weight_sparsity)
 
         return loss, meta
 
