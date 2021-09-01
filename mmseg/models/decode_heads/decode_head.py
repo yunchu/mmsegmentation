@@ -3,10 +3,10 @@ from abc import ABCMeta, abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import normal_init, ConvModule
+from mmcv.cnn import normal_init
 from mmcv.runner import auto_fp16, force_fp32
 
-from mmseg.core import normalize, add_prefix
+from mmseg.core import normalize, add_prefix, AngularPWConv
 from mmseg.ops import resize
 from ..builder import build_loss
 from ..losses import accuracy
@@ -62,7 +62,6 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  ignore_index=255,
                  align_corners=False,
                  enable_out_seg=True,
-                 enable_out_bn=False,
                  enable_out_norm=False):
         super(BaseDecodeHead, self).__init__()
 
@@ -93,15 +92,17 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         self.conv_seg = None
         if enable_out_seg:
-            if enable_out_bn:
-                self.conv_seg = ConvModule(
+            if enable_out_norm:
+                self.conv_seg = AngularPWConv(
                     channels,
                     num_classes,
-                    kernel_size=1,
-                    act_cfg=None,
-                    conv_cfg=self.conv_cfg,
-                    norm_cfg=self.norm_cfg
+                    clip_output=True
                 )
+                # self.conv_seg = nn.Conv2d(
+                #     channels,
+                #     num_classes,
+                #     kernel_size=1
+                # )
             else:
                 self.conv_seg = nn.Conv2d(
                     channels,

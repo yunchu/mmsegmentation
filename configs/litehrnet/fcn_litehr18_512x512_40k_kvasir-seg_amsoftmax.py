@@ -19,7 +19,6 @@ model = dict(
         norm_cfg=norm_cfg,
         align_corners=False,
         enable_out_norm=True,
-        enable_out_bn=False,
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(
