@@ -22,9 +22,16 @@ model = dict(
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(
-                     type='ConstantScalarScheduler',
-                     scale=10.0
+                     type='PolyScalarScheduler',
+                     start_scale=30,
+                     end_scale=5,
+                     num_iters=30000,
+                     power=1.2
                  ),
+                 # scale_cfg=dict(
+                 #     type='ConstantScalarScheduler',
+                 #     scale=10.0
+                 # ),
                  margin_type='cos',
                  margin=0.5,
                  gamma=2.0,
@@ -34,13 +41,12 @@ model = dict(
                  conf_penalty_weight=dict(
                      type='PolyScalarScheduler',
                      start_scale=0.085,
-                     end_scale=5e-4,
+                     end_scale=5e-3,
                      num_iters=20000,
                      power=1.2
                  ),
                  loss_jitter_prob=0.01,
                  border_reweighting=False,
-                 # sampler=dict(type='OHEMPixelSampler', kept_ratio=0.6),
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  loss_weight=1.0),
             # dict(type='LovaszLoss',
