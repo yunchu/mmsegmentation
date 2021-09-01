@@ -99,11 +99,11 @@ class BasePixelLoss(BaseWeightedLoss):
         valid_labels = torch.clamp(labels, 0, num_classes - 1)
         valid_mask = labels != self.ignore_index
 
-        losses = self._calculate(output, valid_labels, self._last_scale)
+        losses, updated_output = self._calculate(output, valid_labels, self._last_scale)
 
         if self.with_regularization:
             self._last_reg_weight = self._reg_weight_scheduler(self.iter)
-            regularization = self._regularization(output, self._last_scale, self._last_reg_weight)
+            regularization = self._regularization(updated_output, self._last_scale, self._last_reg_weight)
             losses = torch.clamp_min(losses + regularization, 0.0)
 
         if self.with_border_reweighting:

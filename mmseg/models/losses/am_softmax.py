@@ -60,4 +60,4 @@ class AMSoftmaxLoss(BasePixelLoss):
         else:
             out_losses = focal_loss(self.target_loss(scale * output, target), self.gamma)
 
-        return out_losses
+        return out_losses, output
