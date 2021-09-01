@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 from mmcv.cnn import build_norm_layer, build_activation_layer
 
+from mmseg.core import normalize
 from mmseg.models.utils import MetaConv2d, MetaSequential
 from ..builder import HEADS
 from .decode_head import BaseDecodeHead
@@ -39,8 +40,8 @@ class MultiScaleDecoder(nn.Module):
 
     def __init__(self, feat_channels, signal_channels, num_classes=3, kernel_sizes=3, level_layers=1,
                  level_channels=None, norm_cfg=dict(type='BN'), act_cfg=dict(type='ReLU6'),
-                 out_kernel_size=1, expand_ratio=1, groups=1, weight_groups=1, with_out_fc=False, dropout=None,
-                 coords_res=None, unify_level=None):  # must be a list of tuples
+                 out_kernel_size=1, expand_ratio=1, groups=1, weight_groups=1, with_out_fc=False,
+                 with_out_norm=False, dropout=None, coords_res=None, unify_level=None):  # must be a list of tuples
         super().__init__()
 
         if isinstance(kernel_sizes, numbers.Number):
@@ -116,6 +117,10 @@ class MultiScaleDecoder(nn.Module):
                     self.weight_blocks.append(WeightLayer(
                         hyper_params
                     ))
+
+        self.with_out_norm = with_out_norm
+        if self.with_out_norm:
+            assert with_out_fc
 
         # Add the last layer
         if with_out_fc:
@@ -193,6 +198,9 @@ class MultiScaleDecoder(nn.Module):
                     w = weight_block(s)
                 i = level - self.unify_level + 1
                 p = level_block(p, w[:, self._ranges[i]:self._ranges[i + 1]])
+
+        if self.with_out_norm:
+            p = normalize(p, dim=1, p=2)
 
         # Last layer
         if self.out_fc is not None:
@@ -632,8 +640,8 @@ class HyperSegHead(BaseDecodeHead):
 
     def __init__(self, kernel_sizes=3, level_layers=1,
                  level_channels=None, expand_ratio=1, weight_groups=1,
-                 with_out_fc=False, decoder_groups=1, decoder_dropout=None, coords_res=None,
-                 unify_level=None, weight_levels=3, weight_same_last_level=False, **kwargs):
+                 with_out_fc=False, with_out_norm=False, decoder_groups=1, decoder_dropout=None,
+                 coords_res=None, unify_level=None, weight_levels=3, weight_same_last_level=False, **kwargs):
         super().__init__(input_transform='multiple_select', enable_out_seg=False, **kwargs)
 
         self.weight_same_last_level = weight_same_last_level
@@ -642,7 +650,7 @@ class HyperSegHead(BaseDecodeHead):
         self.decoder = MultiScaleDecoder(
             feat_channels, self.in_channels[-1], self.num_classes,
             kernel_sizes, level_layers, level_channels,
-            with_out_fc=with_out_fc, out_kernel_size=1,
+            with_out_fc=with_out_fc, with_out_norm=with_out_norm, out_kernel_size=1,
             expand_ratio=expand_ratio, groups=decoder_groups,
             weight_groups=weight_groups, dropout=decoder_dropout,
             coords_res=coords_res, unify_level=unify_level,
