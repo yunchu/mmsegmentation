@@ -35,7 +35,7 @@ model = dict(
                  conf_penalty_weight=dict(
                      type='PolyScalarScheduler',
                      start_scale=0.085,
-                     end_scale=5e-3,
+                     end_scale=5e-4,
                      num_iters=20000,
                      power=1.2
                  ),
