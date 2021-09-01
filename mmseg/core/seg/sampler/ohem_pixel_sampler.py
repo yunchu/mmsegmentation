@@ -20,13 +20,12 @@ class OHEMPixelSampler(BasePixelSampler):
             Default: 100000.
     """
 
-    def __init__(self, context, thresh=None, min_kept=100000):
-        super(OHEMPixelSampler, self).__init__(context)
-
-        assert min_kept > 1
+    def __init__(self, thresh=None, min_kept=100000, kept_ratio=None, **kwargs):
+        super(OHEMPixelSampler, self).__init__(**kwargs)
 
         self.thresh = thresh
         self.min_kept = min_kept
+        self.kept_ratio = kept_ratio
 
     def _sample(self, losses=None, seg_logit=None, seg_label=None, valid_mask=None):
         """Sample pixels that have high loss or with low prediction confidence.
@@ -52,7 +51,7 @@ class OHEMPixelSampler(BasePixelSampler):
                 assert seg_label.shape[1] == 1
 
                 seg_label = seg_label.squeeze(1).long()
-                batch_kept = self.min_kept * seg_label.size(0)
+                num_kept = self.min_kept * seg_label.size(0)
                 seg_weight = seg_logit.new_zeros(size=seg_label.size())
                 valid_seg_weight = seg_weight[valid_mask]
 
@@ -64,22 +63,31 @@ class OHEMPixelSampler(BasePixelSampler):
                 sort_prob, sort_indices = seg_prob[valid_mask].sort()
 
                 if sort_prob.numel() > 0:
-                    min_threshold = sort_prob[min(batch_kept, sort_prob.numel() - 1)]
+                    min_threshold = sort_prob[min(num_kept, sort_prob.numel() - 1)]
                 else:
                     min_threshold = 0.0
                 threshold = max(min_threshold, self.thresh)
 
-                valid_seg_weight[seg_prob[valid_mask] < threshold] = 1.
+                valid_seg_weight[seg_prob[valid_mask] < threshold] = 1.0
             else:
                 assert losses is not None
+                valid_losses = losses[valid_mask]
 
-                batch_kept = self.min_kept * losses.size(0)
+                if self.kept_ratio is not None:
+                    assert 0.0 < self.kept_ratio < 1.0
+
+                    num_total = valid_losses.numel()
+                    num_kept = min(max(1, int(self.kept_ratio * num_total)), num_total - 1)
+                else:
+                    assert self.min_kept > 1
+                    num_kept = self.min_kept * losses.size(0)
+
                 seg_weight = torch.zeros_like(losses)
                 valid_seg_weight = seg_weight[valid_mask]
 
                 # faster than topk according to https://github.com/pytorch/pytorch/issues/22812  # noqa
-                _, sort_indices = losses[valid_mask].sort(descending=True)
-                valid_seg_weight[sort_indices[:batch_kept]] = 1.
+                _, sort_indices = valid_losses.sort(descending=True)
+                valid_seg_weight[sort_indices[:num_kept]] = 1.0
 
             seg_weight[valid_mask] = valid_seg_weight
 
