@@ -34,14 +34,14 @@ model = dict(
                  # ),
                  margin_type='cos',
                  margin=0.5,
-                 gamma=2.0,
+                 gamma=0.0,
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
                  conf_penalty_weight=dict(
                      type='PolyScalarScheduler',
-                     start_scale=0.085,
-                     end_scale=5e-3,
+                     start_scale=0.2,
+                     end_scale=0.085,
                      num_iters=20000,
                      power=1.2
                  ),
