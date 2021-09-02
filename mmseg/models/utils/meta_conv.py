@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
+from mmseg.core import normalize
+
 
 class MetaConv2d(nn.Module):
     r"""Applies a dynamic 2D convolution over an input signal composed of several input
@@ -143,7 +145,7 @@ class MetaConv2d(nn.Module):
     padding_modes = ['zeros', 'reflect', 'replicate', 'circular']
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1,
-                 padding_mode='zeros'):
+                 padding_mode='zeros', norm_weights=False):
         super().__init__()
 
         if in_channels % groups != 0:
@@ -162,6 +164,7 @@ class MetaConv2d(nn.Module):
         self.dilation = _pair(dilation)
         self.groups = groups
         self.padding_mode = padding_mode
+        self.norm_weights = norm_weights
         self._padding_repeated_twice = self.padding + self.padding
         self.hyper_params = np.prod((out_channels, in_channels // groups) + self.kernel_size)
 
@@ -187,6 +190,8 @@ class MetaConv2d(nn.Module):
             padding = self.padding
 
         w = w.view(w.shape[0] * self.out_channels, self.in_channels // self.groups, *self.kernel_size)
+        if self.norm_weights:
+            w = normalize(w, dim=1, p=2)
 
         y = F.conv2d(
             input=x,

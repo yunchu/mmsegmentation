@@ -129,7 +129,8 @@ class MultiScaleDecoder(nn.Module):
                 prev_channels,
                 num_classes,
                 out_kernel_size,
-                padding=out_kernel_size // 2
+                padding=out_kernel_size // 2,
+                norm_weights=self.with_out_norm
             ))
             self.out_fc = MetaSequential(*out_fc_layers)
         else:
@@ -493,8 +494,9 @@ class HyperPatch(nn.Module):
 
 class HyperPatchConv2d(HyperPatch):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1,
-                 padding_mode='reflect'):
-        conv = MetaConv2d(in_channels, out_channels, kernel_size, stride, 0, dilation, groups)
+                 padding_mode='reflect', norm_weights=False):
+        conv = MetaConv2d(in_channels, out_channels, kernel_size, stride, 0, dilation, groups,
+                          norm_weights=norm_weights)
         super().__init__(conv, padding, padding_mode)
 
     @property

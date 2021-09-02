@@ -18,7 +18,7 @@ model = dict(
         with_out_fc=True,
         with_out_norm=True,
         decoder_dropout=None,
-        weight_groups=[4, 16, 4, 2],
+        weight_groups=[8, 8, 4, 4],
         decoder_groups=1,
         unify_level=5,
         act_cfg=dict(type='ReLU6'),
@@ -30,19 +30,22 @@ model = dict(
         loss_decode=[
             dict(type='AMSoftmaxLoss',
                  scale_cfg=dict(
-                     type='ConstantScalarScheduler',
-                     scale=10.0
+                     type='PolyScalarScheduler',
+                     start_scale=30,
+                     end_scale=10,
+                     num_iters=30000,
+                     power=1.2
                  ),
                  margin_type='cos',
                  margin=0.5,
-                 gamma=2.0,
+                 gamma=0.0,
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
                  conf_penalty_weight=dict(
                      type='PolyScalarScheduler',
-                     start_scale=0.085,
-                     end_scale=5e-4,
+                     start_scale=0.2,
+                     end_scale=0.085,
                      num_iters=20000,
                      power=1.2
                  ),

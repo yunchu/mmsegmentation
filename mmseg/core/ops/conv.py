@@ -15,11 +15,11 @@ class AngularPWConv(nn.Module):
         assert out_features >= 2
         self.clip_output = clip_output
 
-        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features, 1, 1))
         self.weight.data.normal_().renorm_(2, 1, 1e-5).mul_(1e5)
 
     def forward(self, x):
-        weight = normalize(self.weight, dim=1).view(self.out_features, self.in_features, 1, 1)
+        weight = normalize(self.weight, dim=1, p=2)
         out = F.conv2d(x, weight)
 
         if self.clip_output and not torch.onnx.is_in_onnx_export():
