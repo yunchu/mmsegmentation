@@ -378,7 +378,6 @@ class WeightMapper(nn.Module):
         # Add blocks
         self.down_blocks = nn.ModuleList()
         self.up_blocks = nn.ModuleList()
-        self.upsample_blocks = nn.ModuleList()
         for level in range(self.levels - 1):
             self.down_blocks.append(nn.Sequential(
                 nn.Conv2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2, bias=bias),
@@ -390,7 +389,6 @@ class WeightMapper(nn.Module):
                 nn.BatchNorm2d(in_channels // 2),
                 nn.ReLU(inplace=True))
             )
-            self.upsample_blocks.append(nn.UpsamplingNearest2d(scale_factor=2))
 
     def forward(self, x):
         x = self.in_conv(x)
@@ -410,7 +408,8 @@ class WeightMapper(nn.Module):
         for level in range(self.levels - 2, -1, -1):
             x = torch.cat((feat.pop(-1), x), dim=1)
             x = self.up_blocks[level](x)
-            x = self.upsample_blocks[level](x)
+
+            x = F.interpolate(x, feat[-1].shape[-2:], mode='nearest')
 
         # Output head
         x = torch.cat((feat.pop(-1), x), dim=1)
