@@ -24,8 +24,8 @@ model = dict(
                  scale_cfg=dict(
                      type='PolyScalarScheduler',
                      start_scale=30,
-                     end_scale=10,
-                     num_iters=30000,
+                     end_scale=5,
+                     num_iters=25000,
                      power=1.2
                  ),
                  # scale_cfg=dict(
@@ -38,17 +38,17 @@ model = dict(
                  t=1.0,
                  target_loss='ce',
                  pr_product=False,
-                 # conf_penalty_weight=dict(
-                 #     type='PolyScalarScheduler',
-                 #     start_scale=0.2,
-                 #     end_scale=0.085,
-                 #     num_iters=20000,
-                 #     power=1.2
-                 # ),
                  conf_penalty_weight=dict(
-                     type='ConstantScalarScheduler',
-                     scale=0.085
+                     type='PolyScalarScheduler',
+                     start_scale=0.085,
+                     end_scale=5e-3,
+                     num_iters=25000,
+                     power=1.2
                  ),
+                 # conf_penalty_weight=dict(
+                 #     type='ConstantScalarScheduler',
+                 #     scale=0.085
+                 # ),
                  loss_jitter_prob=0.01,
                  border_reweighting=False,
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
