@@ -956,7 +956,6 @@ class LiteHRNet(nn.Module):
 
         if self.extra.get('add_input', False):
             out = [x] + out
-            # out = [x, y] + out
 
         return out
 

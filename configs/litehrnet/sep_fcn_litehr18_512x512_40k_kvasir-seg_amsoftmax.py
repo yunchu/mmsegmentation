@@ -5,12 +5,20 @@ _base_ = [
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
+    backbone=dict(
+        extra=dict(
+            out_aggregator=dict(
+                enable=True
+            ),
+        )
+    ),
     decode_head=dict(
         type='DepthwiseSeparableFCNHead',
-        in_channels=40,
-        in_index=0,
+        # in_channels=[40, 80, 160, 320],
+        in_channels=[40, 40, 80, 160],
+        in_index=[0, 1, 2, 3],
         channels=40,
-        input_transform=None,
+        input_transform='resize_concat',
         kernel_size=3,
         num_convs=2,
         concat_input=False,
