@@ -52,7 +52,7 @@ class FCNHead(BaseDecodeHead):
                     dilation=dilation,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg,
-                    act_cfg=self.act_cfg
+                    act_cfg=self.act_cfg if i < num_convs - 1 else None
                 ))
             self.convs = nn.Sequential(*convs)
 
