@@ -1,21 +1,21 @@
 _base_ = [
-    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/kvasir.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
+    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/coco_stuff.py',
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_160k_ml.py'
 ]
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     decode_head=dict(
         type='FCNHead',
-        in_channels=40,
-        in_index=0,
-        channels=40,
-        input_transform=None,
+        in_channels=[40, 40, 80, 160],
+        in_index=[0, 1, 2, 3],
+        channels=320,
+        input_transform='resize_concat',
         kernel_size=1,
-        num_convs=0,
+        num_convs=1,
         concat_input=False,
         dropout_ratio=-1,
-        num_classes=2,
+        num_classes=181,
         norm_cfg=norm_cfg,
         align_corners=False,
         enable_out_norm=True,
@@ -45,32 +45,6 @@ model = dict(
                  border_reweighting=False,
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  loss_weight=1.0),
-            # dict(type='LovaszLoss',
-            #      scale_cfg=dict(
-            #          type='ConstantScalarScheduler',
-            #          scale=10.0
-            #      ),
-            #      loss_type='multi_class',
-            #      classes='present',
-            #      per_image=False,
-            #      reduction='none',
-            #      loss_weight=1.0),
-            # dict(type='AMSoftmaxLoss',
-            #      scale_cfg=dict(
-            #          type='ConstantScalarScheduler',
-            #          scale=10.0
-            #      ),
-            #      margin_type='cos',
-            #      margin=0.5,
-            #      gamma=0.0,
-            #      t=1.0,
-            #      target_loss='ce',
-            #      pr_product=False,
-            #      conf_penalty_weight=0.085,
-            #      loss_jitter_prob=0.01,
-            #      border_reweighting=True,
-            #      sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
-            #      loss_weight=0.1),
         ]
     ),
     train_cfg=dict(
@@ -78,7 +52,8 @@ model = dict(
     ),
 )
 evaluation = dict(
-    metric='mDice',
+    interval=4000,
+    metric='mIoU'
 )
 
 find_unused_parameters = True

@@ -10,6 +10,7 @@ from .pascal_context import PascalContextDataset, PascalContextDataset59
 from .stare import STAREDataset
 from .voc import PascalVOCDataset
 from .kvasir import KvasirDataset
+from .coco_stuff import COCOStuffDataset
 
 __all__ = [
     'CustomDataset',
@@ -29,4 +30,5 @@ __all__ = [
     'HRFDataset',
     'STAREDataset',
     'KvasirDataset',
+    'COCOStuffDataset',
 ]
