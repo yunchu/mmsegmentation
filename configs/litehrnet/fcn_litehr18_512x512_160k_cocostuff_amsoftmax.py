@@ -25,7 +25,7 @@ model = dict(
                      type='PolyScalarScheduler',
                      start_scale=30,
                      end_scale=5,
-                     num_iters=30000,
+                     num_iters=130000,
                      power=1.2
                  ),
                  margin_type='cos',
@@ -38,7 +38,7 @@ model = dict(
                      type='PolyScalarScheduler',
                      start_scale=0.2,
                      end_scale=0.15,
-                     num_iters=20000,
+                     num_iters=100000,
                      power=1.2
                  ),
                  loss_jitter_prob=0.01,
