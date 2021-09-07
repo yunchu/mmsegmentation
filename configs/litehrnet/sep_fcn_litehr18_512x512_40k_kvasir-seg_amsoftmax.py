@@ -1,24 +1,16 @@
 _base_ = [
     '../_base_/models/fcn_litehr18.py', '../_base_/datasets/kvasir.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_cos_40k_ml.py'
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
 ]
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
-    backbone=dict(
-        extra=dict(
-            out_aggregator=dict(
-                enable=False
-            ),
-        )
-    ),
     decode_head=dict(
         type='DepthwiseSeparableFCNHead',
-        in_channels=[40, 80, 160, 320],
-        # in_channels=[40, 40, 80, 160],
-        in_index=[0, 1, 2, 3],
+        in_channels=40,
+        in_index=0,
         channels=40,
-        input_transform='resize_concat',
+        input_transform=None,
         kernel_size=3,
         num_convs=2,
         concat_input=False,
