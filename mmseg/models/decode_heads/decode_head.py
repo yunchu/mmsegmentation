@@ -98,11 +98,6 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                     num_classes,
                     clip_output=True
                 )
-                # self.conv_seg = nn.Conv2d(
-                #     channels,
-                #     num_classes,
-                #     kernel_size=1
-                # )
             else:
                 self.conv_seg = nn.Conv2d(
                     channels,

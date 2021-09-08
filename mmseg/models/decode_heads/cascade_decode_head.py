@@ -15,8 +15,7 @@ class BaseCascadeDecodeHead(BaseDecodeHead, metaclass=ABCMeta):
         """Placeholder of forward function."""
         pass
 
-    def forward_train(self, inputs, prev_output, img_metas, gt_semantic_seg,
-                      train_cfg):
+    def forward_train(self, inputs, prev_output, img_metas, gt_semantic_seg, train_cfg, pixel_weights=None):
         """Forward function for training.
         Args:
             inputs (list[Tensor]): List of multi-level img features.
@@ -29,12 +28,13 @@ class BaseCascadeDecodeHead(BaseDecodeHead, metaclass=ABCMeta):
             gt_semantic_seg (Tensor): Semantic segmentation masks
                 used if the architecture supports semantic segmentation task.
             train_cfg (dict): The training config.
+            pixel_weights (Tensor): Pixels weights.
 
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
         seg_logits = self.forward(inputs, prev_output)
-        losses = self.losses(seg_logits, gt_semantic_seg)
+        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, pixel_weights)
 
         return losses
 

@@ -37,6 +37,7 @@ class CascadeEncoderDecoder(EncoderDecoder):
 
     def _init_decode_head(self, decode_head):
         """Initialize ``decode_head``"""
+
         assert isinstance(decode_head, list)
         assert len(decode_head) == self.num_stages
         self.decode_head = nn.ModuleList()
@@ -52,6 +53,7 @@ class CascadeEncoderDecoder(EncoderDecoder):
             pretrained (str, optional): Path to pre-trained weights.
                 Defaults to None.
         """
+
         self.backbone.init_weights(pretrained=pretrained)
         for i in range(self.num_stages):
             self.decode_head[i].init_weights()
@@ -65,34 +67,41 @@ class CascadeEncoderDecoder(EncoderDecoder):
     def encode_decode(self, img, img_metas):
         """Encode images with backbone and decode into a semantic segmentation
         map of the same size as input."""
+
         x = self.extract_feat(img)
+
         out = self.decode_head[0].forward_test(x, img_metas, self.test_cfg)
         for i in range(1, self.num_stages):
-            out = self.decode_head[i].forward_test(x, out, img_metas,
-                                                   self.test_cfg)
+            out = self.decode_head[i].forward_test(x, out, img_metas, self.test_cfg)
+
         out = resize(
             input=out,
             size=img.shape[2:],
             mode='bilinear',
-            align_corners=self.align_corners)
+            align_corners=self.align_corners
+        )
+
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg):
+    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg, pixel_weights=None):
         """Run forward function and calculate loss for decode head in
         training."""
+
         losses = dict()
 
         loss_decode = self.decode_head[0].forward_train(
-            x, img_metas, gt_semantic_seg, self.train_cfg)
-
+            x, img_metas, gt_semantic_seg, self.train_cfg, pixel_weights
+        )
         losses.update(add_prefix(loss_decode, 'decode_0'))
 
         for i in range(1, self.num_stages):
             # forward test again, maybe unnecessary for most methods.
             prev_outputs = self.decode_head[i - 1].forward_test(
-                x, img_metas, self.test_cfg)
+                x, img_metas, self.test_cfg
+            )
             loss_decode = self.decode_head[i].forward_train(
-                x, prev_outputs, img_metas, gt_semantic_seg, self.train_cfg)
+                x, prev_outputs, img_metas, gt_semantic_seg, self.train_cfg, pixel_weights
+            )
             losses.update(add_prefix(loss_decode, f'decode_{i}'))
 
         return losses

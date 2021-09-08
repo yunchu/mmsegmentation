@@ -2,7 +2,6 @@ from abc import abstractmethod
 
 import torch
 import torch.nn.functional as F
-from scipy.special import erfinv
 
 from mmseg.core import entropy
 from .base import BaseWeightedLoss
@@ -12,25 +11,15 @@ from .. import builder
 
 class BasePixelLoss(BaseWeightedLoss):
     def __init__(self,
-                 scale_cfg,
+                 scale_cfg=None,
                  pr_product=False,
                  conf_penalty_weight=None,
-                 loss_jitter_prob=None,
-                 loss_jitter_momentum=0.1,
                  border_reweighting=False,
                  **kwargs):
         super(BasePixelLoss, self).__init__(**kwargs)
 
         self._enable_pr_product = pr_product
         self._border_reweighting = border_reweighting
-
-        self._smooth_loss = None
-        self._jitter_sigma_factor = None
-        self._loss_jitter_momentum = loss_jitter_momentum
-        assert 0.0 < self._loss_jitter_momentum < 1.0
-        if loss_jitter_prob is not None:
-            assert 0.0 < loss_jitter_prob < 1.0
-            self._jitter_sigma_factor = 1.0 / ((2.0 ** 0.5) * erfinv(1.0 - 2.0 * loss_jitter_prob))
 
         self._reg_weight_scheduler = builder.build_scheduler(conf_penalty_weight)
         self._scale_scheduler = builder.build_scheduler(scale_cfg, default_value=1.0)
@@ -58,10 +47,6 @@ class BasePixelLoss(BaseWeightedLoss):
     def with_border_reweighting(self):
         return self._border_reweighting
 
-    @property
-    def with_loss_jitter(self):
-        return self._jitter_sigma_factor is not None
-
     @staticmethod
     def _pr_product(prod):
         alpha = torch.sqrt(1.0 - prod.pow(2.0))
@@ -85,8 +70,7 @@ class BasePixelLoss(BaseWeightedLoss):
 
             return sparsity
 
-    def _forward(self, output, labels, avg_factor=None, pixel_weights=None,
-                 reduction_override=None):
+    def _forward(self, output, labels, avg_factor=None, pixel_weights=None, reduction_override=None):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
 
@@ -125,22 +109,13 @@ class BasePixelLoss(BaseWeightedLoss):
             avg_factor=avg_factor
         )
 
-        if self.with_loss_jitter and loss.numel() == 1:
-            if self._smooth_loss is None:
-                self._smooth_loss = loss.item()
-            else:
-                self._smooth_loss = (1.0 - self._loss_jitter_momentum) * self._smooth_loss + \
-                                    self._loss_jitter_momentum * loss.item()
-
-            jitter_sigma = self._jitter_sigma_factor * abs(self._smooth_loss)
-            jitter_point = torch.normal(0.0, jitter_sigma, [], device=loss.device, dtype=loss.dtype)
-            loss = (loss - jitter_point).abs() + jitter_point
-
-        meta = dict(weight=self.last_loss_weight,
-                    reg_weight=self.last_reg_weight,
-                    scale=self.last_scale,
-                    raw_sparsity=raw_sparsity,
-                    weight_sparsity=weight_sparsity)
+        meta = dict(
+            weight=self.last_loss_weight,
+            reg_weight=self.last_reg_weight,
+            scale=self.last_scale,
+            raw_sparsity=raw_sparsity,
+            weight_sparsity=weight_sparsity
+        )
 
         return loss, meta
 

@@ -79,21 +79,28 @@ class EncoderDecoder(BaseSegmentor):
 
     def extract_feat(self, img):
         """Extract features from images."""
+
         x = self.backbone(img)
+
         if self.with_neck:
             x = self.neck(x)
+
         return x
 
     def encode_decode(self, img, img_metas):
         """Encode images with backbone and decode into a semantic segmentation
         map of the same size as input."""
+
         x = self.extract_feat(img)
+
         out = self._decode_head_forward_test(x, img_metas)
         out = resize(
             input=out,
             size=img.shape[2:],
             mode='bilinear',
-            align_corners=self.align_corners)
+            align_corners=self.align_corners
+        )
+
         return out
 
     def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg, pixel_weights=None):

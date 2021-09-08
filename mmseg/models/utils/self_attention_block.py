@@ -33,10 +33,9 @@ class SelfAttentionBlock(nn.Module):
                  out_channels, share_key_query, query_downsample,
                  key_downsample, key_query_num_convs, value_out_num_convs,
                  key_query_norm, value_out_norm, matmul_norm, with_out,
-                 conv_cfg, norm_cfg, act_cfg):
+                 conv_cfg, norm_cfg, act_cfg, out_act_cfg='default'):
         super(SelfAttentionBlock, self).__init__()
-        if share_key_query:
-            assert key_in_channels == query_in_channels
+
         self.key_in_channels = key_in_channels
         self.query_in_channels = query_in_channels
         self.out_channels = out_channels
@@ -45,6 +44,10 @@ class SelfAttentionBlock(nn.Module):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
+        self.query_downsample = query_downsample
+        self.key_downsample = key_downsample
+        self.matmul_norm = matmul_norm
+
         self.key_project = self.build_project(
             key_in_channels,
             channels,
@@ -52,8 +55,11 @@ class SelfAttentionBlock(nn.Module):
             use_conv_module=key_query_norm,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            act_cfg=act_cfg)
+            act_cfg=act_cfg
+        )
+
         if share_key_query:
+            assert key_in_channels == query_in_channels
             self.query_project = self.key_project
         else:
             self.query_project = self.build_project(
@@ -63,7 +69,9 @@ class SelfAttentionBlock(nn.Module):
                 use_conv_module=key_query_norm,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                act_cfg=act_cfg)
+                act_cfg=act_cfg
+            )
+
         self.value_project = self.build_project(
             key_in_channels,
             channels if with_out else out_channels,
@@ -71,7 +79,9 @@ class SelfAttentionBlock(nn.Module):
             use_conv_module=value_out_norm,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            act_cfg=act_cfg)
+            act_cfg=act_cfg
+        )
+
         if with_out:
             self.out_project = self.build_project(
                 channels,
@@ -80,56 +90,53 @@ class SelfAttentionBlock(nn.Module):
                 use_conv_module=value_out_norm,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                act_cfg=act_cfg)
+                act_cfg=act_cfg if out_act_cfg == 'default' else out_act_cfg
+            )
         else:
             self.out_project = None
-
-        self.query_downsample = query_downsample
-        self.key_downsample = key_downsample
-        self.matmul_norm = matmul_norm
 
         self.init_weights()
 
     def init_weights(self):
         """Initialize weight of later layer."""
+
         if self.out_project is not None:
             if not isinstance(self.out_project, ConvModule):
                 constant_init(self.out_project, 0)
 
-    def build_project(self, in_channels, channels, num_convs, use_conv_module,
-                      conv_cfg, norm_cfg, act_cfg):
+    @staticmethod
+    def build_project(in_channels, channels, num_convs, use_conv_module, conv_cfg, norm_cfg, act_cfg):
         """Build projection layer for key/query/value/out."""
+
+        convs = []
         if use_conv_module:
-            convs = [
-                ConvModule(
-                    in_channels,
+            for i in range(num_convs):
+                convs.append(ConvModule(
+                    in_channels if i == 0 else channels,
                     channels,
                     1,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
-                    act_cfg=act_cfg)
-            ]
-            for _ in range(num_convs - 1):
-                convs.append(
-                    ConvModule(
-                        channels,
-                        channels,
-                        1,
-                        conv_cfg=conv_cfg,
-                        norm_cfg=norm_cfg,
-                        act_cfg=act_cfg))
+                    act_cfg=act_cfg
+                ))
         else:
-            convs = [nn.Conv2d(in_channels, channels, 1)]
-            for _ in range(num_convs - 1):
-                convs.append(nn.Conv2d(channels, channels, 1))
+            for i in range(num_convs):
+                convs.append(nn.Conv2d(
+                    in_channels if i == 0 else channels,
+                    channels,
+                    1
+                ))
+
         if len(convs) > 1:
             convs = nn.Sequential(*convs)
         else:
             convs = convs[0]
+
         return convs
 
     def forward(self, query_feats, key_feats):
         """Forward function."""
+
         batch_size = query_feats.size(0)
         query = self.query_project(query_feats)
         if self.query_downsample is not None:
@@ -156,4 +163,5 @@ class SelfAttentionBlock(nn.Module):
         context = context.reshape(batch_size, -1, *query_feats.shape[2:])
         if self.out_project is not None:
             context = self.out_project(context)
+
         return context

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import ConvModule
+from mmcv.cnn import ConvModule, DepthwiseSeparableConvModule
 
 from mmseg.ops import resize
 from ..builder import HEADS
@@ -45,8 +45,7 @@ class SpatialGatherModule(nn.Module):
 class ObjectAttentionBlock(_SelfAttentionBlock):
     """Make a OCR used SelfAttentionBlock."""
 
-    def __init__(self, in_channels, channels, scale, conv_cfg, norm_cfg,
-                 act_cfg):
+    def __init__(self, in_channels, channels, scale, conv_cfg, norm_cfg, act_cfg, out_act_cfg):
         if scale > 1:
             query_downsample = nn.MaxPool2d(kernel_size=scale)
         else:
@@ -68,7 +67,9 @@ class ObjectAttentionBlock(_SelfAttentionBlock):
             with_out=True,
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
-            act_cfg=act_cfg)
+            act_cfg=act_cfg,
+            out_act_cfg=out_act_cfg
+        )
 
         self.bottleneck = ConvModule(
             in_channels * 2,
@@ -104,7 +105,7 @@ class OCRHead(BaseCascadeDecodeHead):
             Default: 1.
     """
 
-    def __init__(self, ocr_channels, scale=1, **kwargs):
+    def __init__(self, ocr_channels, scale=1, out_act_cfg='default', sep_conv=False, **kwargs):
         super(OCRHead, self).__init__(**kwargs)
 
         self.ocr_channels = ocr_channels
@@ -116,11 +117,14 @@ class OCRHead(BaseCascadeDecodeHead):
             self.scale,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg)
+            act_cfg=self.act_cfg,
+            out_act_cfg=out_act_cfg
+        )
         self.spatial_gather_module = SpatialGatherModule(
             self.scale
         )
-        self.bottleneck = ConvModule(
+        self.bottleneck = self._build_conv_module(
+            sep_conv,
             self.in_channels,
             self.channels,
             3,
@@ -129,6 +133,24 @@ class OCRHead(BaseCascadeDecodeHead):
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg
         )
+
+    @staticmethod
+    def _build_conv_module(sep_conv, in_channels, out_channels, kernel_size, **kwargs):
+        if sep_conv:
+            return DepthwiseSeparableConvModule(
+                in_channels,
+                out_channels,
+                kernel_size,
+                dw_act_cfg=None,
+                **kwargs
+            )
+        else:
+            return ConvModule(
+                in_channels,
+                out_channels,
+                kernel_size,
+                **kwargs
+            )
 
     def forward(self, inputs, prev_output):
         """Forward function."""
