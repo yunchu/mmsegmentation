@@ -95,12 +95,12 @@ class CascadeEncoderDecoder(EncoderDecoder):
         losses.update(add_prefix(loss_decode, 'decode_0'))
 
         for i in range(1, self.num_stages):
-            # forward test again, maybe unnecessary for most methods.
-            prev_outputs = self.decode_head[i - 1].forward_test(
-                x, img_metas, self.test_cfg
-            )
+            prev_scale = self.decode_head[i - 1].last_scale
+            prev_logits = self.decode_head[i - 1].forward_test(x, img_metas, self.test_cfg)
+
+            prev_scaled_logits = prev_scale * prev_logits
             loss_decode = self.decode_head[i].forward_train(
-                x, prev_outputs, img_metas, gt_semantic_seg, self.train_cfg, pixel_weights
+                x, prev_scaled_logits, img_metas, gt_semantic_seg, self.train_cfg, pixel_weights
             )
             losses.update(add_prefix(loss_decode, f'decode_{i}'))
 

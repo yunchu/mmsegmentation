@@ -105,6 +105,18 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                     kernel_size=1
                 )
 
+    @property
+    def last_scale(self):
+        num_losses = len(self.loss_modules)
+        if num_losses <= 0:
+            return 1.0
+
+        loss_module = self.loss_modules[0]
+        if not hasattr(loss_module, 'last_scale'):
+            return 1.0
+
+        return loss_module.last_scale
+
     def extra_repr(self):
         """Extra repr."""
         s = f'input_transform={self.input_transform}, ' \

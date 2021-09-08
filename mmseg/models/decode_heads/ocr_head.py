@@ -16,24 +16,22 @@ class SpatialGatherModule(nn.Module):
     Employ the soft-weighted method to aggregate the context.
     """
 
-    def __init__(self, scale):
+    def __init__(self):
         super(SpatialGatherModule, self).__init__()
 
-        self.scale = scale
-
-    def forward(self, feats, probs):
+    def forward(self, feats, prev_logits):
         """Forward function."""
 
-        batch_size, num_classes, height, width = probs.size()
+        batch_size, num_classes, height, width = prev_logits.size()
         channels = feats.size(1)
 
-        probs = probs.view(batch_size, num_classes, -1)
+        prev_logits = prev_logits.view(batch_size, num_classes, -1)
         feats = feats.view(batch_size, channels, -1)
 
         # [batch_size, height*width, num_classes]
         feats = feats.permute(0, 2, 1)
         # [batch_size, channels, height*width]
-        probs = F.softmax(self.scale * probs, dim=2)
+        probs = F.softmax(prev_logits, dim=2)
 
         # [batch_size, channels, num_classes]
         ocr_context = torch.matmul(probs, feats)
@@ -111,36 +109,33 @@ class OCRHead(BaseCascadeDecodeHead):
         self.ocr_channels = ocr_channels
         self.scale = scale
 
-        self.object_context_block = ObjectAttentionBlock(
-            self.channels,
-            self.ocr_channels,
-            self.scale,
-            conv_cfg=self.conv_cfg,
-            norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg,
-            out_act_cfg=out_act_cfg
-        )
-        self.spatial_gather_module = SpatialGatherModule(
-            self.scale
-        )
         self.bottleneck = self._build_conv_module(
             sep_conv,
             self.in_channels,
             self.channels,
-            3,
+            kernel_size=3,
             padding=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg
         )
+        self.object_context_block = ObjectAttentionBlock(
+            self.channels,
+            self.ocr_channels,
+            scale=self.scale,
+            conv_cfg=self.conv_cfg,
+            norm_cfg=self.norm_cfg,
+            act_cfg=self.act_cfg,
+            out_act_cfg=out_act_cfg
+        )
+        self.spatial_gather_module = SpatialGatherModule()
 
     @staticmethod
-    def _build_conv_module(sep_conv, in_channels, out_channels, kernel_size, **kwargs):
+    def _build_conv_module(sep_conv, in_channels, out_channels, **kwargs):
         if sep_conv:
             return DepthwiseSeparableConvModule(
                 in_channels,
                 out_channels,
-                kernel_size,
                 dw_act_cfg=None,
                 **kwargs
             )
@@ -148,7 +143,6 @@ class OCRHead(BaseCascadeDecodeHead):
             return ConvModule(
                 in_channels,
                 out_channels,
-                kernel_size,
                 **kwargs
             )
 
