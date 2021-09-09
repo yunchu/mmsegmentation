@@ -581,9 +581,9 @@ class LiteHRModule(nn.Module):
                         build_norm_layer(
                             self.norm_cfg,
                             in_channels[i])[1],
-                        nn.Upsample(
-                            scale_factor=2**(j - i),
-                            mode='nearest')
+                        # nn.Upsample(
+                        #     scale_factor=2**(j - i),
+                        #     mode='nearest')
                     ))
                 elif j == i:
                     fuse_layer.append(None)
@@ -670,6 +670,10 @@ class LiteHRModule(nn.Module):
                         fuse_y = out[j]
                     else:
                         fuse_y = self.fuse_layers[i][j](out[j])
+
+                    if fuse_y.size()[-2:] != y.size()[-2:]:
+                        fuse_y = F.interpolate(fuse_y, size=y.size()[-2:], mode='nearest')
+
                     y += fuse_y
                 out_fuse.append(self.relu(y))
             out = out_fuse
