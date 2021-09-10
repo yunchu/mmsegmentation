@@ -24,8 +24,8 @@ model = dict(
                  scale_cfg=dict(
                      type='PolyScalarScheduler',
                      start_scale=30,
-                     end_scale=5,
-                     num_iters=130000,
+                     end_scale=10,
+                     num_iters=100000,
                      power=1.2
                  ),
                  margin_type='cos',
@@ -37,7 +37,7 @@ model = dict(
                  conf_penalty_weight=dict(
                      type='PolyScalarScheduler',
                      start_scale=0.2,
-                     end_scale=0.15,
+                     end_scale=0.085,
                      num_iters=100000,
                      power=1.2
                  ),
