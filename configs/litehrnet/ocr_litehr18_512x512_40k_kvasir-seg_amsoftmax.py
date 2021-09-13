@@ -46,7 +46,7 @@ model = dict(
                       scale_cfg=dict(
                           type='PolyScalarScheduler',
                           start_scale=30,
-                          end_scale=5,
+                          end_scale=10,
                           num_iters=30000,
                           power=1.2
                       ),
