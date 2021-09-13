@@ -66,7 +66,7 @@ class ObjectAttentionBlock(_SelfAttentionBlock):
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg,
             act_cfg=act_cfg,
-            out_act_cfg=out_act_cfg
+            # out_act_cfg=out_act_cfg
         )
 
         self.bottleneck = ConvModule(
@@ -75,7 +75,7 @@ class ObjectAttentionBlock(_SelfAttentionBlock):
             1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
-            act_cfg=self.act_cfg
+            act_cfg=act_cfg if out_act_cfg == 'default' else out_act_cfg
         )
 
     def forward(self, query_feats, key_feats):
