@@ -20,8 +20,8 @@ params_config = dict(
     type='FreezeLayers',
     by_epoch=False,
     iters=2000,
-    open_layers=[r'neck\.', r'decode_head\.', r'auxiliary_head\.']
-    # open_layers=[r'backbone\.aggregator\.', r'neck\.', r'decode_head\.', r'auxiliary_head\.']
+    # open_layers=[r'neck\.', r'decode_head\.', r'auxiliary_head\.']
+    open_layers=[r'backbone\.aggregator\.', r'neck\.', r'decode_head\.', r'auxiliary_head\.']
 )
 
 # learning policy
