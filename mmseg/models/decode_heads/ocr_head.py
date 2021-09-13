@@ -16,8 +16,11 @@ class SpatialGatherModule(nn.Module):
     Employ the soft-weighted method to aggregate the context.
     """
 
-    def __init__(self):
+    def __init__(self, scale=1.0):
         super(SpatialGatherModule, self).__init__()
+
+        self.scale = scale
+        assert self.scale > 0.0
 
     def forward(self, feats, prev_logits):
         """Forward function."""
@@ -28,16 +31,13 @@ class SpatialGatherModule(nn.Module):
         prev_logits = prev_logits.view(batch_size, num_classes, -1)
         feats = feats.view(batch_size, channels, -1)
 
-        # [batch_size, height*width, num_classes]
-        feats = feats.permute(0, 2, 1)
-        # [batch_size, channels, height*width]
-        probs = F.softmax(prev_logits, dim=2)
+        feats = feats.permute(0, 2, 1)  # [batch_size, height*width, channels]
+        probs = F.softmax(self.scale * prev_logits, dim=2)  # [batch_size, num_classes, height*width]
 
-        # [batch_size, channels, num_classes]
-        ocr_context = torch.matmul(probs, feats)
-        ocr_context = ocr_context.permute(0, 2, 1).contiguous().unsqueeze(3)
+        out_context = torch.matmul(probs, feats)  # [batch_size, num_classes, channels]
+        out_context = out_context.permute(0, 2, 1).contiguous().unsqueeze(3)  # [batch_size, channels, num_classes, 1]
 
-        return ocr_context
+        return out_context
 
 
 class ObjectAttentionBlock(_SelfAttentionBlock):
@@ -75,6 +75,7 @@ class ObjectAttentionBlock(_SelfAttentionBlock):
             1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
+            # act_cfg=act_cfg,
             act_cfg=act_cfg if out_act_cfg == 'default' else out_act_cfg
         )
 
@@ -103,11 +104,12 @@ class OCRHead(BaseCascadeDecodeHead):
             Default: 1.
     """
 
-    def __init__(self, ocr_channels, scale=1, out_act_cfg='default', sep_conv=False, **kwargs):
+    def __init__(self, ocr_channels, scale=1, spatial_scale=1.0, out_act_cfg='default', sep_conv=False, **kwargs):
         super(OCRHead, self).__init__(**kwargs)
 
         self.ocr_channels = ocr_channels
         self.scale = scale
+        self.spatial_scale = spatial_scale
 
         self.bottleneck = self._build_conv_module(
             sep_conv,
@@ -128,7 +130,9 @@ class OCRHead(BaseCascadeDecodeHead):
             act_cfg=self.act_cfg,
             out_act_cfg=out_act_cfg
         )
-        self.spatial_gather_module = SpatialGatherModule()
+        self.spatial_gather_module = SpatialGatherModule(
+            scale=self.spatial_scale
+        )
 
     @staticmethod
     def _build_conv_module(sep_conv, in_channels, out_channels, **kwargs):
