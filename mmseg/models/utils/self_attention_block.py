@@ -33,7 +33,7 @@ class SelfAttentionBlock(nn.Module):
                  out_channels, share_key_query, query_downsample,
                  key_downsample, key_query_num_convs, value_out_num_convs,
                  key_query_norm, value_out_norm, matmul_norm, with_out,
-                 conv_cfg, norm_cfg, act_cfg, out_act_cfg='default'):
+                 conv_cfg, norm_cfg, act_cfg):
         super(SelfAttentionBlock, self).__init__()
 
         self.key_in_channels = key_in_channels
@@ -90,7 +90,7 @@ class SelfAttentionBlock(nn.Module):
                 use_conv_module=value_out_norm,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                act_cfg=act_cfg if out_act_cfg == 'default' else out_act_cfg
+                act_cfg=act_cfg
             )
         else:
             self.out_project = None

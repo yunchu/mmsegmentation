@@ -36,7 +36,6 @@ model = dict(
              # out_act_cfg=None,
              sep_conv=True,
              input_transform=None,
-             spatial_scale=0.9,
              dropout_ratio=-1,
              num_classes=2,
              norm_cfg=norm_cfg,
