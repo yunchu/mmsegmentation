@@ -155,8 +155,8 @@ class OCRHead(BaseCascadeDecodeHead):
 
         feats = self.bottleneck(x)
         context = self.spatial_gather_module(feats, prev_output)
-        object_context = self.object_context_block(feats, context)
+        augmented_feat = self.object_context_block(feats, context)
 
-        output = self.cls_seg(object_context)
+        output = self.cls_seg(augmented_feat)
 
         return output

@@ -33,7 +33,6 @@ model = dict(
              in_index=0,
              channels=40,
              ocr_channels=40,
-             # out_act_cfg=None,
              sep_conv=True,
              input_transform=None,
              dropout_ratio=-1,
