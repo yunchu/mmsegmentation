@@ -62,7 +62,8 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  ignore_index=255,
                  align_corners=False,
                  enable_out_seg=True,
-                 enable_out_norm=False):
+                 enable_out_norm=False,
+                 **kwargs):
         super(BaseDecodeHead, self).__init__()
 
         self._init_inputs(in_channels, in_index, input_transform)

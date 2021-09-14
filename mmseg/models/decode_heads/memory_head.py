@@ -298,17 +298,17 @@ class MemoryHead(BaseCascadeDecodeHead):
         memory_input, seg_logits = self.forward(inputs, prev_output, return_memory_input=True)
         losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, pixel_weights)
 
-        # with torch.no_grad():
-        #     scaled_memoryInput = F.interpolate(
-        #         memory_input,
-        #         size=gt_semantic_seg.shape[-2:],
-        #         mode='bilinear',
-        #         align_corners=self.align_corners
-        #     )
-        #
-        #     self.memory_module.update(
-        #         features=scaled_memoryInput,
-        #         segmentation=gt_semantic_seg
-        #     )
+        with torch.no_grad():
+            scaled_memoryInput = F.interpolate(
+                memory_input,
+                size=gt_semantic_seg.shape[-2:],
+                mode='bilinear',
+                align_corners=self.align_corners
+            )
+
+            self.memory_module.update(
+                features=scaled_memoryInput,
+                segmentation=gt_semantic_seg
+            )
 
         return losses

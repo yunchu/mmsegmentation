@@ -26,6 +26,7 @@ from .bise_head import BiSeHead
 from .shelf_head import ShelfHead
 from .hyperseg_head import HyperSegHead
 from .memory_head import MemoryHead
+from .hamburger_head import HamburgerHead
 
 __all__ = [
     'FCNHead',
@@ -56,4 +57,5 @@ __all__ = [
     'ShelfHead',
     'HyperSegHead',
     'MemoryHead',
+    'HamburgerHead',
 ]
