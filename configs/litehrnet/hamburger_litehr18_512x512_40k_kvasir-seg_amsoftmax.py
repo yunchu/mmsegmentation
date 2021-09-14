@@ -10,6 +10,7 @@ model = dict(
         in_channels=40,
         in_index=0,
         channels=40,
+        reduced_channels=8,
         input_transform=None,
         dropout_ratio=-1,
         num_classes=2,

@@ -343,13 +343,15 @@ class HamburgerHead(BaseDecodeHead):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, reduced_channels=8, **kwargs):
         super().__init__(**kwargs)
+
+        self.reduced_channels = reduced_channels
 
         self.hamburger = HamburgerV2Plus(
             self.in_channels,
             D=self.channels,
-            R=self.channels,
+            R=self.reduced_channels,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg
