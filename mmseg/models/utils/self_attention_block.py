@@ -90,7 +90,7 @@ class SelfAttentionBlock(nn.Module):
                 use_conv_module=value_out_norm,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                act_cfg=act_cfg
+                # act_cfg=act_cfg
             )
         else:
             self.out_project = None
@@ -105,7 +105,7 @@ class SelfAttentionBlock(nn.Module):
                 constant_init(self.out_project, 0)
 
     @staticmethod
-    def build_project(in_channels, channels, num_convs, use_conv_module, conv_cfg, norm_cfg, act_cfg):
+    def build_project(in_channels, channels, num_convs, use_conv_module, conv_cfg, norm_cfg, act_cfg=None):
         """Build projection layer for key/query/value/out."""
 
         convs = []
