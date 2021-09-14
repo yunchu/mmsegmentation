@@ -35,6 +35,28 @@ class CrossEntropy:
         return self.weight * F.cross_entropy(logits, target, reduction='none')
 
 
+class CrossEntropySmooth:
+    def __init__(self, epsilon=0.1, weight=1.0):
+        self.epsilon = epsilon
+        self.weight = weight
+
+    def __call__(self, logits, target):
+        with torch.no_grad():
+            b, n, h, w = logits.size()
+            assert n > 1
+
+            target_value = 1.0 - self.epsilon
+            blank_value = self.epsilon / float(n - 1)
+
+            targets = logits.new_full((b * h * w, n), blank_value).scatter_(1, target.view(-1, 1), target_value)
+            targets = targets.view(b, h, w, n).permute(0, 3, 1, 2)
+
+        log_softmax = F.log_softmax(logits, dim=1)
+        losses = torch.neg((targets * log_softmax).sum(dim=1))
+
+        return self.weight * losses
+
+
 class NormalizedCrossEntropy:
     def __init__(self, weight=1.0):
         self.weight = weight
@@ -92,16 +114,18 @@ class ActivePassiveLoss:
         return self.active_loss(logits, target) + self.passive_loss(logits, target)
 
 
-def build_classification_loss(name):
+def build_classification_loss(name, **kwargs):
     if name == 'ce':
-        return CrossEntropy()
+        return CrossEntropy(**kwargs)
+    elif name == 'ce_smooth':
+        return CrossEntropySmooth(**kwargs)
     elif name == 'nce':
-        return NormalizedCrossEntropy()
+        return NormalizedCrossEntropy(**kwargs)
     elif name == 'rce':
-        return ReverseCrossEntropy()
+        return ReverseCrossEntropy(**kwargs)
     elif name == 'sl':
-        return SymmetricCrossEntropy()
+        return SymmetricCrossEntropy(**kwargs)
     elif name == 'apl':
-        return ActivePassiveLoss()
+        return ActivePassiveLoss(**kwargs)
     else:
         raise AttributeError('Unknown name of loss: {}'.format(name))
