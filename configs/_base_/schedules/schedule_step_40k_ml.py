@@ -56,7 +56,7 @@ evaluation = dict(
 ema_config = dict(
     momentum=0.0002,
     ema_interval=1,
-    warm_up=100,
+    warm_up=5000,
     eval_interval=1000
 )
 
