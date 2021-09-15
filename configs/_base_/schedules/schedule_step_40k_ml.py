@@ -51,3 +51,12 @@ evaluation = dict(
     interval=1000,
     metric='mIoU'
 )
+
+# EMA
+ema_config = dict(
+    momentum=0.0002,
+    ema_interval=1,
+    warm_up=100,
+    eval_interval=1000
+)
+

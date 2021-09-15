@@ -5,9 +5,8 @@ import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import build_optimizer, build_runner
-from mmcv.runner.hooks import EMAHook
 
-from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook, load_checkpoint
+from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook, load_checkpoint, IterBasedEMAHook
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.utils import get_root_logger
 from mmseg.models import build_params_manager
@@ -107,7 +106,7 @@ def train_segmentor(model,
     # register EMA hook
     ema_cfg = cfg.get('ema_config', None)
     if ema_cfg:
-        runner.register_hook(EMAHook(**ema_cfg))
+        runner.register_hook(IterBasedEMAHook(**ema_cfg))
 
     # register training hooks
     runner.register_training_hooks(
