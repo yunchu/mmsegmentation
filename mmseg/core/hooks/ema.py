@@ -38,7 +38,6 @@ class IterBasedEMAHook(Hook):
 
     def before_train_iter(self, runner):
         if self.eval_mode:
-            print('!!!!!!!!!!!!!!!!! After eval')
             self._swap_ema_parameters()
             self.eval_mode = False
 
@@ -56,13 +55,11 @@ class IterBasedEMAHook(Hook):
         if curr_step > 0 and (curr_step + 1) % self.eval_interval == 0:
             assert not self.eval_mode
 
-            print('!!!!!!!!!!!!!!!!! Before eval')
             self._swap_ema_parameters()
             self.eval_mode = True
 
     def after_run(self, runner):
         if not self.eval_mode:
-            print('!!!!!!!!!!!!!!!!! Final swap')
             self._swap_ema_parameters()
             self.eval_mode = True
 
