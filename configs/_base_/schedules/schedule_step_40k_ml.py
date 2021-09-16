@@ -54,9 +54,9 @@ evaluation = dict(
 
 # EMA
 ema_config = dict(
-    momentum=0.0002,
+    momentum=0.0001,
     ema_interval=1,
-    warm_up=5000,
+    skip_iters=500,
     eval_interval=1000
 )
 
