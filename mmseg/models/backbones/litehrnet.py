@@ -110,7 +110,8 @@ class ConditionalChannelWeighting(nn.Module):
                  reduce_ratio,
                  conv_cfg=None,
                  norm_cfg=dict(type='BN'),
-                 with_cp=False):
+                 with_cp=False,
+                 dropout=None):
         super().__init__()
         self.with_cp = with_cp
         self.stride = stride
@@ -142,6 +143,13 @@ class ConditionalChannelWeighting(nn.Module):
             for channel in branch_channels
         ])
 
+        self.dropout = None
+        if dropout is not None and dropout > 0:
+            self.dropout = nn.ModuleList([
+                nn.Dropout(p=dropout)
+                for _ in branch_channels
+            ])
+
     def _inner_forward(self, x):
         x = [s.chunk(2, dim=1) for s in x]
         x1 = [s[0] for s in x]
@@ -150,6 +158,9 @@ class ConditionalChannelWeighting(nn.Module):
         x2 = self.cross_resolution_weighting(x2)
         x2 = [dw(s) for s, dw in zip(x2, self.depthwise_convs)]
         x2 = [sw(s) for s, sw in zip(x2, self.spatial_weighting)]
+
+        if self.dropout is not None:
+            x2 = [dropout(s) for s, dropout in zip(x2, self.dropout)]
 
         out = [torch.cat([s1, s2], dim=1) for s1, s2 in zip(x1, x2)]
         out = [channel_shuffle(s, 2) for s in out]
@@ -475,6 +486,7 @@ class LiteHRModule(nn.Module):
             conv_cfg=None,
             norm_cfg=dict(type='BN'),
             with_cp=False,
+            dropout=None
     ):
         super().__init__()
         self._check_branches(num_branches, in_channels)
@@ -490,7 +502,7 @@ class LiteHRModule(nn.Module):
         self.with_cp = with_cp
 
         if self.module_type == 'LITE':
-            self.layers = self._make_weighting_blocks(num_blocks, reduce_ratio)
+            self.layers = self._make_weighting_blocks(num_blocks, reduce_ratio, dropout=dropout)
         elif self.module_type == 'NAIVE':
             self.layers = self._make_naive_branches(num_branches, num_blocks)
 
@@ -506,7 +518,7 @@ class LiteHRModule(nn.Module):
             error_msg = f'NUM_BRANCHES({num_branches}) != NUM_INCHANNELS({len(in_channels)})'
             raise ValueError(error_msg)
 
-    def _make_weighting_blocks(self, num_blocks, reduce_ratio, stride=1):
+    def _make_weighting_blocks(self, num_blocks, reduce_ratio, stride=1, dropout=None):
         layers = []
         for i in range(num_blocks):
             layers.append(ConditionalChannelWeighting(
@@ -515,7 +527,8 @@ class LiteHRModule(nn.Module):
                 reduce_ratio=reduce_ratio,
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg,
-                with_cp=self.with_cp
+                with_cp=self.with_cp,
+                dropout=dropout
             ))
 
         return nn.Sequential(*layers)
@@ -711,7 +724,8 @@ class LiteHRNet(nn.Module):
                  norm_cfg=dict(type='BN'),
                  norm_eval=False,
                  with_cp=False,
-                 zero_init_residual=False):
+                 zero_init_residual=False,
+                 dropout=None):
         super().__init__()
 
         self.extra = extra
@@ -747,7 +761,8 @@ class LiteHRNet(nn.Module):
             )
 
             stage, num_channels_last = self._make_stage(
-                self.stages_spec, i, num_channels, multiscale_output=True
+                self.stages_spec, i, num_channels,
+                multiscale_output=True, dropout=dropout
             )
             setattr(self, 'stage{}'.format(i), stage)
 
@@ -870,7 +885,7 @@ class LiteHRNet(nn.Module):
 
         return nn.ModuleList(transition_layers)
 
-    def _make_stage(self, stages_spec, stage_index, in_channels, multiscale_output=True):
+    def _make_stage(self, stages_spec, stage_index, in_channels, multiscale_output=True, dropout=None):
         num_modules = stages_spec['num_modules'][stage_index]
         num_branches = stages_spec['num_branches'][stage_index]
         num_blocks = stages_spec['num_blocks'][stage_index]
@@ -896,8 +911,9 @@ class LiteHRNet(nn.Module):
                 with_fuse=with_fuse,
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg,
-                with_cp=self.with_cp)
-            )
+                with_cp=self.with_cp,
+                dropout=dropout
+            ))
             in_channels = modules[-1].in_channels
 
         return nn.Sequential(*modules), in_channels

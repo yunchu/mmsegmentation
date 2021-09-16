@@ -268,7 +268,7 @@ class BaseSegmentor(nn.Module):
             color_seg[seg == label, :] = color
         # convert to BGR
         color_seg = color_seg[..., ::-1]
-        
+
         if gt_seg_map is not None:
             invalid_seg_mask = (gt_seg_map != seg) * (gt_seg_map != 255)
             color_seg[invalid_seg_mask] = (255, 255, 255)
