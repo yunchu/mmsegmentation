@@ -52,11 +52,11 @@ evaluation = dict(
     metric='mIoU'
 )
 
-# EMA
-ema_config = dict(
-    momentum=0.0001,
-    ema_interval=1,
-    skip_iters=5000,
-    eval_interval=1000
-)
+# # EMA
+# ema_config = dict(
+#     momentum=0.0001,
+#     ema_interval=1,
+#     skip_iters=5000,
+#     eval_interval=1000
+# )
 
