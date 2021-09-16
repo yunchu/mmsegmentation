@@ -36,7 +36,8 @@ def single_gpu_test(model,
                     show=False,
                     out_dir=None,
                     efficient_test=False,
-                    opacity=0.5):
+                    opacity=0.5,
+                    add_gt_borders=True):
     """Test with single GPU.
 
     Args:
@@ -50,6 +51,7 @@ def single_gpu_test(model,
         opacity(float): Opacity of painted segmentation map.
             Default 0.5.
             Must be in (0, 1] range.
+        add_gt_borders (bool): Whether show GT borders. Default: True.
     Returns:
         list: The prediction results.
     """
@@ -69,6 +71,12 @@ def single_gpu_test(model,
             imgs = tensor2imgs(img_tensor, **img_metas[0]['img_norm_cfg'])
             assert len(imgs) == len(img_metas)
 
+            gt_seg_map = None
+            if add_gt_borders:
+                ann_info = dataset.get_ann_info(i)
+                ann_file = osp.join(dataset.ann_dir, ann_info['seg_map'])
+                gt_seg_map = mmcv.imread(ann_file, flag='unchanged', backend='pillow')
+
             for img, img_meta in zip(imgs, img_metas):
                 h, w, _ = img_meta['img_shape']
                 img_show = img[:h, :w, :]
@@ -87,7 +95,9 @@ def single_gpu_test(model,
                     palette=dataset.PALETTE,
                     show=show,
                     out_file=out_file,
-                    opacity=opacity)
+                    opacity=opacity,
+                    gt_seg_map=gt_seg_map
+                )
 
         if isinstance(result, list):
             if efficient_test:

@@ -225,7 +225,8 @@ class BaseSegmentor(nn.Module):
                     show=False,
                     wait_time=0,
                     out_file=None,
-                    opacity=0.5):
+                    opacity=0.5,
+                    gt_seg_map=None):
         """Draw `result` over `img`.
 
         Args:
@@ -245,6 +246,7 @@ class BaseSegmentor(nn.Module):
             opacity(float): Opacity of painted segmentation map.
                 Default 0.5.
                 Must be in (0, 1] range.
+            gt_seg_map (Tensor): The semantic segmentation GT to draw borders.
         Returns:
             img (Tensor): Only if not `show` or `out_file`
         """
@@ -253,8 +255,7 @@ class BaseSegmentor(nn.Module):
         seg = result[0]
         if palette is None:
             if self.PALETTE is None:
-                palette = np.random.randint(
-                    0, 255, size=(len(self.CLASSES), 3))
+                palette = np.random.randint(0, 255, size=(len(self.CLASSES), 3))
             else:
                 palette = self.PALETTE
         palette = np.array(palette)
@@ -267,9 +268,14 @@ class BaseSegmentor(nn.Module):
             color_seg[seg == label, :] = color
         # convert to BGR
         color_seg = color_seg[..., ::-1]
+        
+        if gt_seg_map is not None:
+            invalid_seg_mask = (gt_seg_map != seg) * (gt_seg_map != 255)
+            color_seg[invalid_seg_mask] = (255, 255, 255)
 
         img = img * (1 - opacity) + color_seg * opacity
         img = img.astype(np.uint8)
+
         # if out_file specified, do not show image in window
         if out_file is not None:
             show = False
