@@ -53,6 +53,56 @@ class SpatialWeighting(nn.Module):
         return x * out
 
 
+class SpatialWeightingV2(nn.Module):
+    def __init__(self,
+                 channels,
+                 ratio=16,
+                 conv_cfg=None):
+        super().__init__()
+
+        self.in_channels = channels
+        self.internal_channels = int(channels / ratio)
+
+        self.v_conv = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.q_conv = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.global_avgpool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        h, w = x.size()[-2:]
+
+        v = self.v_conv(x)
+        v = v.view(-1, self.internal_channels, h * w)
+
+        q = self.q_conv(x).view(-1, h * w, 1)
+        q = self.global_avgpool(q)
+        q = torch.softmax(q, dim=1)
+        q = q.view(-1, 1, self.internal_channels)
+
+        y = torch.matmul(q, v)
+        y = y.view(-1, 1, h, w)
+        y = torch.sigmoid(y)
+
+        out = x * y
+
+        return out
+
+
 class CrossResolutionWeighting(nn.Module):
     def __init__(self,
                  channels,
@@ -103,6 +153,70 @@ class CrossResolutionWeighting(nn.Module):
         return out
 
 
+class CrossResolutionWeightingV2(nn.Module):
+    def __init__(self,
+                 channels,
+                 ratio=16,
+                 conv_cfg=None,
+                 norm_cfg=None):
+        super().__init__()
+
+        self.channels = channels
+        self.total_channel = sum(channels)
+        self.internal_channels = int(self.total_channel / ratio)
+
+        self.v_conv = ConvModule(
+            in_channels=self.total_channel,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.q_conv = ConvModule(
+            in_channels=self.total_channel,
+            out_channels=1,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.out_conv = ConvModule(
+            in_channels=self.internal_channels,
+            out_channels=self.total_channel,
+            kernel_size=1,
+            stride=1,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg,
+            act_cfg=dict(type='Sigmoid'))
+
+    def forward(self, x):
+        min_size = [int(_) for _ in x[-1].size()[-2:]]
+
+        downscaled_x = [F.adaptive_avg_pool2d(s, min_size) for s in x[:-1]] + [x[-1]]
+        y = torch.cat(downscaled_x, dim=1)
+        h, w = y.size()[-2:]
+
+        v = self.v_conv(y).view(-1, self.internal_channels, h * w)
+
+        q = self.q_conv(y).view(-1, h * w, 1)
+        q = torch.softmax(q, dim=1)
+
+        y = torch.matmul(v, q)
+        y = y.view(-1, self.internal_channels, 1, 1)
+        y = self.out_conv(y)
+
+        out = torch.split(y, self.channels, dim=1)
+        out = [
+            s * F.interpolate(a, size=s.size()[-2:], mode='nearest')
+            for s, a in zip(x, out)
+        ]
+
+        return out
+
+
 class ConditionalChannelWeighting(nn.Module):
     def __init__(self,
                  in_channels,
@@ -111,15 +225,21 @@ class ConditionalChannelWeighting(nn.Module):
                  conv_cfg=None,
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
-                 dropout=None):
+                 dropout=None,
+                 cr_version='v2',
+                 sw_version='v1'):
         super().__init__()
+
         self.with_cp = with_cp
         self.stride = stride
         assert stride in [1, 2]
 
+        cross_resolution_module = CrossResolutionWeighting if cr_version == 'v1' else CrossResolutionWeightingV2
+        spatial_weighting_module = SpatialWeighting if sw_version == 'v1' else SpatialWeightingV2
+
         branch_channels = [channel // 2 for channel in in_channels]
 
-        self.cross_resolution_weighting = CrossResolutionWeighting(
+        self.cross_resolution_weighting = cross_resolution_module(
             branch_channels,
             ratio=reduce_ratio,
             conv_cfg=conv_cfg,
@@ -139,7 +259,7 @@ class ConditionalChannelWeighting(nn.Module):
             for channel in branch_channels
         ])
         self.spatial_weighting = nn.ModuleList([
-            SpatialWeighting(channels=channel, ratio=4)
+            spatial_weighting_module(channels=channel, ratio=4)
             for channel in branch_channels
         ])
 
