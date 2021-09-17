@@ -7,9 +7,6 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     type='CascadeEncoderDecoder',
     num_stages=2,
-    backbone=dict(
-        dropout=0.1,
-    ),
     decode_head=[
         dict(type='FCNHead',
              in_channels=40,
