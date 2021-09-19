@@ -16,93 +16,6 @@ from ..builder import BACKBONES
 from .resnet import BasicBlock, Bottleneck
 
 
-class SpatialWeighting(nn.Module):
-    def __init__(self,
-                 channels,
-                 ratio=16,
-                 conv_cfg=None,
-                 act_cfg=(dict(type='ReLU'), dict(type='Sigmoid'))):
-        super().__init__()
-
-        if isinstance(act_cfg, dict):
-            act_cfg = (act_cfg, act_cfg)
-        assert len(act_cfg) == 2
-        assert mmcv.is_tuple_of(act_cfg, dict)
-
-        self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-        self.conv1 = ConvModule(
-            in_channels=channels,
-            out_channels=int(channels / ratio),
-            kernel_size=1,
-            stride=1,
-            conv_cfg=conv_cfg,
-            act_cfg=act_cfg[0])
-        self.conv2 = ConvModule(
-            in_channels=int(channels / ratio),
-            out_channels=channels,
-            kernel_size=1,
-            stride=1,
-            conv_cfg=conv_cfg,
-            act_cfg=act_cfg[1])
-
-    def forward(self, x):
-        out = self.global_avgpool(x)
-        out = self.conv1(out)
-        out = self.conv2(out)
-
-        return x * out
-
-
-class SpatialWeightingV2(nn.Module):
-    def __init__(self,
-                 channels,
-                 ratio=16,
-                 conv_cfg=None):
-        super().__init__()
-
-        self.in_channels = channels
-        self.internal_channels = int(channels / ratio)
-
-        self.v_conv = ConvModule(
-            in_channels=self.in_channels,
-            out_channels=self.internal_channels,
-            kernel_size=1,
-            stride=1,
-            bias=False,
-            conv_cfg=conv_cfg,
-            norm_cfg=None,
-            act_cfg=None)
-        self.q_conv = ConvModule(
-            in_channels=self.in_channels,
-            out_channels=self.internal_channels,
-            kernel_size=1,
-            stride=1,
-            bias=False,
-            conv_cfg=conv_cfg,
-            norm_cfg=None,
-            act_cfg=None)
-        self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-
-    def forward(self, x):
-        h, w = x.size()[-2:]
-
-        v = self.v_conv(x)
-        v = v.view(-1, self.internal_channels, h * w)
-
-        q = self.q_conv(x).view(-1, h * w, 1)
-        q = self.global_avgpool(q)
-        q = torch.softmax(q, dim=1)
-        q = q.view(-1, 1, self.internal_channels)
-
-        y = torch.matmul(q, v)
-        y = y.view(-1, 1, h, w)
-        y = torch.sigmoid(y)
-
-        out = x * y
-
-        return out
-
-
 class CrossResolutionWeighting(nn.Module):
     def __init__(self,
                  channels,
@@ -217,6 +130,93 @@ class CrossResolutionWeightingV2(nn.Module):
         return out
 
 
+class SpatialWeighting(nn.Module):
+    def __init__(self,
+                 channels,
+                 ratio=16,
+                 conv_cfg=None,
+                 act_cfg=(dict(type='ReLU'), dict(type='Sigmoid'))):
+        super().__init__()
+
+        if isinstance(act_cfg, dict):
+            act_cfg = (act_cfg, act_cfg)
+        assert len(act_cfg) == 2
+        assert mmcv.is_tuple_of(act_cfg, dict)
+
+        self.global_avgpool = nn.AdaptiveAvgPool2d(1)
+        self.conv1 = ConvModule(
+            in_channels=channels,
+            out_channels=int(channels / ratio),
+            kernel_size=1,
+            stride=1,
+            conv_cfg=conv_cfg,
+            act_cfg=act_cfg[0])
+        self.conv2 = ConvModule(
+            in_channels=int(channels / ratio),
+            out_channels=channels,
+            kernel_size=1,
+            stride=1,
+            conv_cfg=conv_cfg,
+            act_cfg=act_cfg[1])
+
+    def forward(self, x):
+        out = self.global_avgpool(x)
+        out = self.conv1(out)
+        out = self.conv2(out)
+
+        return x * out
+
+
+class SpatialWeightingV2(nn.Module):
+    def __init__(self,
+                 channels,
+                 ratio=16,
+                 conv_cfg=None):
+        super().__init__()
+
+        self.in_channels = channels
+        self.internal_channels = int(channels / ratio)
+
+        self.v_conv = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.q_conv = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.global_avgpool = nn.AdaptiveAvgPool2d(1)
+
+    def forward(self, x):
+        h, w = x.size()[-2:]
+
+        v = self.v_conv(x)
+        v = v.view(-1, self.internal_channels, h * w)
+
+        q = self.q_conv(x).view(-1, h * w, 1)
+        q = self.global_avgpool(q)
+        q = torch.softmax(q, dim=1)
+        q = q.view(-1, 1, self.internal_channels)
+
+        y = torch.matmul(q, v)
+        y = y.view(-1, 1, h, w)
+        y = torch.sigmoid(y)
+
+        out = x * y
+
+        return out
+
+
 class ConditionalChannelWeighting(nn.Module):
     def __init__(self,
                  in_channels,
@@ -226,8 +226,8 @@ class ConditionalChannelWeighting(nn.Module):
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
                  dropout=None,
-                 cr_version='v1',
-                 sw_version='v1'):
+                 cr_version='v2',
+                 sw_version='v2'):
         super().__init__()
 
         self.with_cp = with_cp
