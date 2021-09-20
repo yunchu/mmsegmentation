@@ -67,6 +67,9 @@ class CrossResolutionWeighting(nn.Module):
 
 
 class CrossResolutionWeightingV2(nn.Module):
+    """The original repo: https://github.com/DeLightCMU/PSA
+    """
+
     def __init__(self,
                  channels,
                  ratio=16,
@@ -168,6 +171,9 @@ class SpatialWeighting(nn.Module):
 
 
 class SpatialWeightingV2(nn.Module):
+    """The original repo: https://github.com/DeLightCMU/PSA
+    """
+
     def __init__(self,
                  channels,
                  ratio=16,
