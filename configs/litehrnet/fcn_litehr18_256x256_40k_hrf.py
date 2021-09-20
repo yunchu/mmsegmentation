@@ -25,6 +25,7 @@ model = dict(
             loss_weight=1.0
         )
     ),
+    train_cfg=dict(mix_loss=dict(enable=False, weight=0.1)),
     # test_cfg=dict(mode='slide', crop_size=(256, 256), stride=(170, 170))
     test_cfg=dict(mode='slide', crop_size=(1024, 1024), stride=(680, 680))
 )
