@@ -226,8 +226,8 @@ class ConditionalChannelWeighting(nn.Module):
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
                  dropout=None,
-                 cr_version='v2',
-                 sw_version='v2'):
+                 cr_version='v1',
+                 sw_version='v1'):
         super().__init__()
 
         self.with_cp = with_cp
