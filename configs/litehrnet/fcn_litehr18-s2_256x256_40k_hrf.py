@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/kvasir.py',
+    '../_base_/models/fcn_litehr18_s2.py', '../_base_/datasets/hrf.py',
     '../_base_/default_runtime.py', '../_base_/schedules/schedule_cos_40k.py'
 ]
 
@@ -28,9 +28,9 @@ model = dict(
             ),
         ]
     ),
-    train_cfg=dict(
-        mix_loss=dict(enable=False, weight=0.1)
-    ),
+    train_cfg=dict(mix_loss=dict(enable=False, weight=0.1)),
+    # test_cfg=dict(mode='slide', crop_size=(256, 256), stride=(170, 170)),
+    test_cfg=dict(mode='slide', crop_size=(1024, 1024), stride=(680, 680)),
 )
 evaluation = dict(
     metric='mDice',
