@@ -305,8 +305,12 @@ class Stem(nn.Module):
                  conv_cfg=None,
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
+                 strides=(2, 2),
                  extra_stride=False):
         super().__init__()
+
+        assert isinstance(strides, (tuple, list))
+        assert len(strides) == 2
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -318,7 +322,7 @@ class Stem(nn.Module):
             in_channels=in_channels,
             out_channels=stem_channels,
             kernel_size=3,
-            stride=2,
+            stride=strides[0],
             padding=1,
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
@@ -350,7 +354,7 @@ class Stem(nn.Module):
                 branch_channels,
                 branch_channels,
                 kernel_size=3,
-                stride=2,
+                stride=strides[1],
                 padding=1,
                 groups=branch_channels,
                 conv_cfg=conv_cfg,
@@ -381,7 +385,7 @@ class Stem(nn.Module):
             mid_channels,
             mid_channels,
             kernel_size=3,
-            stride=2,
+            stride=strides[1],
             padding=1,
             groups=mid_channels,
             conv_cfg=conv_cfg,
@@ -860,6 +864,7 @@ class LiteHRNet(nn.Module):
             stem_channels=self.extra['stem']['stem_channels'],
             out_channels=self.extra['stem']['out_channels'],
             expand_ratio=self.extra['stem']['expand_ratio'],
+            strides=self.extra['stem']['strides'],
             extra_stride=self.extra['stem']['extra_stride'],
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg

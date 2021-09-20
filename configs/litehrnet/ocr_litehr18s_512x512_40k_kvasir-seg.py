@@ -16,6 +16,7 @@ model = dict(
                 stem_channels=32,
                 out_channels=32,
                 expand_ratio=1,
+                strides=(2, 2),
                 extra_stride=True
             ),
             num_stages=3,
