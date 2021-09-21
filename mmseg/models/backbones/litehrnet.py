@@ -312,7 +312,8 @@ class Stem(nn.Module):
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
                  strides=(2, 2),
-                 extra_stride=False):
+                 extra_stride=False,
+                 input_norm=False):
         super().__init__()
 
         assert isinstance(strides, (tuple, list))
@@ -323,6 +324,10 @@ class Stem(nn.Module):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.with_cp = with_cp
+
+        self.input_norm = None
+        if input_norm:
+            self.input_norm = nn.InstanceNorm2d(in_channels)
 
         self.conv1 = ConvModule(
             in_channels=in_channels,
@@ -411,6 +416,9 @@ class Stem(nn.Module):
         )
 
     def _inner_forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
+
         x = self.conv1(x)
         if self.conv2 is not None:
             x = self.conv2(x)

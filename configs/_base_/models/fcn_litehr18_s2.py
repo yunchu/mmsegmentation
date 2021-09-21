@@ -18,7 +18,8 @@ model = dict(
                 out_channels=32,
                 expand_ratio=1,
                 strides=(2, 1),
-                extra_stride=False
+                extra_stride=False,
+                input_norm=True,
             ),
             num_stages=3,
             stages_spec=dict(
