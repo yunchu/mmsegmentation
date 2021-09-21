@@ -19,7 +19,7 @@ from typing import List
 
 import numpy as np
 from ote_sdk.entities.annotation import Annotation, AnnotationSceneKind
-from ote_sdk.entities.label import ScoredLabel
+from ote_sdk.entities.label import DenseLabel
 from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.subset import Subset
 from sc_sdk.entities.annotation import AnnotationScene, NullMediaIdentifier
@@ -210,6 +210,10 @@ def abs_path_if_valid(value):
         return None
 
 
+def split_multiclass_annot(annot):
+    raise NotImplementedError
+
+
 class MMDatasetAdapter(Dataset):
     def __init__(self,
                  train_img_dir=None,
@@ -285,29 +289,26 @@ class MMDatasetAdapter(Dataset):
         return True
 
     def __getitem__(self, indx) -> dict:
-        def create_gt_scored_label(label_name):
-            return ScoredLabel(label=self.label_name_to_project_label(label_name))
-
-        def create_gt_box(x1, y1, x2, y2, label):
-            return Annotation(Rectangle(x1=x1, y1=y1, x2=x2, y2=y2),
-                              labels=[create_gt_scored_label(label)])
+        def create_gt_dense_label(label_name, mask):
+            return DenseLabel(label=self.label_name_to_project_label(label_name), mask=mask)
 
         item = self.dataset[indx]
 
-        divisor = np.tile([item['ori_shape'][:2][::-1]], 2)
-        bboxes = item['gt_bboxes'] / divisor
-        labels = item['gt_labels']
-
-        shapes = [create_gt_box(*coords, self.labels[label_id]) for coords, label_id in zip(bboxes, labels)]
+        splited_annot = split_multiclass_annot(item['annot'])
+        dense_labels = [create_gt_dense_label(label_name, mask)
+                        for label_name, mask in splited_annot]
+        annotation = Annotation(Rectangle(x1=0, y1=0, x2=1, y2=1),
+                                labels=dense_labels)
 
         image = Image(name=None,
                       numpy=item['img'],
                       dataset_storage=NullDatasetStorage())
         annotation_scene = AnnotationScene(kind=AnnotationSceneKind.ANNOTATION,
                                            media_identifier=NullMediaIdentifier(),
-                                           annotations=shapes)
-        datset_item = DatasetItem(image, annotation_scene)
-        return datset_item
+                                           annotations=[annotation])
+        dataset_item = DatasetItem(image, annotation_scene)
+
+        return dataset_item
 
     def __len__(self) -> int:
         assert self.dataset is not None
