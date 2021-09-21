@@ -19,7 +19,7 @@ model = dict(
                 expand_ratio=1,
                 strides=(2, 1),
                 extra_stride=False,
-                input_norm=True,
+                input_norm=False,
             ),
             num_stages=3,
             stages_spec=dict(
