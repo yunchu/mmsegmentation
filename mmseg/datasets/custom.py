@@ -96,8 +96,8 @@ class CustomDataset(Dataset):
         self.ignore_index = ignore_index
         self.reduce_zero_label = reduce_zero_label
         self.label_map = None
-        self.CLASSES, self.PALETTE = self.get_classes_and_palette(
-            classes, palette)
+
+        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
 
         # join paths if data_root is specified
         if self.data_root is not None:
