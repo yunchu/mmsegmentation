@@ -417,7 +417,25 @@ class Stem(nn.Module):
 
     def _inner_forward(self, x):
         if self.input_norm is not None:
-            x = self.input_norm(x)
+            x_norm = self.input_norm(x)
+
+            def _get_image(_x):
+                _image_float = _x.detach().permute(1, 2, 0).contiguous().cpu().numpy()
+
+                import numpy as np
+                _min_value = np.min(_image_float)
+                _max_value = np.max(_image_float)
+                _norm_image = 255.0 * (_image_float - _min_value) / (_max_value - _min_value)
+
+                return _norm_image.astype(np.uint8)
+
+            import matplotlib.pyplot as plt
+            _, axs = plt.subplots(1, 2)
+            axs[0].imshow(_get_image(x[0]))
+            axs[1].imshow(_get_image(x_norm[0]))
+            plt.show()
+
+            x = x_norm
 
         x = self.conv1(x)
         if self.conv2 is not None:
@@ -875,6 +893,7 @@ class LiteHRNet(nn.Module):
 
         self.stem = Stem(
             in_channels,
+            input_norm=self.extra['stem']['input_norm'],
             stem_channels=self.extra['stem']['stem_channels'],
             out_channels=self.extra['stem']['out_channels'],
             expand_ratio=self.extra['stem']['expand_ratio'],
