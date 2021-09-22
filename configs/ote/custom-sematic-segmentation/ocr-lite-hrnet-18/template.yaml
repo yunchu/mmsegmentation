@@ -1,0 +1,33 @@
+# Description.
+name: Custom Sematic Segmentation Lite-HRNet-18 OCR
+task_type: SEGMENTATION
+task_family: VISION
+instantiation: "CLASS"
+summary: OCR with Lite-HRNet-18 backbone.
+application:
+  ~
+
+# Algo backend.
+framework: OTESegmentation v0.14.0
+
+# Task implementations.
+entrypoints:
+  base: mmseg.apis.ote.apis.segmentation.OTEDetectionTask
+  openvino: mmseg.apis.ote.apis.segmentation.OpenVINODetectionTask
+
+# Hyperparameters.
+hyper_parameters:
+  base_path: ../../../../mmseg/apis/ote/apis/segmentation/configuration.yaml
+  parameter_overrides:
+    learning_parameters:
+      batch_size:
+        default_value: 8
+      learning_rate:
+        default_value: 0.008
+      learning_rate_warmup_iters:
+        default_value: 200
+
+# Training resources.
+max_nodes: 1
+training_targets:
+  - GPU

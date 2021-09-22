@@ -234,14 +234,15 @@ class CustomDataset(Dataset):
     def get_gt_seg_maps(self, efficient_test=False):
         """Get ground truth segmentation maps for evaluation."""
         gt_seg_maps = []
-        for img_info in self.img_infos:
-            seg_map = osp.join(self.ann_dir, img_info['ann']['seg_map'])
+        for item_id in range(len(self)):
+            ann_info = self.get_ann_info(item_id)
+            seg_map = osp.join(self.ann_dir, ann_info['seg_map'])
             if efficient_test:
                 gt_seg_map = seg_map
             else:
-                gt_seg_map = mmcv.imread(
-                    seg_map, flag='unchanged', backend='pillow')
+                gt_seg_map = mmcv.imread(seg_map, flag='unchanged', backend='pillow')
             gt_seg_maps.append(gt_seg_map)
+
         return gt_seg_maps
 
     def get_classes_and_palette(self, classes=None, palette=None):

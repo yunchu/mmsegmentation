@@ -19,7 +19,7 @@ from typing import List
 
 import numpy as np
 from ote_sdk.entities.annotation import Annotation, AnnotationSceneKind
-from ote_sdk.entities.label import DenseLabel
+from ote_sdk.entities.dense_label import DenseLabel
 from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.subset import Subset
 from sc_sdk.entities.annotation import AnnotationScene, NullMediaIdentifier
@@ -42,37 +42,21 @@ def get_annotation_mmseg_format(dataset_item: DatasetItem, label_list: List[str]
     :return dict: annotation information dict in mmdet format
     """
     width, height = dataset_item.width, dataset_item.height
-
-    # load annotations for item
-    gt_bboxes = []
-    gt_labels = []
+    gt_seg_map = np.full((height, width), 255, dtype=np.uint8)
 
     for ann in dataset_item.get_annotations():
         box = ann.shape
         if not isinstance(box, Rectangle):
             continue
 
-        gt_bboxes.append([box.x1 * width, box.y1 * height, box.x2 * width, box.y2 * height])
+        labels = ann.get_labels(include_empty=False)
+        for label in labels:
+            mask = label.get_mask().numpy
+            label_id = label.id
 
-        if ann.get_labels():
-            # Label is not empty, add it to the gt labels
-            label = ann.get_labels()[0]
-            class_name = label.name
-            gt_labels.append(label_list.index(class_name))
-            is_empty_label = False
-        else:
-            is_empty_label = True
+            gt_seg_map[mask] = label_id
 
-    if not ((len(gt_bboxes) == 1) and is_empty_label):
-        ann_info = dict(
-            bboxes=np.array(gt_bboxes, dtype=np.float32).reshape(-1, 4),
-            labels=np.array(gt_labels, dtype=int)
-        )
-    else:
-        ann_info = dict(bboxes=np.array([0, 0, 0, 0], dtype=np.float32).reshape(-1, 4),
-                        labels=np.array([-1], dtype=int))
-
-    # return self.img_infos[idx]['ann']
+    ann_info = dict(gt_semantic_seg=gt_seg_map)
 
     return ann_info
 
@@ -115,21 +99,20 @@ class OTEDataset(CustomDataset):
             dataset = self.ote_dataset
             item = dataset[index]
 
-            height, width = item.height, item.width
             data_info = dict(dataset_item=item,
-                             width=width,
-                             height=height,
+                             width=item.width,
+                             height=item.height,
                              dataset_id=dataset.id,
                              index=index,
                              ann_info=dict(label_list=self.CLASSES))
 
             return data_info
 
-    def __init__(self, ote_dataset: Dataset, pipeline, classes=None, test_mode: bool = False):
+    def __init__(self, ote_dataset: Dataset, pipeline, classes=None, palette=None, test_mode: bool = False):
         self.ote_dataset = ote_dataset
         self.test_mode = test_mode
 
-        self.CLASSES = self.get_classes(classes)
+        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
 
         # Instead of using list data_infos as in CustomDataset, this implementation of dataset
         # uses a proxy class with overriden __len__ and __getitem__; this proxy class
@@ -195,11 +178,24 @@ class OTEDataset(CustomDataset):
 
         return ann_info
 
+    def get_gt_seg_maps(self, efficient_test=False):
+        """Get ground truth segmentation maps for evaluation."""
 
-def get_classes_from_annotation(path):
-    with open(path) as read_file:
-        content = json.load(read_file)
-        categories = [v['name'] for v in sorted(content['categories'], key=lambda x: x['id'])]
+        gt_seg_maps = []
+        for item_id in range(len(self)):
+            ann_info = self.get_ann_info(item_id)
+            gt_seg_maps.append(ann_info['gt_semantic_seg'])
+
+        return gt_seg_maps
+
+
+def get_classes_from_annotation(annot_path):
+    with open(annot_path) as input_stream:
+        content = json.load(input_stream)
+        labels_map = content['labels_map']
+
+        categories = [(int(v['id']), v['name']) for v in labels_map]
+
     return categories
 
 
@@ -211,20 +207,23 @@ def abs_path_if_valid(value):
 
 
 def split_multiclass_annot(annot):
-    raise NotImplementedError
+    unique_labels = np.unique(annot)
+
+    out_masks = []
+    for label_id in unique_labels:
+        out_masks.append((label_id, annot == label_id))
+
+    return out_masks
 
 
 class MMDatasetAdapter(Dataset):
     def __init__(self,
                  train_img_dir=None,
                  train_ann_dir=None,
-                 train_data_root=None,
                  val_img_dir=None,
                  val_ann_dir=None,
-                 val_data_root=None,
                  test_img_dir=None,
                  test_ann_dir=None,
-                 test_data_root=None,
                  **kwargs):
         super().__init__(**kwargs)
 
@@ -238,11 +237,6 @@ class MMDatasetAdapter(Dataset):
             Subset.VALIDATION: abs_path_if_valid(val_ann_dir),
             Subset.TESTING: abs_path_if_valid(test_ann_dir),
         }
-        self.data_roots = {
-            Subset.TRAINING: abs_path_if_valid(train_data_root),
-            Subset.VALIDATION: abs_path_if_valid(val_data_root),
-            Subset.TESTING: abs_path_if_valid(test_data_root),
-        }
 
         self.labels = self.get_labels_from_annotation(self.ann_dirs)
         assert self.labels is not None
@@ -251,24 +245,34 @@ class MMDatasetAdapter(Dataset):
         self.project_labels = None
 
     @staticmethod
-    def get_labels_from_annotation(ann_files):
+    def get_labels_from_annotation(ann_dirs):
         out_labels = None
         for subset in (Subset.TRAINING, Subset.VALIDATION, Subset.TESTING):
-            path = ann_files[subset]
-            if path:
-                labels = get_classes_from_annotation(path)
-                if out_labels and out_labels != labels:
-                    raise RuntimeError('Labels are different from annotation file to annotation file.')
+            dir_path = ann_dirs[subset]
+            if dir_path is None:
+                continue
 
-                out_labels = labels
+            labels_map_path = os.path.join(dir_path, 'meta.json')
+            labels = get_classes_from_annotation(labels_map_path)
+
+            if out_labels and out_labels != labels:
+                raise RuntimeError('Labels are different from annotation file to annotation file.')
+
+            out_labels = labels
 
         return out_labels
 
     def set_project_labels(self, project_labels):
         self.project_labels = project_labels
 
-    def label_name_to_project_label(self, label_name):
-        return [label for label in self.project_labels if label.name == label_name][0]
+    def label_id_to_project_label(self, label_id):
+        matches = [label for label in self.project_labels if label.id == label_id]
+
+        if len(matches) == 0:
+            return None
+        else:
+            assert len(matches) == 1
+            return matches[0]
 
     def init_as_subset(self, subset: Subset):
         test_mode = subset in {Subset.VALIDATION, Subset.TESTING}
@@ -280,7 +284,6 @@ class MMDatasetAdapter(Dataset):
 
         self.dataset = CustomDataset(img_dir=self.img_dirs[subset],
                                      ann_dir=self.ann_dirs[subset],
-                                     data_root=self.data_roots[subset],
                                      pipeline=pipeline,
                                      classes=self.labels,
                                      test_mode=test_mode)
@@ -288,21 +291,39 @@ class MMDatasetAdapter(Dataset):
 
         return True
 
-    def __getitem__(self, indx) -> dict:
-        def create_gt_dense_label(label_name, mask):
-            return DenseLabel(label=self.label_name_to_project_label(label_name), mask=mask)
+    def __getitem__(self, indx) -> DatasetItem:
+        def _create_gt_label(label_id, mask):
+            label = self.label_id_to_project_label(label_id)
+            if label is None:
+                return None
+
+            mask = Image(name=None, numpy=mask, dataset_storage=NullDatasetStorage())
+            out_label = DenseLabel(label=label, mask=mask)
+
+            return out_label
+
+        def _create_gt_labels(enumerated_masks):
+            out_labels = []
+            for label_id, mask in enumerated_masks:
+                label = _create_gt_label(label_id, mask)
+                if label is None:
+                    continue
+
+                out_labels.append(label)
+
+            return out_labels
 
         item = self.dataset[indx]
 
-        splited_annot = split_multiclass_annot(item['annot'])
-        dense_labels = [create_gt_dense_label(label_name, mask)
-                        for label_name, mask in splited_annot]
+        splitted_annot = split_multiclass_annot(item['gt_semantic_seg'])
+        dense_labels = _create_gt_labels(splitted_annot)
         annotation = Annotation(Rectangle(x1=0, y1=0, x2=1, y2=1),
                                 labels=dense_labels)
 
         image = Image(name=None,
                       numpy=item['img'],
                       dataset_storage=NullDatasetStorage())
+
         annotation_scene = AnnotationScene(kind=AnnotationSceneKind.ANNOTATION,
                                            media_identifier=NullMediaIdentifier(),
                                            annotations=[annotation])
@@ -319,6 +340,8 @@ class MMDatasetAdapter(Dataset):
 
     def get_subset(self, subset: Subset) -> Dataset:
         dataset = deepcopy(self)
+
         if dataset.init_as_subset(subset):
             return dataset
-        return NullDataset()
+        else:
+            return NullDataset()
