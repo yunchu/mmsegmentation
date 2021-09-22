@@ -33,7 +33,7 @@ from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
 from ote_sdk.entities.task_environment import TaskEnvironment
 
-# from mmseg.apis.ote.apis.segmentation.config_utils import set_values_as_default
+from mmseg.apis.ote.apis.segmentation.config_utils import set_values_as_default
 from mmseg.apis.ote.apis.segmentation.ote_utils import generate_label_schema, get_task_class
 from mmseg.apis.ote.extension.datasets.mmdataset import MMDatasetAdapter
 
@@ -70,26 +70,26 @@ def main(args):
     logger.info(f'Train dataset: {len(dataset.get_subset(Subset.TRAINING))} items')
     logger.info(f'Validation dataset: {len(dataset.get_subset(Subset.VALIDATION))} items')
 
-    # logger.info('Load model template')
-    # model_template = parse_model_template(args.template_file_path)
-    #
-    # hyper_parameters = model_template.hyper_parameters.data
-    # set_values_as_default(hyper_parameters)
-    #
-    # logger.info('Setup environment')
-    # params = create(hyper_parameters)
-    # logger.info('Set hyperparameters')
-    # params.learning_parameters.num_iters = 1
-    # environment = TaskEnvironment(model=None,
-    #                               hyper_parameters=params,
-    #                               label_schema=labels_schema,
-    #                               model_template=model_template)
-    #
-    # logger.info('Create base Task')
-    # task_impl_path = model_template.entrypoints.base
-    # task_cls = get_task_class(task_impl_path)
-    # task = task_cls(task_environment=environment)
-    #
+    logger.info('Load model template')
+    model_template = parse_model_template(args.template_file_path)
+
+    hyper_parameters = model_template.hyper_parameters.data
+    set_values_as_default(hyper_parameters)
+
+    logger.info('Setup environment')
+    params = create(hyper_parameters)
+    logger.info('Set hyperparameters')
+    params.learning_parameters.num_iters = 1
+    environment = TaskEnvironment(model=None,
+                                  hyper_parameters=params,
+                                  label_schema=labels_schema,
+                                  model_template=model_template)
+
+    logger.info('Create base Task')
+    task_impl_path = model_template.entrypoints.base
+    task_cls = get_task_class(task_impl_path)
+    task = task_cls(task_environment=environment)
+
     # logger.info('Train model')
     # output_model = ModelEntity(
     #     dataset,

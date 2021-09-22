@@ -12,8 +12,8 @@ framework: OTESegmentation v0.14.0
 
 # Task implementations.
 entrypoints:
-  base: mmseg.apis.ote.apis.segmentation.OTEDetectionTask
-  openvino: mmseg.apis.ote.apis.segmentation.OpenVINODetectionTask
+  base: mmseg.apis.ote.apis.segmentation.OTESegmentationTask
+  openvino: mmseg.apis.ote.apis.segmentation.OpenVINOSegmentationTask
 
 # Hyperparameters.
 hyper_parameters:
