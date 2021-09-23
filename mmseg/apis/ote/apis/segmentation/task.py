@@ -48,47 +48,49 @@ from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 from sc_sdk.entities.datasets import Dataset
 
-# from mmseg.apis import export_model, single_gpu_test, train_detector
-# from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config, prepare_for_testing, prepare_for_training,
-#                                                         set_hyperparams)
-# from mmseg.apis.ote.apis.segmentation.configuration import OTEDetectionConfig
-# from mmseg.apis.ote.apis.segmentation.ote_utils import InferenceProgressCallback, TrainingProgressCallback
-# from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
-# from mmseg.datasets import build_dataloader, build_dataset
-# from mmseg.models import build_detector
-# from mmseg.parallel import MMDataCPU
+from mmseg.apis import single_gpu_test, train_segmentor  # export_model
+from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
+                                                           prepare_for_testing,
+                                                           prepare_for_training,
+                                                           set_hyperparams)
+from mmseg.apis.ote.apis.segmentation.configuration import OTESegmentationConfig
+from mmseg.apis.ote.apis.segmentation.ote_utils import InferenceProgressCallback, TrainingProgressCallback
+from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
+from mmseg.datasets import build_dataloader, build_dataset
+from mmseg.models import build_segmentor
+from mmseg.parallel import MMDataCPU
 
 logger = logging.getLogger(__name__)
 
 
-class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
+class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
 
     task_environment: TaskEnvironment
 
     def __init__(self, task_environment: TaskEnvironment):
         """"
-        Task for training object detection models using OTEDetection.
+        Task for training semantic segmentation models using OTESegmentation.
 
         """
 
-        logger.info(f"Loading OTEDetectionTask.")
-        self._scratch_space = tempfile.mkdtemp(prefix="ote-det-scratch-")
+        logger.info(f"Loading OTESegmentationTask.")
+        self._scratch_space = tempfile.mkdtemp(prefix="ote-seg-scratch-")
         logger.info(f"Scratch space created at {self._scratch_space}")
 
         self._task_environment = task_environment
-        self._hyperparams = hyperparams = task_environment.get_hyper_parameters(OTEDetectionConfig)
+        self._hyperparams = task_environment.get_hyper_parameters(OTESegmentationConfig)
 
-        self._model_name = hyperparams.algo_backend.model_name
-        self._labels = task_environment.get_labels(False)
+        self._model_name = self._hyperparams.algo_backend.model_name
+        self._labels = task_environment.get_labels(include_empty=False)
 
         template_file_path = task_environment.model_template.model_template_path
 
-        # Get and prepare mmdet config.
+        # Get and prepare mmseg config.
         base_dir = os.path.abspath(os.path.dirname(template_file_path))
-        config_file_path = os.path.join(base_dir, hyperparams.algo_backend.model)
+        config_file_path = os.path.join(base_dir, self._hyperparams.algo_backend.model)
         self._config = Config.fromfile(config_file_path)
         patch_config(self._config, self._scratch_space, self._labels, random_seed=42)
-        set_hyperparams(self._config, hyperparams)
+        set_hyperparams(self._config, self._hyperparams)
 
         # Create and initialize PyTorch model.
         self._model = self._load_model(task_environment.model)
@@ -126,38 +128,42 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         """
         Creates a model, based on the configuration in config
 
-        :param config: mmdetection configuration from which the model has to be built
+        :param config: mmsegmentation configuration from which the model has to be built
         :param from_scratch: bool, if True does not load any weights
 
         :return model: ModelEntity in training mode
         """
+
         model_cfg = copy.deepcopy(config.model)
 
         init_from = None if from_scratch else config.get('load_from', None)
-        logger.warning(init_from)
+        logger.warning(f"Init from: {init_from}")
+
         if init_from is not None:
             # No need to initialize backbone separately, if all weights are provided.
             model_cfg.pretrained = None
-            logger.warning('build detector')
-            model = build_detector(model_cfg)
+            logger.warning('build segmentor')
+            model = build_segmentor(model_cfg)
+
             # Load all weights.
             logger.warning('load checkpoint')
             load_checkpoint(model, init_from, map_location='cpu')
         else:
-            logger.warning('build detector')
-            model = build_detector(model_cfg)
-        return model
+            logger.warning('build segmentor')
+            model = build_segmentor(model_cfg)
 
+        return model
 
     def infer(self, dataset: Dataset, inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
         """ Analyzes a dataset using the latest inference model. """
+
         set_hyperparams(self._config, self._hyperparams)
 
         if inference_parameters is not None:
+            # is_evaluation = inference_parameters.is_evaluation
             update_progress_callback = inference_parameters.update_progress
-            is_evaluation = inference_parameters.is_evaluation
         else:
-            is_evaluation = False
+            # is_evaluation = False
             update_progress_callback = default_progress_callback
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
@@ -171,10 +177,10 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         pre_hook_handle = self._model.register_forward_pre_hook(pre_hook)
         hook_handle = self._model.register_forward_hook(hook)
 
-        confidence_threshold = self._get_confidence_threshold(is_evaluation)
-        logger.info(f'Confidence threshold {confidence_threshold}')
+        # confidence_threshold = self._get_confidence_threshold(is_evaluation)
+        # logger.info(f'Confidence threshold {confidence_threshold}')
 
-        prediction_results, _ = self._infer_detector(self._model, self._config, dataset, False)
+        prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, False)
 
         # Loop over dataset again to assign predictions. Convert from MMDetection format to OTE format
         for dataset_item, output in zip(dataset, prediction_results):
@@ -189,13 +195,8 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
                     coords /= np.array([width, height, width, height], dtype=float)
                     coords = np.clip(coords, 0, 1)
 
-                    if probability < confidence_threshold:
-                        continue
-
                     assigned_label = [ScoredLabel(self._labels[label_idx],
                                                   probability=probability)]
-                    if coords[3] - coords[1] <= 0 or coords[2] - coords[0] <= 0:
-                        continue
 
                     shapes.append(Annotation(
                         Rectangle(x1=coords[0], y1=coords[1], x2=coords[2], y2=coords[3]),
@@ -208,13 +209,14 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
 
         return dataset
 
-
     @staticmethod
-    def _infer_detector(model: torch.nn.Module, config: Config, dataset: Dataset,
-                        eval: Optional[bool] = False, metric_name: Optional[str] = 'mAP') -> Tuple[List, float]:
+    def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: Dataset,
+                         eval: Optional[bool] = False, metric_name: Optional[str] = 'mIoU') -> Tuple[List, float]:
         model.eval()
+
         test_config = prepare_for_testing(config, dataset)
         mm_val_dataset = build_dataset(test_config.data.test)
+
         batch_size = 1
         mm_val_dataloader = build_dataloader(mm_val_dataset,
                                              samples_per_gpu=batch_size,
@@ -227,28 +229,32 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
                                         device_ids=test_config.gpu_ids)
         else:
             eval_model = MMDataCPU(model)
+
         # Use a single gpu for testing. Set in both mm_val_dataloader and eval_model
         eval_predictions = single_gpu_test(eval_model, mm_val_dataloader, show=False)
 
         metric = None
         if eval:
             metric = mm_val_dataset.evaluate(eval_predictions, metric=metric_name)[metric_name]
-        return eval_predictions, metric
 
+        return eval_predictions, metric
 
     def evaluate(self,
                  output_result_set: ResultSetEntity,
                  evaluation_metric: Optional[str] = None):
         """ Computes performance on a resultset """
-        params = self._hyperparams
 
+        params = self._hyperparams
         result_based_confidence_threshold = params.postprocessing.result_based_confidence_threshold
 
-        logger.info('Computing F-measure' + (' with auto threshold adjustment' if result_based_confidence_threshold else ''))
-        f_measure_metrics = MetricsHelper.compute_f_measure(output_result_set,
-                                                            result_based_confidence_threshold,
-                                                            False,
-                                                            False)
+        logger.info('Computing F-measure' +
+                    ' with auto threshold adjustment' if result_based_confidence_threshold else '')
+        f_measure_metrics = MetricsHelper.compute_f_measure(
+            output_result_set,
+            result_based_confidence_threshold,
+            False,
+            False
+        )
 
         if output_result_set.purpose is ResultsetPurpose.EVALUATION:
             # only set configurable params based on validation result set
@@ -265,7 +271,6 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
 
         output_result_set.performance = f_measure_metrics.get_performance()
 
-
     def train(self, dataset: Dataset, output_model: ModelEntity, train_parameters: Optional[TrainParameters] = None):
         """ Trains a model on a dataset """
 
@@ -279,7 +284,7 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         old_model = copy.deepcopy(self._model)
 
         # Evaluate model performance before training.
-        _, initial_performance = self._infer_detector(self._model, config, val_dataset, True)
+        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, True)
 
         # Check for stop signal between pre-eval and training. If training is cancelled at this point,
         # old_model should be restored.
@@ -303,7 +308,7 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         mm_train_dataset = build_dataset(training_config.data.train)
         self._is_training = True
         self._model.train()
-        train_detector(model=self._model, dataset=mm_train_dataset, cfg=training_config, validate=True)
+        train_segmentor(model=self._model, dataset=mm_train_dataset, cfg=training_config, validate=True)
 
         # Check for stop signal when training has stopped. If should_stop is true, training was cancelled and no new
         # model should be returned. Old train model is restored.
@@ -321,7 +326,7 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         self._model.load_state_dict(best_checkpoint['state_dict'])
 
         # Evaluate model performance after training.
-        _, final_performance = self._infer_detector(self._model, config, val_dataset, True)
+        _, final_performance = self._infer_segmentor(self._model, config, val_dataset, True)
         improved = final_performance > initial_performance
 
         # Return a new model if model has improved, or there is no model yet.
@@ -344,16 +349,15 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
 
         self._is_training = False
 
-
     def save_model(self, output_model: ModelEntity):
-        buffer = io.BytesIO()
-        hyperparams = self._task_environment.get_hyper_parameters(OTEDetectionConfig)
+        hyperparams = self._task_environment.get_hyper_parameters(OTESegmentationConfig)
         hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
         labels = {label.name: label.color.rgb_tuple for label in self._labels}
-        modelinfo = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
-        torch.save(modelinfo, buffer)
-        output_model.set_data("weights.pth", buffer.getvalue())
+        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
 
+        buffer = io.BytesIO()
+        torch.save(model_info, buffer)
+        output_model.set_data("weights.pth", buffer.getvalue())
 
     def cancel_training(self):
         """
@@ -367,10 +371,9 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         stop_training_filepath = os.path.join(self._training_work_dir, '.stop_training')
         open(stop_training_filepath, 'a').close()
 
-
     def _generate_training_metrics_group(self, learning_curves) -> Optional[List[MetricsGroup]]:
         """
-        Parses the mmdetection logs to get metrics from the latest training run
+        Parses the mmsegmentation logs to get metrics from the latest training run
 
         :return output List[MetricsGroup]
         """
@@ -390,7 +393,6 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
             output.append(MetricsGroup(metrics=[metric_curve], visualization_info=visualization_info))
 
         return output
-
 
     def _get_confidence_threshold(self, is_evaluation: bool) -> float:
         """
@@ -426,15 +428,15 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
         is_in_docker = is_in_docker or os.path.exists('/.dockerenv')
         return is_in_docker
 
-
     def unload(self):
         """
         Unload the task
         """
+
         self._delete_scratch_space()
+
         if self._is_docker():
-            logger.warning(
-                "Got unload request. Unloading models. Throwing Segmentation Fault on purpose")
+            logger.warning("Got unload request. Unloading models. Throwing Segmentation Fault on purpose")
             import ctypes
             ctypes.string_at(0)
         else:
@@ -442,7 +444,6 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
             torch.cuda.empty_cache()
             logger.warning(f"Done unloading. "
                            f"Torch is still occupying {torch.cuda.memory_allocated()} bytes of GPU memory")
-
 
     def export(self,
                export_type: ExportType,
@@ -476,10 +477,9 @@ class OTEDetectionTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTa
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
 
-
     def _delete_scratch_space(self):
         """
-        Remove model checkpoints and mmdet logs
+        Remove model checkpoints and mmseg logs
         """
         if os.path.exists(self._scratch_space):
             shutil.rmtree(self._scratch_space, ignore_errors=False)

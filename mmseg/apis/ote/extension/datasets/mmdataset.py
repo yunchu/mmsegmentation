@@ -108,11 +108,14 @@ class OTEDataset(CustomDataset):
 
             return data_info
 
-    def __init__(self, ote_dataset: Dataset, pipeline, classes=None, palette=None, test_mode: bool = False):
+    def __init__(self, ote_dataset: Dataset, pipeline, classes=None, test_mode: bool = False):
         self.ote_dataset = ote_dataset
+        self.ignore_index = 255
+        self.reduce_zero_label = False
         self.test_mode = test_mode
 
-        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, palette)
+        self.label_map = None
+        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, None)
 
         # Instead of using list data_infos as in CustomDataset, this implementation of dataset
         # uses a proxy class with overriden __len__ and __getitem__; this proxy class
@@ -125,6 +128,17 @@ class OTEDataset(CustomDataset):
         self.data_infos = OTEDataset._DataInfoProxy(ote_dataset, self.CLASSES)
 
         self.pipeline = Compose(pipeline)
+
+    def __len__(self):
+        """Total number of samples of data."""
+
+        return len(self.data_infos)
+
+    def pre_pipeline(self, results):
+        """Prepare results dict for pipeline."""
+        results['seg_fields'] = []
+        if self.custom_classes:
+            results['label_map'] = self.label_map
 
     def prepare_train_img(self, idx: int) -> dict:
         """Get training data and annotations after pipeline.

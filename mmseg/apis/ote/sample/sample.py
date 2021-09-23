@@ -53,15 +53,13 @@ def parse_args():
 
 def main(args):
     logger.info('Initialize dataset')
-    dataset = MMDatasetAdapter(
-        train_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/training'),
-        train_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
-        val_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-        val_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-        test_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-        test_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-        dataset_storage=NullDatasetStorage
-    )
+    dataset = MMDatasetAdapter(train_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/training'),
+                               train_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
+                               val_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+                               val_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+                               test_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+                               test_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+                               dataset_storage=NullDatasetStorage)
 
     labels_schema = generate_label_schema(dataset.get_labels())
     labels_list = labels_schema.get_labels(include_empty=False)
@@ -79,7 +77,7 @@ def main(args):
     logger.info('Setup environment')
     params = create(hyper_parameters)
     logger.info('Set hyperparameters')
-    params.learning_parameters.num_iters = 1
+    params.learning_parameters.num_iters = 100
     environment = TaskEnvironment(model=None,
                                   hyper_parameters=params,
                                   label_schema=labels_schema,
@@ -90,27 +88,23 @@ def main(args):
     task_cls = get_task_class(task_impl_path)
     task = task_cls(task_environment=environment)
 
-    # logger.info('Train model')
-    # output_model = ModelEntity(
-    #     dataset,
-    #     environment.get_model_configuration(),
-    #     model_status=ModelStatus.NOT_READY)
-    # task.train(dataset, output_model)
-    #
-    # logger.info('Get predictions on the validation set')
-    # validation_dataset = dataset.get_subset(Subset.VALIDATION)
-    # predicted_validation_dataset = task.infer(
-    #     validation_dataset.with_empty_annotations(),
-    #     InferenceParameters(is_evaluation=True))
-    # resultset = ResultSetEntity(
-    #     model=output_model,
-    #     ground_truth_dataset=validation_dataset,
-    #     prediction_dataset=predicted_validation_dataset,
-    # )
-    # logger.info('Estimate quality on validation set')
-    # task.evaluate(resultset)
-    # logger.info(str(resultset.performance))
-    #
+    logger.info('Train model')
+    output_model = ModelEntity(dataset,
+                               environment.get_model_configuration(),
+                               model_status=ModelStatus.NOT_READY)
+    task.train(dataset, output_model)
+
+    logger.info('Get predictions on the validation set')
+    validation_dataset = dataset.get_subset(Subset.VALIDATION)
+    predicted_validation_dataset = task.infer(validation_dataset.with_empty_annotations(),
+                                              InferenceParameters(is_evaluation=True))
+    resultset = ResultSetEntity(model=output_model,
+                                ground_truth_dataset=validation_dataset,
+                                prediction_dataset=predicted_validation_dataset)
+    logger.info('Estimate quality on validation set')
+    task.evaluate(resultset)
+    logger.info(str(resultset.performance))
+
     # if args.export:
     #     logger.info('Export model')
     #     exported_model = ModelEntity(

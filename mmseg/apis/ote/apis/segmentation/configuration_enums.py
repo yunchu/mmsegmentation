@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 
-from .mmdataset import OTEDataset, get_annotation_mmseg_format
+from ote_sdk.configuration import ConfigurableEnum
 
-__all__ = [
-    "OTEDataset",
-    "get_annotation_mmseg_format",
-]
+
+class POTQuantizationPreset(ConfigurableEnum):
+    """
+    This Enum represents the quantization preset for post training optimization
+    """
+
+    PERFORMANCE = 'Performance'
+    MIXED = 'Mixed'
