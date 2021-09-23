@@ -6,9 +6,10 @@ import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import build_optimizer, build_runner
 
-from mmseg.core import DistEvalHook, EvalHook, DistOptimizerHook, load_checkpoint, IterBasedEMAHook
+from mmseg.core import DistEvalHook, EvalHook, CustomOptimizerHook, load_checkpoint, IterBasedEMAHook
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.utils import get_root_logger
+from mmseg.parallel import MMDataCPU
 from mmseg.models import build_params_manager
 
 
@@ -58,22 +59,25 @@ def train_segmentor(model,
         for ds in dataset
     ]
 
-    # put model on gpus
-    if distributed:
-        find_unused_parameters = cfg.get('find_unused_parameters', False)
-        # Sets the `find_unused_parameters` parameter in
-        # torch.nn.parallel.DistributedDataParallel
-        model = MMDistributedDataParallel(
-            model.cuda(),
-            device_ids=[torch.cuda.current_device()],
-            broadcast_buffers=False,
-            find_unused_parameters=find_unused_parameters
-        )
+    if torch.cuda.is_available():
+        # put model on gpus
+        if distributed:
+            find_unused_parameters = cfg.get('find_unused_parameters', False)
+            # Sets the `find_unused_parameters` parameter in
+            # torch.nn.parallel.DistributedDataParallel
+            model = MMDistributedDataParallel(
+                model.cuda(),
+                device_ids=[torch.cuda.current_device()],
+                broadcast_buffers=False,
+                find_unused_parameters=find_unused_parameters
+            )
+        else:
+            model = MMDataParallel(
+                model.cuda(cfg.gpu_ids[0]),
+                device_ids=cfg.gpu_ids
+            )
     else:
-        model = MMDataParallel(
-            model.cuda(cfg.gpu_ids[0]),
-            device_ids=cfg.gpu_ids
-        )
+        model = MMDataCPU(model)
 
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
@@ -98,8 +102,8 @@ def train_segmentor(model,
     )
 
     # prepare optimizer config
-    if distributed and 'type' not in cfg.optimizer_config:
-        optimizer_config = DistOptimizerHook(**cfg.optimizer_config)
+    if 'type' not in cfg.optimizer_config:
+        optimizer_config = CustomOptimizerHook(**cfg.optimizer_config)
     else:
         optimizer_config = cfg.optimizer_config
 

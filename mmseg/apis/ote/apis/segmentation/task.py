@@ -308,6 +308,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         mm_train_dataset = build_dataset(training_config.data.train)
         self._is_training = True
         self._model.train()
+
         train_segmentor(model=self._model, dataset=mm_train_dataset, cfg=training_config, validate=True)
 
         # Check for stop signal when training has stopped. If should_stop is true, training was cancelled and no new
