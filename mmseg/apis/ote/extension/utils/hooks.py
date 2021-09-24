@@ -15,13 +15,11 @@
 import logging
 import math
 import os
-from math import inf
 from collections import defaultdict
 
-from mmcv.runner.hooks import HOOKS, Hook, LoggerHook, LrUpdaterHook
+from mmcv.runner.hooks import HOOKS, Hook, LoggerHook
 from mmcv.runner import BaseRunner, EpochBasedRunner
 from mmcv.runner.dist_utils import master_only
-from mmcv.utils import print_log
 
 
 logger = logging.getLogger(__name__)

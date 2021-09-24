@@ -17,7 +17,6 @@ import copy
 import numpy as np
 
 from mmseg.datasets.builder import PIPELINES
-
 from ..datasets import get_annotation_mmseg_format
 
 
