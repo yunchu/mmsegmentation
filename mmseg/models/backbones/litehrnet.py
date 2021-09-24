@@ -204,12 +204,12 @@ class SpatialWeightingV2(nn.Module):
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
-        h, w = x.size()[-2:]
+        h, w = [int(_) for _ in x.size()[:-2]]
 
         v = self.v_conv(x)
         v = v.view(-1, self.internal_channels, h * w)
 
-        q = self.q_conv(x).view(-1, h * w, 1)
+        q = self.q_conv(x)
         q = self.global_avgpool(q)
         q = torch.softmax(q, dim=1)
         q = q.view(-1, 1, self.internal_channels)
