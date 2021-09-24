@@ -77,7 +77,7 @@ def main(args):
     logger.info('Setup environment')
     params = create(hyper_parameters)
     logger.info('Set hyperparameters')
-    params.learning_parameters.num_iters = 100
+    params.learning_parameters.num_iters = 1
     environment = TaskEnvironment(model=None,
                                   hyper_parameters=params,
                                   label_schema=labels_schema,

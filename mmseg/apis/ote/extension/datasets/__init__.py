@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 
-from .mmdataset import OTEDataset, get_annotation_mmseg_format
+from .mmdataset import (MMDatasetAdapter,
+                        get_label_ote_format,
+                        split_multiclass_annot,
+                        OTEDataset,
+                        get_annotation_mmseg_format)
 
 __all__ = [
+    'MMDatasetAdapter',
+    'get_label_ote_format',
+    'split_multiclass_annot',
     "OTEDataset",
     "get_annotation_mmseg_format",
 ]

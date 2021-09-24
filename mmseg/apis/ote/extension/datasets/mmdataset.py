@@ -220,14 +220,24 @@ def abs_path_if_valid(value):
         return None
 
 
-def split_multiclass_annot(annot):
-    unique_labels = np.unique(annot)
+def split_multiclass_annot(input_annot):
+    unique_labels = np.unique(input_annot)
 
     out_masks = []
     for label_id in unique_labels:
-        out_masks.append((label_id, annot == label_id))
+        out_masks.append((label_id, input_annot == label_id))
 
     return out_masks
+
+
+def get_label_ote_format(label, mask):
+    if label is None:
+        return None
+
+    mask = Image(name=None, numpy=mask, dataset_storage=NullDatasetStorage())
+    out_label = DenseLabel(label=label, mask=mask)
+
+    return out_label
 
 
 class MMDatasetAdapter(Dataset):
@@ -306,24 +316,15 @@ class MMDatasetAdapter(Dataset):
         return True
 
     def __getitem__(self, indx) -> DatasetItem:
-        def _create_gt_label(label_id, mask):
-            label = self.label_id_to_project_label(label_id)
-            if label is None:
-                return None
-
-            mask = Image(name=None, numpy=mask, dataset_storage=NullDatasetStorage())
-            out_label = DenseLabel(label=label, mask=mask)
-
-            return out_label
-
         def _create_gt_labels(enumerated_masks):
             out_labels = []
             for label_id, mask in enumerated_masks:
-                label = _create_gt_label(label_id, mask)
-                if label is None:
+                project_label = self.label_id_to_project_label(label_id)
+                out_label = get_label_ote_format(project_label, mask)
+                if out_label is None:
                     continue
 
-                out_labels.append(label)
+                out_labels.append(out_label)
 
             return out_labels
 

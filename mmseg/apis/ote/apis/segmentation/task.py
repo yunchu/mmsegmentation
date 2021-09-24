@@ -31,7 +31,7 @@ from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.annotation import Annotation
 from ote_sdk.entities.inference_parameters import InferenceParameters
-from ote_sdk.entities.label import ScoredLabel
+from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
@@ -49,6 +49,7 @@ from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 from sc_sdk.entities.datasets import Dataset
 
 from mmseg.apis import single_gpu_test, train_segmentor  # export_model
+from mmseg.apis.ote.extension.datasets import get_label_ote_format, split_multiclass_annot
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
                                                            prepare_for_training,
@@ -154,16 +155,30 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return model
 
+    @staticmethod
+    def _convert_labels(masks: List[np.ndarray], labels: List[LabelEntity]):
+        out_labels = []
+        for label_id, mask in masks:
+            matches = [label for label in labels if label.id == label_id]
+            if len(matches) == 0:
+                continue
+
+            out_label = get_label_ote_format(matches[0], mask)
+            if out_label is None:
+                continue
+
+            out_labels.append(out_label)
+
+        return out_labels
+
     def infer(self, dataset: Dataset, inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
         """ Analyzes a dataset using the latest inference model. """
 
         set_hyperparams(self._config, self._hyperparams)
 
         if inference_parameters is not None:
-            # is_evaluation = inference_parameters.is_evaluation
             update_progress_callback = inference_parameters.update_progress
         else:
-            # is_evaluation = False
             update_progress_callback = default_progress_callback
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
@@ -177,32 +192,14 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         pre_hook_handle = self._model.register_forward_pre_hook(pre_hook)
         hook_handle = self._model.register_forward_hook(hook)
 
-        # confidence_threshold = self._get_confidence_threshold(is_evaluation)
-        # logger.info(f'Confidence threshold {confidence_threshold}')
-
         prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, False)
 
-        # Loop over dataset again to assign predictions. Convert from MMDetection format to OTE format
+        # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
         for dataset_item, output in zip(dataset, prediction_results):
-            width = dataset_item.width
-            height = dataset_item.height
-
-            shapes = []
-            for label_idx, detections in enumerate(output):
-                for i in range(detections.shape[0]):
-                    probability = float(detections[i, 4])
-                    coords = detections[i, :4].astype(float).copy()
-                    coords /= np.array([width, height, width, height], dtype=float)
-                    coords = np.clip(coords, 0, 1)
-
-                    assigned_label = [ScoredLabel(self._labels[label_idx],
-                                                  probability=probability)]
-
-                    shapes.append(Annotation(
-                        Rectangle(x1=coords[0], y1=coords[1], x2=coords[2], y2=coords[3]),
-                        labels=assigned_label))
-
-            dataset_item.append_annotations(shapes)
+            predicted_masks = split_multiclass_annot(output)
+            dense_labels = self._convert_labels(predicted_masks, self._labels)
+            annotation = Annotation(Rectangle(x1=0, y1=0, x2=1, y2=1), labels=dense_labels)
+            dataset_item.append_annotations([annotation])
 
         pre_hook_handle.remove()
         hook_handle.remove()
@@ -211,7 +208,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
     @staticmethod
     def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: Dataset,
-                         eval: Optional[bool] = False, metric_name: Optional[str] = 'mIoU') -> Tuple[List, float]:
+                         eval: Optional[bool] = False, metric_name: Optional[str] = 'mDice') -> Tuple[List, float]:
         model.eval()
 
         test_config = prepare_for_testing(config, dataset)
@@ -244,32 +241,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                  evaluation_metric: Optional[str] = None):
         """ Computes performance on a resultset """
 
-        params = self._hyperparams
-        result_based_confidence_threshold = params.postprocessing.result_based_confidence_threshold
-
-        logger.info('Computing F-measure' +
-                    ' with auto threshold adjustment' if result_based_confidence_threshold else '')
-        f_measure_metrics = MetricsHelper.compute_f_measure(
-            output_result_set,
-            result_based_confidence_threshold,
-            False,
-            False
+        logger.info('Computing mDice')
+        m_dice_metrics = MetricsHelper.compute_dice_averaged_over_pixels(
+            output_result_set
         )
+        logger.info(f"mDice after evaluation: {m_dice_metrics.overall_dice.value}")
 
-        if output_result_set.purpose is ResultsetPurpose.EVALUATION:
-            # only set configurable params based on validation result set
-            if result_based_confidence_threshold:
-                best_confidence_threshold = f_measure_metrics.best_confidence_threshold.value
-                if best_confidence_threshold is not None:
-                    logger.info(f"Setting confidence_threshold to " f"{best_confidence_threshold} based on results")
-                    # params.postprocessing.confidence_threshold = best_confidence_threshold
-                else:
-                    raise ValueError(f"Cannot compute metrics: Invalid confidence threshold!")
-
-            # self._task_environment.set_configurable_parameters(params)
-        logger.info(f"F-measure after evaluation: {f_measure_metrics.f_measure.value}")
-
-        output_result_set.performance = f_measure_metrics.get_performance()
+        output_result_set.performance = m_dice_metrics.get_performance()
 
     def train(self, dataset: Dataset, output_model: ModelEntity, train_parameters: Optional[TrainParameters] = None):
         """ Trains a model on a dataset """
@@ -482,5 +460,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         """
         Remove model checkpoints and mmseg logs
         """
+
         if os.path.exists(self._scratch_space):
             shutil.rmtree(self._scratch_space, ignore_errors=False)
