@@ -148,7 +148,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             # Load all weights.
             logger.warning('load checkpoint')
-            load_checkpoint(model, init_from, map_location='cpu')
+            load_checkpoint(model, init_from, map_location='cpu', strict=True)
         else:
             logger.warning('build segmentor')
             model = build_segmentor(model_cfg)
@@ -263,6 +263,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         # Evaluate model performance before training.
         _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, True)
+        logger.info('INITIAL MODEL PERFORMANCE\n' + str(initial_performance))
 
         # Check for stop signal between pre-eval and training. If training is cancelled at this point,
         # old_model should be restored.
@@ -314,10 +315,12 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                 logger.info("Training finished, and it has an improved model")
             else:
                 logger.info("First training round, saving the model.")
-            # Add mAP metric and loss curves
-            performance = Performance(score=ScoreMetric(value=final_performance, name="mAP"),
+
+            # Add mDice metric and loss curves
+            performance = Performance(score=ScoreMetric(value=final_performance, name="mDice"),
                                       dashboard_metrics=training_metrics)
             logger.info('FINAL MODEL PERFORMANCE\n' + str(performance))
+
             self.save_model(output_model)
             output_model.performance = performance
             output_model.model_status = ModelStatus.SUCCESS
