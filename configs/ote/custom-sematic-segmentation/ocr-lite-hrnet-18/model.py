@@ -194,8 +194,8 @@ log_config = dict(
 # yapf:enable
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = None
-# load_from = '/media/experiments/segmentation/kvasir_seg/v77/iter_21000.pth'
+# load_from = None
+load_from = '/media/experiments/segmentation/kvasir_seg/v77/iter_21000.pth'
 resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True
