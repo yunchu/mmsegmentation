@@ -40,9 +40,9 @@ class OTESegmentationConfig(ModelConfig):
         description = header
 
         batch_size = configurable_integer(
-            default_value=5,
+            default_value=8,
             min_value=1,
-            max_value=512,
+            max_value=64,
             header="Batch size",
             description="The number of training samples seen in each iteration of training. Increasing this value "
             "improves training time and may make the training more stable. A larger batch size has higher "
@@ -62,8 +62,8 @@ class OTESegmentationConfig(ModelConfig):
         )
 
         learning_rate = configurable_float(
-            default_value=0.01,
-            min_value=1e-07,
+            default_value=1e-3,
+            min_value=1e-05,
             max_value=1e-01,
             header="Learning rate",
             description="Increasing this value will speed up training convergence but might make it unstable.",
@@ -73,7 +73,7 @@ class OTESegmentationConfig(ModelConfig):
         learning_rate_warmup_iters = configurable_integer(
             default_value=100,
             min_value=0,
-            max_value=10000,
+            max_value=2000,
             header="Number of iterations for learning rate warmup",
             description="",
             affects_outcome_of=ModelLifecycle.TRAINING

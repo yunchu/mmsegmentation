@@ -30,6 +30,7 @@ class EpochRunnerWithCancel(EpochBasedRunner):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.should_stop = False
         _, world_size = get_dist_info()
         self.distributed = True if world_size > 1 else False
@@ -79,6 +80,11 @@ class IterBasedRunnerWithCancel(IterBasedRunner):
     # TODO: Implement cancelling of training via keyboard interrupt signal, instead of should_stop
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.should_stop = False
+
     def main_loop(self, workflow, iter_loaders, **kwargs):
         while self.iter < self._max_iters:
             for i, flow in enumerate(workflow):
@@ -92,7 +98,9 @@ class IterBasedRunnerWithCancel(IterBasedRunner):
                 for _ in range(iters):
                     if mode == 'train' and self.iter >= self._max_iters:
                         break
+
                     iter_runner(iter_loaders[i], **kwargs)
+
                     if self.should_stop:
                         return
 
@@ -101,12 +109,10 @@ class IterBasedRunnerWithCancel(IterBasedRunner):
         assert mmcv.is_list_of(workflow, tuple)
         assert len(data_loaders) == len(workflow)
         if max_iters is not None:
-            warnings.warn(
-                'setting max_iters in run is deprecated, '
-                'please set max_iters in runner_config', DeprecationWarning)
+            warnings.warn('setting max_iters in run is deprecated, '
+                          'please set max_iters in runner_config', DeprecationWarning)
             self._max_iters = max_iters
-        assert self._max_iters is not None, (
-            'max_iters must be specified during instantiation')
+        assert self._max_iters is not None, 'max_iters must be specified during instantiation'
 
         work_dir = self.work_dir if self.work_dir is not None else 'NONE'
         self.logger.info('Start running, host: %s, work_dir: %s',

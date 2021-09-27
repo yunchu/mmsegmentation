@@ -34,19 +34,19 @@ from mmseg.datasets.pipelines import Compose
 
 def get_annotation_mmseg_format(dataset_item: DatasetItem, label_list: List[str]) -> dict:
     """
-    Function to convert a OTE annotation to mmdetection format. This is used both in the OTEDataset class defined in
+    Function to convert a OTE annotation to mmsegmentation format. This is used both in the OTEDataset class defined in
     this file as in the custom pipeline element 'LoadAnnotationFromOTEDataset'
 
     :param dataset_item: DatasetItem for which to get annotations
     :param label_list: List of label names in the project
-    :return dict: annotation information dict in mmdet format
+    :return dict: annotation information dict in mmseg format
     """
+
     width, height = dataset_item.width, dataset_item.height
     gt_seg_map = np.full((height, width), 255, dtype=np.uint8)
 
     for ann in dataset_item.get_annotations():
-        box = ann.shape
-        if not isinstance(box, Rectangle):
+        if not isinstance(ann.shape, Rectangle):
             continue
 
         labels = ann.get_labels(include_empty=False)

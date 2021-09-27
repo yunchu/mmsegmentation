@@ -2,10 +2,10 @@ _base_ = [
     './data_pipeline.py'
 ]
 
-# pre-trained params settings
-ignore_keys = [r'^backbone\.increase_modules\.', r'^backbone\.increase_modules\.',
-               r'^backbone\.downsample_modules\.', r'^backbone\.final_layer\.',
-               r'^head\.']
+# # pre-trained params settings
+# ignore_keys = [r'^backbone\.increase_modules\.', r'^backbone\.increase_modules\.',
+#                r'^backbone\.downsample_modules\.', r'^backbone\.final_layer\.',
+#                r'^head\.']
 
 # norm_cfg = dict(type='SyncBN', requires_grad=True)
 norm_cfg = dict(type='BN', requires_grad=True)
@@ -194,7 +194,7 @@ log_config = dict(
 # yapf:enable
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-load_from = None
+load_from = '/media/experiments/segmentation/kvasir_seg/v77/iter_21000.pth'
 resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True

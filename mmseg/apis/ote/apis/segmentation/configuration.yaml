@@ -4,13 +4,13 @@ id: ''
 learning_parameters:
   batch_size:
     affects_outcome_of: TRAINING
-    default_value: 5
+    default_value: 8
     description: The number of training samples seen in each iteration of training.
       Increasing this value improves training time and may make the training more
       stable. A larger batch size has higher memory requirements.
     editable: true
     header: Batch size
-    max_value: 512
+    max_value: 64
     min_value: 1
     type: INTEGER
     ui_rules:
@@ -18,7 +18,7 @@ learning_parameters:
       operator: AND
       rules: []
       type: UI_RULES
-    value: 5
+    value: 8
     visible_in_ui: true
     warning: Increasing this value may cause the system to use more memory than available,
       potentially causing out of memory errors, please update with caution.
@@ -26,7 +26,7 @@ learning_parameters:
   header: Learning Parameters
   learning_rate:
     affects_outcome_of: TRAINING
-    default_value: 0.01
+    default_value: 1.0e-03
     description: Increasing this value will speed up training convergence but might
       make it unstable.
     editable: true
@@ -39,7 +39,7 @@ learning_parameters:
       operator: AND
       rules: []
       type: UI_RULES
-    value: 0.01
+    value: 1.0e-03
     visible_in_ui: true
     warning: null
   learning_rate_warmup_iters:
