@@ -104,19 +104,22 @@ class OTESegmentationConfig(ModelConfig):
         header = string_attribute("Postprocessing")
         description = header
 
-        result_based_confidence_threshold = configurable_boolean(
-            default_value=True,
-            header="Result based confidence threshold",
-            description="Confidence threshold is derived from the results",
+        blur_strength = configurable_integer(
+            header="Blur strength",
+            description="With a higher value, the segmentation output will be smoother, but less accurate.",
+            default_value=1,
+            min_value=1,
+            max_value=25,
             affects_outcome_of=ModelLifecycle.INFERENCE
         )
 
-        confidence_threshold = configurable_float(
-            default_value=0.35,
-            min_value=0,
+        soft_threshold = configurable_float(
+            default_value=0.5,
+            header="Soft threshold",
+            description="The threshold to apply to the probability output of the model, for each pixel. A higher value "
+                        "means a stricter segmentation prediction.",
+            min_value=0.0,
             max_value=1,
-            header="Confidence threshold",
-            description="This threshold only takes effect if the threshold is not set based on the result.",
             affects_outcome_of=ModelLifecycle.INFERENCE
         )
 

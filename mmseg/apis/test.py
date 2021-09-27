@@ -37,7 +37,8 @@ def single_gpu_test(model,
                     out_dir=None,
                     efficient_test=False,
                     opacity=0.5,
-                    add_gt_borders=True):
+                    add_gt_borders=True,
+                    output_logits=False):
     """Test with single GPU.
 
     Args:
@@ -63,7 +64,9 @@ def single_gpu_test(model,
     progress_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, **data)
+            result = model(return_loss=False,
+                           output_logits=output_logits,
+                           **data)
 
         if show or out_dir:
             img_tensor = data['img'][0]

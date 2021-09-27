@@ -117,39 +117,42 @@ learning_parameters:
   visible_in_ui: true
 model_storage_id: ''
 postprocessing:
-  confidence_threshold:
+  description: Postprocessing
+  header: Postprocessing
+  blur_strength:
     affects_outcome_of: INFERENCE
-    default_value: 0.35
-    description: This threshold only takes effect if the threshold is not set based
-      on the result.
+    default_value: 1
+    description: With a higher value, the segmentation output will be smoother, but
+      less accurate.
     editable: true
-    header: Confidence threshold
-    max_value: 1
-    min_value: 0
+    header: Blur strength
+    max_value: 25
+    min_value: 1
     type: FLOAT
     ui_rules:
       action: DISABLE_EDITING
       operator: AND
       rules: []
       type: UI_RULES
-    value: 0.35
+    value: 1
     visible_in_ui: true
     warning: null
-  description: Postprocessing
-  header: Postprocessing
-  result_based_confidence_threshold:
+  soft_threshold:
     affects_outcome_of: INFERENCE
-    default_value: true
-    description: Confidence threshold is derived from the results
+    default_value: 0.5
+    description: The threshold to apply to the probability output of the model, for
+      each pixel. A higher value means a stricter segmentation prediction.
     editable: true
-    header: Result based confidence threshold
-    type: BOOLEAN
+    header: Soft threshold
+    max_value: 1.0
+    min_value: 0.0
+    type: FLOAT
     ui_rules:
       action: DISABLE_EDITING
       operator: AND
       rules: []
       type: UI_RULES
-    value: true
+    value: 0.5
     visible_in_ui: true
     warning: null
   type: PARAMETER_GROUP

@@ -22,20 +22,20 @@ import warnings
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
-import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
 from mmcv.utils import Config
 from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
+from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
+                                              create_annotation_from_segmentation_map)
 from ote_sdk.entities.annotation import Annotation
 from ote_sdk.entities.inference_parameters import InferenceParameters
-from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
-from ote_sdk.entities.resultset import ResultSetEntity, ResultsetPurpose
+from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
@@ -49,7 +49,6 @@ from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 from sc_sdk.entities.datasets import Dataset
 
 from mmseg.apis import single_gpu_test, train_segmentor  # export_model
-from mmseg.apis.ote.extension.datasets import get_label_ote_format, split_multiclass_annot
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
                                                            prepare_for_training,
@@ -155,22 +154,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return model
 
-    @staticmethod
-    def _convert_labels(masks: List[np.ndarray], labels: List[LabelEntity]):
-        out_labels = []
-        for label_id, mask in masks:
-            matches = [label for label in labels if label.id == label_id]
-            if len(matches) == 0:
-                continue
-
-            out_label = get_label_ote_format(matches[0], mask)
-            if out_label is None:
-                continue
-
-            out_labels.append(out_label)
-
-        return out_labels
-
     def infer(self, dataset: Dataset, inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
         """ Analyzes a dataset using the latest inference model. """
 
@@ -192,14 +175,28 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         pre_hook_handle = self._model.register_forward_pre_hook(pre_hook)
         hook_handle = self._model.register_forward_hook(hook)
 
-        prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, False)
+        prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, False,
+                                                      output_logits=True)
+
+        label_dictionary = {
+            i: self._labels[i - 1] for i in range(1, len(self._labels) + 1)
+        }
 
         # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
-        for dataset_item, output in zip(dataset, prediction_results):
-            predicted_masks = split_multiclass_annot(output)
-            dense_labels = self._convert_labels(predicted_masks, self._labels)
-            annotation = Annotation(Rectangle(x1=0, y1=0, x2=1, y2=1), labels=dense_labels)
-            dataset_item.append_annotations([annotation])
+        for dataset_item, soft_prediction in zip(dataset, prediction_results):
+            hard_prediction = create_hard_prediction_from_soft_prediction(
+                soft_prediction=soft_prediction,
+                soft_threshold=self._hyperparams.postprocessing.soft_threshold,
+                blur_strength=self._hyperparams.postprocessing.blur_strength,
+            )
+
+            annotations = create_annotation_from_segmentation_map(
+                hard_prediction=hard_prediction,
+                soft_prediction=soft_prediction,
+                label_map=label_dictionary,
+            )
+
+            dataset_item.append_annotations(annotations=annotations)
 
         pre_hook_handle.remove()
         hook_handle.remove()
@@ -208,7 +205,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
     @staticmethod
     def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: Dataset,
-                         eval: Optional[bool] = False, metric_name: Optional[str] = 'mDice') -> Tuple[List, float]:
+                         eval: Optional[bool] = False, metric_name: Optional[str] = 'mDice',
+                         output_logits: bool = False) -> Tuple[List, float]:
         model.eval()
 
         test_config = prepare_for_testing(config, dataset)
@@ -228,10 +226,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             eval_model = MMDataCPU(model)
 
         # Use a single gpu for testing. Set in both mm_val_dataloader and eval_model
-        eval_predictions = single_gpu_test(eval_model, mm_val_dataloader, show=False)
+        eval_predictions = single_gpu_test(eval_model, mm_val_dataloader,
+                                           output_logits=output_logits,
+                                           show=False)
 
         metric = None
         if eval:
+            assert not output_logits
             metric = mm_val_dataset.evaluate(eval_predictions, metric=metric_name)[metric_name]
 
         return eval_predictions, metric

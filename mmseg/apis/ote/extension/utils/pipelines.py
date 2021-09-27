@@ -79,17 +79,11 @@ class LoadAnnotationFromOTEDataset:
     def __init__(self):
         pass
 
-    @staticmethod
-    def _load_bboxes(results, ann_info):
-        results['bbox_fields'].append('gt_bboxes')
-        results['gt_bboxes'] = copy.deepcopy(ann_info['bboxes'])
-        return results
-
     def __call__(self, results):
         dataset_item = results['dataset_item']
-        label_list = results['ann_info']['label_list']
+        labels = results['ann_info']['labels']
 
-        ann_info = get_annotation_mmseg_format(dataset_item, label_list)
+        ann_info = get_annotation_mmseg_format(dataset_item, labels)
 
         results['gt_semantic_seg'] = ann_info['gt_semantic_seg']
         results['seg_fields'].append('gt_semantic_seg')

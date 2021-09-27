@@ -13,15 +13,13 @@
 # and limitations under the License.
 
 from .mmdataset import (MMDatasetAdapter,
-                        get_label_ote_format,
-                        split_multiclass_annot,
+                        create_annotation_from_hard_seg_map,
                         OTEDataset,
                         get_annotation_mmseg_format)
 
 __all__ = [
     'MMDatasetAdapter',
-    'get_label_ote_format',
-    'split_multiclass_annot',
+    'create_annotation_from_hard_seg_map',
     "OTEDataset",
     "get_annotation_mmseg_format",
 ]
