@@ -7,8 +7,7 @@ _base_ = [
 #                r'^backbone\.downsample_modules\.', r'^backbone\.final_layer\.',
 #                r'^head\.']
 
-# norm_cfg = dict(type='SyncBN', requires_grad=True)
-norm_cfg = dict(type='BN', requires_grad=True)
+norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     type='CascadeEncoderDecoder',
     num_stages=2,

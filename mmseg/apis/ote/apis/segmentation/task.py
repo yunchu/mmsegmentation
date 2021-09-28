@@ -63,7 +63,6 @@ logger = logging.getLogger(__name__)
 
 
 class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
-
     task_environment: TaskEnvironment
 
     def __init__(self, task_environment: TaskEnvironment):
@@ -88,7 +87,10 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         base_dir = os.path.abspath(os.path.dirname(template_file_path))
         config_file_path = os.path.join(base_dir, self._hyperparams.algo_backend.model)
         self._config = Config.fromfile(config_file_path)
-        patch_config(self._config, self._scratch_space, self._labels, random_seed=42)
+
+        distributed = torch.distributed.is_initialized()
+        patch_config(self._config, self._scratch_space, self._labels,
+                     random_seed=42, distributed=distributed)
         set_hyperparams(self._config, self._hyperparams)
 
         # Create and initialize PyTorch model.
@@ -146,7 +148,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             # Load all weights.
             logger.warning('load checkpoint')
-            load_checkpoint(model, init_from, map_location='cpu', strict=True)
+            load_checkpoint(model, init_from, map_location='cpu', strict=False)
         else:
             logger.warning('build segmentor')
             model = build_segmentor(model_cfg)
@@ -242,9 +244,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return eval_predictions, metric
 
-    def evaluate(self,
-                 output_result_set: ResultSetEntity,
-                 evaluation_metric: Optional[str] = None):
+    def evaluate(self, output_result_set: ResultSetEntity, evaluation_metric: Optional[str] = None):
         """ Computes performance on a resultset """
 
         logger.info('Computing mDice')
@@ -414,9 +414,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             logger.warning(f"Done unloading. "
                            f"Torch is still occupying {torch.cuda.memory_allocated()} bytes of GPU memory")
 
-    def export(self,
-               export_type: ExportType,
-               output_model: ModelEntity):
+    def export(self, export_type: ExportType, output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
 
         optimized_model_precision = ModelPrecision.FP32

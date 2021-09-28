@@ -16,7 +16,6 @@
 import copy
 import glob
 import logging
-import math
 import os
 import tempfile
 from collections import defaultdict
@@ -37,7 +36,11 @@ def is_epoch_based_runner(runner_config: ConfigDict):
     return 'Epoch' in runner_config.type
 
 
-def patch_config(config: Config, work_dir: str, labels: List[LabelEntity], random_seed: Optional[int] = None):
+def patch_config(config: Config,
+                 work_dir: str,
+                 labels: List[LabelEntity],
+                 random_seed: Optional[int] = None,
+                 distributed=False):
     # Set runner if not defined.
     if 'runner' not in config:
         config.runner = {'type': 'IterBasedRunner'}
@@ -93,6 +96,21 @@ def patch_config(config: Config, work_dir: str, labels: List[LabelEntity], rando
     label_names = [label.name for label in labels]
     set_data_classes(config, label_names)
 
+    if not distributed:
+        norm_cfg = {'type': 'BN', 'requires_grad': True}
+
+        config.model.backbone.norm_cfg = norm_cfg
+        for head_type in ('decode_head', 'auxiliary_head'):
+            head = config.model.get(head_type, None)
+            if head is None:
+                continue
+
+            if isinstance(head, (tuple, list)):
+                for sub_head in head:
+                    sub_head.norm_cfg = norm_cfg
+            else:
+                head.norm_cfg = norm_cfg
+
     config.gpu_ids = range(1)
     config.work_dir = work_dir
     config.seed = random_seed
@@ -112,7 +130,6 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
 
 def prepare_for_testing(config: Config, dataset: Dataset) -> Config:
     config = copy.deepcopy(config)
-    # FIXME. Should working directories be modified here?
     config.data.test.ote_dataset = dataset
     return config
 
