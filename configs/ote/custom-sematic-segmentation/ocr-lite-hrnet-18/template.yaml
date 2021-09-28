@@ -31,3 +31,4 @@ hyper_parameters:
 max_nodes: 1
 training_targets:
   - GPU
+  - CPU

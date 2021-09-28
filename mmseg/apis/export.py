@@ -171,7 +171,7 @@ def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None,
                    f'--mean_values="{mean_values}" ' \
                    f'--scale_values="{scale_values}" ' \
                    f'--output_dir="{output_dir_path}" ' \
-                   f'--output="{output_names}"' \
+                   f'--output="{output_names}" ' \
                    f'--data_type {precision}'
 
     assert input_format.lower() in ['bgr', 'rgb']
