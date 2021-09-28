@@ -44,6 +44,7 @@ def get_annotation_mmseg_format(dataset_item: DatasetItem, labels: List[LabelEnt
     :param labels: List of labels in the project
     :return dict: annotation information dict in mmseg format
     """
+
     gt_seg_map = mask_from_dataset_item(dataset_item, labels)
     gt_seg_map = gt_seg_map.squeeze(2).astype(np.uint8) - 1  # replace the ignore label from 0 to 255
 
@@ -358,7 +359,11 @@ class MMDatasetAdapter(Dataset):
         return len(self.dataset)
 
     def get_labels(self) -> list:
-        return self.labels
+        # TODO: Fix the logic: return List[str] or List[LabelEntity] only
+        if self.project_labels is None:
+            return self.labels
+        else:
+            return self.project_labels
 
     def get_subset(self, subset: Subset) -> Dataset:
         dataset = deepcopy(self)

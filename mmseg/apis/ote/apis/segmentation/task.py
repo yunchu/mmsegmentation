@@ -30,14 +30,13 @@ from mmcv.utils import Config
 from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
-                                              create_annotation_from_segmentation_map)
-from ote_sdk.entities.annotation import Annotation
+                                              create_annotation_from_segmentation_map, mask_from_dataset_item)
+from ote_sdk.entities.label import ScoredLabel
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
 from ote_sdk.entities.resultset import ResultSetEntity
-from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.entities.train_parameters import TrainParameters, default_progress_callback
@@ -180,7 +179,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                                                       output_logits=True)
 
         label_dictionary = {
-            i: self._labels[i - 1] for i in range(1, len(self._labels) + 1)
+            i + 1: self._labels[i] for i in range(len(self._labels))
         }
 
         # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
@@ -188,8 +187,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             soft_prediction = np.transpose(soft_prediction, axes=(1, 2, 0))
             pred_size = soft_prediction.shape[:2]
 
-            extra_prediction = np.concatenate([soft_prediction,
-                                               np.zeros(pred_size + (1,), dtype=soft_prediction.dtype)], axis=2)
+            extra_prediction = np.concatenate([np.zeros(pred_size + (1,), dtype=soft_prediction.dtype),
+                                               soft_prediction], axis=2)
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
                 soft_prediction=extra_prediction,
@@ -383,25 +382,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             output.append(MetricsGroup(metrics=[metric_curve], visualization_info=visualization_info))
 
         return output
-
-    def _get_confidence_threshold(self, is_evaluation: bool) -> float:
-        """
-        Retrieves the threshold for confidence from the configurable parameters. If
-        is_evaluation is True, the confidence threshold is set to 0 in order to compute optimum values
-        for the thresholds.
-
-        :param is_evaluation: bool, True in case analysis is requested for evaluation
-
-        :return confidence_threshold: float, threshold for prediction confidence
-        """
-
-        hyperparams = self._hyperparams
-        confidence_threshold = hyperparams.postprocessing.confidence_threshold
-        result_based_confidence_threshold = hyperparams.postprocessing.result_based_confidence_threshold
-        if is_evaluation:
-            if result_based_confidence_threshold:
-                confidence_threshold = 0.0
-        return confidence_threshold
 
     @staticmethod
     def _is_docker():
