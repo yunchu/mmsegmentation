@@ -110,47 +110,47 @@ def main(args):
                                      model_status=ModelStatus.NOT_READY)
         task.export(ExportType.OPENVINO, exported_model)
 
-        logger.info('Create OpenVINO Task')
-        environment.model = exported_model
-        openvino_task_impl_path = model_template.entrypoints.openvino
-        openvino_task_cls = get_task_class(openvino_task_impl_path)
-        openvino_task = openvino_task_cls(environment)
-
-        logger.info('Get predictions on the validation set')
-        predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
-                                                           InferenceParameters(is_evaluation=True))
-        resultset = ResultSetEntity(model=output_model,
-                                    ground_truth_dataset=validation_dataset,
-                                    prediction_dataset=predicted_validation_dataset)
-        logger.info('Estimate quality on validation set')
-        performance = openvino_task.evaluate(resultset)
-        logger.info(str(performance))
-
-        logger.info('Run POT optimization')
-        optimized_model = ModelEntity(dataset,
-                                      environment.get_model_configuration(),
-                                      optimization_type=ModelOptimizationType.POT,
-                                      optimization_methods=OptimizationMethod.QUANTIZATION,
-                                      optimization_objectives={},
-                                      precision=[ModelPrecision.INT8],
-                                      target_device=TargetDevice.CPU,
-                                      performance_improvement={},
-                                      model_size_reduction=1.0,
-                                      model_status=ModelStatus.NOT_READY)
-        openvino_task.optimize(OptimizationType.POT,
-                               dataset.get_subset(Subset.TRAINING),
-                               optimized_model,
-                               OptimizationParameters())
-
-        logger.info('Get predictions on the validation set')
-        predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
-                                                           InferenceParameters(is_evaluation=True))
-        resultset = ResultSetEntity(model=optimized_model,
-                                    ground_truth_dataset=validation_dataset,
-                                    prediction_dataset=predicted_validation_dataset)
-        logger.info('Performance of optimized model:')
-        performance = openvino_task.evaluate(resultset)
-        logger.info(str(performance))
+        # logger.info('Create OpenVINO Task')
+        # environment.model = exported_model
+        # openvino_task_impl_path = model_template.entrypoints.openvino
+        # openvino_task_cls = get_task_class(openvino_task_impl_path)
+        # openvino_task = openvino_task_cls(environment)
+        #
+        # logger.info('Get predictions on the validation set')
+        # predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
+        #                                                    InferenceParameters(is_evaluation=True))
+        # resultset = ResultSetEntity(model=output_model,
+        #                             ground_truth_dataset=validation_dataset,
+        #                             prediction_dataset=predicted_validation_dataset)
+        # logger.info('Estimate quality on validation set')
+        # performance = openvino_task.evaluate(resultset)
+        # logger.info(str(performance))
+        #
+        # logger.info('Run POT optimization')
+        # optimized_model = ModelEntity(dataset,
+        #                               environment.get_model_configuration(),
+        #                               optimization_type=ModelOptimizationType.POT,
+        #                               optimization_methods=OptimizationMethod.QUANTIZATION,
+        #                               optimization_objectives={},
+        #                               precision=[ModelPrecision.INT8],
+        #                               target_device=TargetDevice.CPU,
+        #                               performance_improvement={},
+        #                               model_size_reduction=1.0,
+        #                               model_status=ModelStatus.NOT_READY)
+        # openvino_task.optimize(OptimizationType.POT,
+        #                        dataset.get_subset(Subset.TRAINING),
+        #                        optimized_model,
+        #                        OptimizationParameters())
+        #
+        # logger.info('Get predictions on the validation set')
+        # predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
+        #                                                    InferenceParameters(is_evaluation=True))
+        # resultset = ResultSetEntity(model=optimized_model,
+        #                             ground_truth_dataset=validation_dataset,
+        #                             prediction_dataset=predicted_validation_dataset)
+        # logger.info('Performance of optimized model:')
+        # performance = openvino_task.evaluate(resultset)
+        # logger.info(str(performance))
 
 
 if __name__ == '__main__':

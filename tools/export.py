@@ -181,7 +181,11 @@ def pytorch2onnx(model,
         onnx.checker.check_model(onnx_model)
 
 
-def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None, input_format='rgb'):
+def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None,
+                       input_format='rgb', precision='FP32'):
+    cfg.model.pretrained = None
+    cfg.data.test.test_mode = True
+
     onnx_model = onnx.load(onnx_model_path)
 
     output_names = set(out.name for out in onnx_model.graph.output)
@@ -200,7 +204,8 @@ def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None, 
                    f'--mean_values="{mean_values}" ' \
                    f'--scale_values="{scale_values}" ' \
                    f'--output_dir="{output_dir_path}" ' \
-                   f'--output="{output_names}"'
+                   f'--output="{output_names}"' \
+                   f'--data_type {precision}'
 
     assert input_format.lower() in ['bgr', 'rgb']
 
@@ -288,7 +293,13 @@ def main(args):
     )
 
     if args.target == 'openvino':
-        export_to_openvino(cfg, onnx_model_path, args.output_dir, input_shape, args.input_format)
+        export_to_openvino(
+            cfg,
+            onnx_model_path,
+            args.output_dir,
+            input_shape,
+            args.input_format
+        )
 
 
 if __name__ == '__main__':
