@@ -30,8 +30,7 @@ from mmcv.utils import Config
 from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
-                                              create_annotation_from_segmentation_map, mask_from_dataset_item)
-from ote_sdk.entities.label import ScoredLabel
+                                              create_annotation_from_segmentation_map)
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
@@ -48,7 +47,7 @@ from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 from sc_sdk.entities.datasets import Dataset
 
-from mmseg.apis import single_gpu_test, train_segmentor  # export_model
+from mmseg.apis import single_gpu_test, train_segmentor, export_model
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
                                                            prepare_for_training,
@@ -419,22 +418,31 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                export_type: ExportType,
                output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
+
         optimized_model_precision = ModelPrecision.FP32
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = ModelOptimizationType.MO
+
         with tempfile.TemporaryDirectory() as tempdir:
             optimized_model_dir = os.path.join(tempdir, "export")
             logger.info(f'Optimized model will be temporarily saved to "{optimized_model_dir}"')
             os.makedirs(optimized_model_dir, exist_ok=True)
+
             try:
                 from torch.jit._trace import TracerWarning
                 warnings.filterwarnings("ignore", category=TracerWarning)
+
                 if torch.cuda.is_available():
                     model = self._model.cuda(self._config.gpu_ids[0])
                 else:
                     model = self._model.cpu()
-                export_model(model, self._config, tempdir,
-                             target='openvino', precision=optimized_model_precision.name)
+
+                export_model(model,
+                             self._config,
+                             tempdir,
+                             target='openvino',
+                             precision=optimized_model_precision.name)
+
                 bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
                 xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]
                 with open(os.path.join(tempdir, bin_file), "rb") as f:
