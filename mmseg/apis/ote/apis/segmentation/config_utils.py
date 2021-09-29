@@ -107,6 +107,8 @@ def patch_config(config: Config,
 
 def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
     config.optimizer.lr = float(hyperparams.learning_parameters.learning_rate)
+    config.params_config.iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
+    config.lr_config.fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
     config.lr_config.warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
     config.data.samples_per_gpu = int(hyperparams.learning_parameters.batch_size)
     config.data.workers_per_gpu = int(hyperparams.learning_parameters.num_workers)

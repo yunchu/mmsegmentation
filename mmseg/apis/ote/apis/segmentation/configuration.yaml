@@ -42,13 +42,30 @@ learning_parameters:
     value: 1.0e-03
     visible_in_ui: true
     warning: null
+  learning_rate_fixed_iters:
+    affects_outcome_of: TRAINING
+    default_value: 100
+    description: ''
+    editable: true
+    header: Number of iterations for fixed learning rate
+    max_value: 5000
+    min_value: 0
+    type: INTEGER
+    ui_rules:
+      action: DISABLE_EDITING
+      operator: AND
+      rules: []
+      type: UI_RULES
+    value: 100
+    visible_in_ui: true
+    warning: null
   learning_rate_warmup_iters:
     affects_outcome_of: TRAINING
     default_value: 100
     description: ''
     editable: true
     header: Number of iterations for learning rate warmup
-    max_value: 10000
+    max_value: 5000
     min_value: 0
     type: INTEGER
     ui_rules:
