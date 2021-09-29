@@ -128,7 +128,7 @@ fi
 
 # Install other requirements.
 cat requirements.txt | xargs -n 1 -L 1 pip install --no-cache -c ${CONSTRAINTS_FILE} || exit 1
-cat openvino-requirements.txt | xargs -n 1 -L 1 pip install --no-cache -c ${CONSTRAINTS_FILE} || exit 1
+# cat openvino-requirements.txt | xargs -n 1 -L 1 pip install --no-cache -c ${CONSTRAINTS_FILE} || exit 1
 
 pip install -e . -c ${CONSTRAINTS_FILE} || exit 1
 MMSEGMENTATION_DIR=`realpath .`
