@@ -95,21 +95,10 @@ def patch_config(config: Config,
 
     label_names = [label.name for label in labels]
     set_data_classes(config, label_names)
+    set_num_classes(config, len(labels))
 
-    if not distributed:
-        norm_cfg = {'type': 'BN', 'requires_grad': True}
-
-        config.model.backbone.norm_cfg = norm_cfg
-        for head_type in ('decode_head', 'auxiliary_head'):
-            head = config.model.get(head_type, None)
-            if head is None:
-                continue
-
-            if isinstance(head, (tuple, list)):
-                for sub_head in head:
-                    sub_head.norm_cfg = norm_cfg
-            else:
-                head.norm_cfg = norm_cfg
+    set_distributed_mode(config, distributed)
+    remove_from_config(config, 'norm_cfg')
 
     config.gpu_ids = range(1)
     config.work_dir = work_dir
@@ -205,6 +194,31 @@ def prepare_work_dir(config: Config) -> str:
     return train_round_checkpoint_dir
 
 
+def set_distributed_mode(config: Config, distributed: bool):
+    if distributed:
+        return
+
+    norm_cfg = {'type': 'BN', 'requires_grad': True}
+
+    def _replace_syncbn(_node, _norm_cfg):
+        if _node.norm_cfg.type != 'SyncBN':
+            return
+
+        _node.norm_cfg = _norm_cfg
+
+    config.model.backbone.norm_cfg = norm_cfg
+    for head_type in ('decode_head', 'auxiliary_head'):
+        head = config.model.get(head_type, None)
+        if head is None:
+            continue
+
+        if isinstance(head, (tuple, list)):
+            for sub_head in head:
+                _replace_syncbn(sub_head, norm_cfg)
+        else:
+            _replace_syncbn(head, norm_cfg)
+
+
 def set_data_classes(config: Config, label_names: List[str]):
     # Save labels in data configs.
     for subset in ('train', 'val', 'test'):
@@ -214,6 +228,21 @@ def set_data_classes(config: Config, label_names: List[str]):
         else:
             cfg.classes = label_names
         config.data[subset].classes = label_names
+
+
+def set_num_classes(config: Config, num_classes: int):
+    assert num_classes > 1
+
+    for head_type in ('decode_head', 'auxiliary_head'):
+        head = config.model.get(head_type, None)
+        if head is None:
+            continue
+
+        if isinstance(head, (tuple, list)):
+            for sub_head in head:
+                sub_head.num_classes = num_classes
+        else:
+            head.num_classes = num_classes
 
 
 def patch_datasets(config: Config):
