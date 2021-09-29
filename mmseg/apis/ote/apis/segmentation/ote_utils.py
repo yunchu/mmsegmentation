@@ -66,12 +66,12 @@ class ColorPalette:
         return len(self.palette)
 
 
-def generate_label_schema(enumerated_label_names, ignore_name="Ignore"):
-    num_label_names = len(enumerated_label_names)
+def generate_label_schema(label_names, ignore_name="Ignore"):
+    num_label_names = len(label_names)
     colors = ColorPalette(num_label_names) if num_label_names > 0 else []
 
     not_empty_labels, empty_label = [], None
-    for label_id, name in enumerated_label_names:
+    for label_id, name in enumerate(label_names):
         name = name.capitalize()
         if name == ignore_name:
             empty_label = LabelEntity(

@@ -215,7 +215,7 @@ def get_classes_from_annotation(annot_path):
         content = json.load(input_stream)
         labels_map = content['labels_map']
 
-        categories = [(int(v['id']), v['name']) for v in labels_map]
+        categories = [v['name'] for v in sorted(labels_map, key=lambda tup: int(tup['id']))]
 
     return categories
 
