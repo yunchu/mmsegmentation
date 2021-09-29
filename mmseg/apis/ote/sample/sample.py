@@ -51,12 +51,12 @@ def parse_args():
 
 def main(args):
     logger.info('Initialize dataset')
-    dataset = MMDatasetAdapter(train_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/training'),
-                               train_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
-                               val_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-                               val_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-                               test_img_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-                               test_ann_dir=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+    dataset = MMDatasetAdapter(train_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
+                               train_data_root=osp.join(args.data_dir, 'kvasir_seg/images/training'),
+                               val_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+                               val_data_root=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+                               test_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+                               test_data_root=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
                                dataset_storage=NullDatasetStorage)
 
     labels_schema = generate_label_schema(dataset.get_labels())

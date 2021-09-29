@@ -274,24 +274,24 @@ def create_annotation_from_hard_seg_map(hard_seg_map: np.ndarray, labels: List[L
 
 class MMDatasetAdapter(Dataset):
     def __init__(self,
-                 train_img_dir=None,
-                 train_ann_dir=None,
-                 val_img_dir=None,
-                 val_ann_dir=None,
-                 test_img_dir=None,
-                 test_ann_dir=None,
+                 train_ann_file=None,
+                 train_data_root=None,
+                 val_ann_file=None,
+                 val_data_root=None,
+                 test_ann_file=None,
+                 test_data_root=None,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.img_dirs = {
-            Subset.TRAINING: abs_path_if_valid(train_img_dir),
-            Subset.VALIDATION: abs_path_if_valid(val_img_dir),
-            Subset.TESTING: abs_path_if_valid(test_img_dir),
+            Subset.TRAINING: abs_path_if_valid(train_data_root),
+            Subset.VALIDATION: abs_path_if_valid(val_data_root),
+            Subset.TESTING: abs_path_if_valid(test_data_root),
         }
         self.ann_dirs = {
-            Subset.TRAINING: abs_path_if_valid(train_ann_dir),
-            Subset.VALIDATION: abs_path_if_valid(val_ann_dir),
-            Subset.TESTING: abs_path_if_valid(test_ann_dir),
+            Subset.TRAINING: abs_path_if_valid(train_ann_file),
+            Subset.VALIDATION: abs_path_if_valid(val_ann_file),
+            Subset.TESTING: abs_path_if_valid(test_ann_file),
         }
 
         self.labels = self.load_labels_from_annotation(self.ann_dirs)
