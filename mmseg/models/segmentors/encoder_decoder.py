@@ -94,6 +94,11 @@ class EncoderDecoder(BaseSegmentor):
         x = self.extract_feat(img)
 
         out = self._decode_head_forward_test(x, img_metas)
+
+        out_scale = self.test_cfg.get('output_scale', None)
+        if out_scale is not None and not self.training:
+            out = out_scale * out
+
         out = resize(
             input=out,
             size=img.shape[2:],

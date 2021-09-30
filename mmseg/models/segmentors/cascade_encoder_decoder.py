@@ -74,6 +74,10 @@ class CascadeEncoderDecoder(EncoderDecoder):
         for i in range(1, self.num_stages):
             out = self.decode_head[i].forward_test(x, out, img_metas, self.test_cfg)
 
+        out_scale = self.test_cfg.get('output_scale', None)
+        if out_scale is not None and not self.training:
+            out = out_scale * out
+
         out = resize(
             input=out,
             size=img.shape[2:],

@@ -125,7 +125,8 @@ model = dict(
         mix_loss=dict(enable=False, weight=0.1)
     ),
     test_cfg=dict(
-        mode='whole'
+        mode='whole',
+        output_scale=5.0,
     ),
 )
 
