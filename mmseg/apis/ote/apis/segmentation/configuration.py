@@ -127,7 +127,7 @@ class OTESegmentationConfig(ModelConfig):
             description="The threshold to apply to the probability output of the model, for each pixel. A higher value "
                         "means a stricter segmentation prediction.",
             min_value=0.0,
-            max_value=1,
+            max_value=1.0,
             affects_outcome_of=ModelLifecycle.INFERENCE
         )
 

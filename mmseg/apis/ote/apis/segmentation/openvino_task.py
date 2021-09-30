@@ -21,14 +21,15 @@ from typing import Any, Dict, Tuple, List, Optional, Union
 import cv2
 import numpy as np
 
-from ote_sdk.entities.annotation import Annotation, AnnotationSceneKind
+from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
+                                              create_annotation_from_segmentation_map, mask_from_dataset_item)
+from ote_sdk.entities.annotation import AnnotationSceneKind
 from ote_sdk.entities.id import ID
 from ote_sdk.entities.inference_parameters import InferenceParameters
-from ote_sdk.entities.label import ScoredLabel, LabelEntity
+from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.model import ModelStatus, ModelEntity
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
-from ote_sdk.entities.shapes.rectangle import Rectangle
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.exportable_code.inference import BaseOpenVINOInferencer
@@ -63,27 +64,6 @@ def get_output(net, outputs, name):
     return outputs[key]
 
 
-def extract_detections(output, net, input_size):
-    if 'detection_out' in output:
-        detection_out = output['detection_out']
-        output['labels'] = detection_out[0, 0, :, 1].astype(np.int32)
-        output['boxes'] = detection_out[0, 0, :, 3:] # * np.tile(input_size, 2)
-        output['boxes'] = np.concatenate((output['boxes'], detection_out[0, 0, :, 2:3]), axis=1)
-        del output['detection_out']
-        return output
-
-    outs = output
-    output = {
-        'labels': get_output(net, outs, 'labels'),
-        'boxes': get_output(net, outs, 'boxes')
-    }
-    valid_detections_mask = output['labels'] >= 0
-    output['labels'] = output['labels'][valid_detections_mask]
-    output['boxes'] = output['boxes'][valid_detections_mask]
-    output['boxes'][:, :4] /= np.tile(input_size, 2)[None]
-    return output
-
-
 class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
     def __init__(
         self,
@@ -111,7 +91,8 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
         self.n, self.c, self.h, self.w = self.net.input_info[self.input_blob_name].tensor_desc.dims
         self.keep_aspect_ratio_resize = False
         self.pad_value = 0
-        # self.confidence_threshold = float(hparams.postprocessing.confidence_threshold)
+        self.soft_threshold = float(hparams.postprocessing.soft_threshold)
+        self.blur_strength = int(hparams.postprocessing.blur_strength)
 
     @staticmethod
     def resize_image(image: np.ndarray, size: Tuple[int], keep_aspect_ratio: bool = False) -> np.ndarray:
@@ -130,47 +111,46 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
 
         h, w = resized_image.shape[:2]
         if h != self.h or w != self.w:
-            resized_image = np.pad(resized_image, ((0, self.h - h), (0, self.w - w), (0, 0)),
-                                   mode='constant', constant_values=self.pad_value)
-        # resized_image = self.input_transform(resized_image)
+            resized_image = np.pad(resized_image,
+                                   ((0, self.h - h), (0, self.w - w), (0, 0)),
+                                   mode='constant',
+                                   constant_values=self.pad_value)
+
         resized_image = resized_image.transpose((2, 0, 1))  # Change data layout from HWC to CHW
         resized_image = resized_image.reshape((self.n, self.c, self.h, self.w))
         dict_inputs = {self.input_blob_name: resized_image}
+
         return dict_inputs, meta
 
     def post_process(self, prediction: Dict[str, np.ndarray], metadata: Dict[str, Any]) -> AnnotationScene:
-        detections = extract_detections(prediction, self.net, (self.w, self.h))
-        scores = detections['boxes'][:, 4]
-        boxes = detections['boxes'][:, :4]
-        labels = detections['labels']
+        pred_class_maps = prediction['output']
+        assert pred_class_maps.shape[0] == 1
+        pred_class_map = pred_class_maps[0]
 
-        resized_image_shape = metadata['resized_shape']
-        scale_x = self.w / resized_image_shape[1]
-        scale_y = self.h / resized_image_shape[0]
-        boxes[:, :4] *= np.array([scale_x, scale_y, scale_x, scale_y], dtype=boxes.dtype)
+        soft_prediction = np.transpose(pred_class_map, axes=(1, 2, 0))
+        pred_size = soft_prediction.shape[:2]
 
-        areas = np.maximum(boxes[:, 3] - boxes[:, 1], 0) * np.maximum(boxes[:, 2] - boxes[:, 0], 0)
-        valid_boxes = (scores >= self.confidence_threshold) & (areas > 0)
-        scores = scores[valid_boxes]
-        boxes = boxes[valid_boxes]
-        labels = labels[valid_boxes]
-        boxes_num = len(boxes)
+        extra_prediction = np.concatenate([np.zeros(pred_size + (1,), dtype=soft_prediction.dtype),
+                                           soft_prediction], axis=2)
 
-        annotations = []
-        for i in range(boxes_num):
-            if scores[i] < self.confidence_threshold:
-                continue
-            assigned_label = [ScoredLabel(self.labels[labels[i]], probability=scores[i])]
-            annotations.append(Annotation(
-                Rectangle(x1=boxes[i, 0], y1=boxes[i, 1], x2=boxes[i, 2], y2=boxes[i, 3]),
-                labels=assigned_label))
+        hard_prediction = create_hard_prediction_from_soft_prediction(
+            soft_prediction=extra_prediction,
+            soft_threshold=self.soft_threshold,
+            blur_strength=self.blur_strength
+        )
 
-        media_identifier = ImageIdentifier(image_id=ID())
+        label_dictionary = {i + 1: self.labels[i] for i in range(len(self.labels))}
+        annotations = create_annotation_from_segmentation_map(
+            hard_prediction=hard_prediction,
+            soft_prediction=extra_prediction,
+            label_map=label_dictionary
+        )
 
         return AnnotationScene(
             kind=AnnotationSceneKind.PREDICTION,
-            media_identifier=media_identifier,
-            annotations=annotations)
+            media_identifier=ImageIdentifier(image_id=ID()),
+            annotations=annotations
+        )
 
     def forward(self, inputs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
         return self.model.infer(inputs)
@@ -193,7 +173,8 @@ class OTEOpenVinoDataLoader(DataLoader):
 
 
 class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTask):
-    def __init__(self, task_environment: TaskEnvironment):
+    def __init__(self,
+                 task_environment: TaskEnvironment):
         self.task_environment = task_environment
         self.hparams = self.task_environment.get_hyper_parameters(OTESegmentationConfig)
         self.model = self.task_environment.model
@@ -206,7 +187,9 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
                                               self.model.get_data("openvino.xml"),
                                               self.model.get_data("openvino.bin"))
 
-    def infer(self, dataset: Dataset, inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
+    def infer(self,
+              dataset: Dataset,
+              inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
         from tqdm import tqdm
         for dataset_item in tqdm(dataset):
             dataset_item.annotation_scene = self.inferencer.predict(dataset_item.numpy)
@@ -215,7 +198,8 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
     def evaluate(self,
                  output_result_set: ResultSetEntity,
                  evaluation_metric: Optional[str] = None):
-        output_result_set.performance = MetricsHelper.compute_f_measure(output_result_set).get_performance()
+        metrics = MetricsHelper.compute_dice_averaged_over_pixels(output_result_set)
+        output_result_set.performance = metrics.get_performance()
 
     def optimize(self,
                  optimization_type: OptimizationType,

@@ -439,7 +439,9 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                              self._config,
                              tempdir,
                              target='openvino',
-                             precision=optimized_model_precision.name)
+                             precision=optimized_model_precision.name,
+                             output_logits=True,
+                             input_format='bgr')
 
                 bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
                 xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]

@@ -82,6 +82,7 @@ def _update_input_img(img_list, img_meta_list, update_ori_shape=False):
 def export_to_onnx(model,
                    fake_inputs,
                    export_name,
+                   output_logits=False,
                    opset=11,
                    verbose=False):
     register_extra_symbolics(opset)
@@ -98,6 +99,7 @@ def export_to_onnx(model,
         model.forward,
         img_metas=img_meta_list,
         return_loss=False,
+        output_logits=output_logits,
         rescale=True
     )
 
@@ -236,7 +238,7 @@ def _get_fake_inputs(input_shape, num_classes):
 
 
 def export_model(model, config, output_dir, target='openvino', onnx_opset=11,
-                 input_format='rgb', precision='FP32'):
+                 input_format='rgb', precision='FP32', output_logits=False):
     assert onnx_opset in available_opsets
 
     if isinstance(model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel)):
@@ -260,6 +262,7 @@ def export_model(model, config, output_dir, target='openvino', onnx_opset=11,
 
     export_to_onnx(model,
                    fake_inputs,
+                   output_logits=output_logits,
                    export_name=onnx_model_path,
                    opset=onnx_opset,
                    verbose=False)
