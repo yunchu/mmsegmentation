@@ -2,11 +2,6 @@ _base_ = [
     './data_pipeline.py'
 ]
 
-# # pre-trained params settings
-# ignore_keys = [r'^backbone\.increase_modules\.', r'^backbone\.increase_modules\.',
-#                r'^backbone\.downsample_modules\.', r'^backbone\.final_layer\.',
-#                r'^head\.']
-
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     type='CascadeEncoderDecoder',
