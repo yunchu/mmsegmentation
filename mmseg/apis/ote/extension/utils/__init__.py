@@ -13,7 +13,6 @@
 # and limitations under the License.
 
 from .hooks import CancelTrainingHook, FixedMomentumUpdaterHook, OTELoggerHook, OTEProgressHook
-# from .hooks import EarlyStoppingHook, ReduceLROnPlateauLrUpdaterHook
 from .pipelines import LoadImageFromOTEDataset, LoadAnnotationFromOTEDataset
 from .runner import EpochRunnerWithCancel, IterBasedRunnerWithCancel
 
@@ -26,6 +25,4 @@ __all__ = [
     "LoadAnnotationFromOTEDataset",
     "OTELoggerHook",
     "OTEProgressHook",
-    # "EarlyStoppingHook",
-    # "ReduceLROnPlateauLrUpdaterHook",
 ]
