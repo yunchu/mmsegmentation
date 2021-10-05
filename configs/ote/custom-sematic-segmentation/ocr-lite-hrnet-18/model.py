@@ -175,7 +175,7 @@ checkpoint_config = dict(
 )
 evaluation = dict(
     interval=1000,
-    metric='mIoU'8
+    metric='mIoU'
 )
 
 # yapf:disable
