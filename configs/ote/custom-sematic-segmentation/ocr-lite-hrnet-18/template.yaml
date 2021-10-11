@@ -26,6 +26,8 @@ hyper_parameters:
         default_value: 0.001
       learning_rate_warmup_iters:
         default_value: 2000
+      num_iters:
+        default_value: 100000
 
 # Training resources.
 max_nodes: 1
