@@ -21,7 +21,8 @@ import cv2
 import numpy as np
 from ote_sdk.utils.segmentation_utils import mask_from_dataset_item
 from ote_sdk.entities.annotation import Annotation, AnnotationSceneKind
-from ote_sdk.entities.label import LabelEntity, ScoredLabel
+from ote_sdk.entities.label import LabelEntity
+from ote_sdk.entities.scored_label import ScoredLabel
 from ote_sdk.entities.shapes.polygon import Point, Polygon
 from ote_sdk.entities.subset import Subset
 from sc_sdk.entities.annotation import AnnotationScene, NullMediaIdentifier
