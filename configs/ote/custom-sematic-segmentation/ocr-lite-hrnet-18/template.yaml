@@ -1,5 +1,5 @@
 # Description.
-name: Custom Sematic Segmentation Lite-HRNet-18 OCR
+name: Custom Semantic Segmentation Lite-HRNet-18 OCR
 task_type: SEGMENTATION
 task_family: VISION
 instantiation: "CLASS"
