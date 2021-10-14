@@ -21,15 +21,15 @@ from ote_sdk.configuration.elements import (ParameterGroup,
                                             configurable_float,
                                             configurable_integer,
                                             selectable,
-                                            string_attribute,
-                                            ModelConfig)
+                                            string_attribute)
+from ote_sdk.configuration.configurable_parameters import ConfigurableParameters
 from ote_sdk.configuration.model_lifecycle import ModelLifecycle
 
 from .configuration_enums import POTQuantizationPreset
 
 
 @attrs
-class OTESegmentationConfig(ModelConfig):
+class OTESegmentationConfig(ConfigurableParameters):
     header = string_attribute("Configuration for an semantic segmentation task")
     description = header
 
