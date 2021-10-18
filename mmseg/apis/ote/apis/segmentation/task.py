@@ -31,6 +31,7 @@ from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
                                               create_annotation_from_segmentation_map)
+from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
@@ -45,7 +46,6 @@ from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExpo
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
-from sc_sdk.entities.datasets import Dataset
 
 from mmseg.apis import single_gpu_test, train_segmentor, export_model
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
@@ -155,7 +155,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return model
 
-    def infer(self, dataset: Dataset, inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
+    def infer(self, dataset: DatasetEntity,
+              inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
         """ Analyzes a dataset using the latest inference model. """
 
         set_hyperparams(self._config, self._hyperparams)
@@ -211,7 +212,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         return dataset
 
     @staticmethod
-    def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: Dataset,
+    def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: DatasetEntity,
                          eval: Optional[bool] = False, metric_name: Optional[str] = 'mDice',
                          output_logits: bool = False) -> Tuple[List, float]:
         model.eval()
@@ -255,7 +256,9 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         output_result_set.performance = m_dice_metrics.get_performance()
 
-    def train(self, dataset: Dataset, output_model: ModelEntity, train_parameters: Optional[TrainParameters] = None):
+    def train(self, dataset: DatasetEntity,
+              output_model: ModelEntity,
+              train_parameters: Optional[TrainParameters] = None):
         """ Trains a model on a dataset """
 
         set_hyperparams(self._config, self._hyperparams)

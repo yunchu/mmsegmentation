@@ -22,9 +22,9 @@ import cv2
 import numpy as np
 
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
-                                              create_annotation_from_segmentation_map, mask_from_dataset_item)
-from ote_sdk.entities.annotation import AnnotationSceneKind
-from ote_sdk.entities.id import ID
+                                              create_annotation_from_segmentation_map)
+from ote_sdk.entities.datasets import DatasetEntity
+from ote_sdk.entities.annotation import AnnotationSceneEntity, AnnotationSceneKind
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.model import ModelStatus, ModelEntity
@@ -36,9 +36,6 @@ from ote_sdk.usecases.exportable_code.inference import BaseOpenVINOInferencer
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import IOptimizationTask, OptimizationType
-from sc_sdk.entities.annotation import AnnotationScene
-from sc_sdk.entities.datasets import Dataset
-from sc_sdk.entities.media_identifier import ImageIdentifier
 
 from compression.api import DataLoader
 from compression.engines.ie_engine import IEEngine
@@ -122,7 +119,7 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
 
         return dict_inputs, meta
 
-    def post_process(self, prediction: Dict[str, np.ndarray], metadata: Dict[str, Any]) -> AnnotationScene:
+    def post_process(self, prediction: Dict[str, np.ndarray], metadata: Dict[str, Any]) -> AnnotationSceneEntity:
         pred_class_maps = prediction['output']
         assert pred_class_maps.shape[0] == 1
         pred_class_map = pred_class_maps[0]
@@ -146,9 +143,8 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
             label_map=label_dictionary
         )
 
-        return AnnotationScene(
+        return AnnotationSceneEntity(
             kind=AnnotationSceneKind.PREDICTION,
-            media_identifier=ImageIdentifier(image_id=ID()),
             annotations=annotations
         )
 
@@ -157,7 +153,7 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
 
 
 class OTEOpenVinoDataLoader(DataLoader):
-    def __init__(self, dataset: Dataset, inferencer: BaseOpenVINOInferencer):
+    def __init__(self, dataset: DatasetEntity, inferencer: BaseOpenVINOInferencer):
         self.dataset = dataset
         self.inferencer = inferencer
 
@@ -188,8 +184,8 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
                                               self.model.get_data("openvino.bin"))
 
     def infer(self,
-              dataset: Dataset,
-              inference_parameters: Optional[InferenceParameters] = None) -> Dataset:
+              dataset: DatasetEntity,
+              inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
         from tqdm import tqdm
         for dataset_item in tqdm(dataset):
             dataset_item.annotation_scene = self.inferencer.predict(dataset_item.numpy)
@@ -203,7 +199,7 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
 
     def optimize(self,
                  optimization_type: OptimizationType,
-                 dataset: Dataset,
+                 dataset: DatasetEntity,
                  output_model: ModelEntity,
                  optimization_parameters: Optional[OptimizationParameters]):
 

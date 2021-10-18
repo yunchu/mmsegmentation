@@ -52,28 +52,6 @@ def get_annotation_mmseg_format(dataset_item: DatasetItemEntity, labels: List[La
     return ann_info
 
 
-def get_annotation_mmseg_format_from_names(dataset_item: DatasetItemEntity, labels: List[str]) -> dict:
-    """
-    Function to convert a OTE annotation to mmsegmentation format. This is used both
-    in the OTEDataset class defined in this file as in the custom pipeline
-    element 'LoadAnnotationFromOTEDataset'
-
-    :param dataset_item: DatasetItem for which to get annotations
-    :param labels: List of labels in the project
-    :return dict: annotation information dict in mmseg format
-    """
-
-    converted_labels = []
-    for label_name in labels:
-        converted_labels.append(LabelEntity(
-            name=label_name,
-            domain=Domain.SEGMENTATION,
-            id=len(converted_labels)
-        ))
-
-    return get_annotation_mmseg_format(dataset_item, converted_labels)
-
-
 @DATASETS.register_module()
 class OTEDataset(CustomDataset):
     """
@@ -115,7 +93,6 @@ class OTEDataset(CustomDataset):
             data_info = dict(dataset_item=item,
                              width=item.width,
                              height=item.height,
-                             dataset_id=dataset.id,
                              index=index,
                              ann_info=dict(labels=self.labels))
 
@@ -129,7 +106,8 @@ class OTEDataset(CustomDataset):
         self.reduce_zero_label = False
         self.label_map = None
 
-        self.project_labels = self.get_project_labels(classes)
+        dataset_labels = self.ote_dataset.get_labels(include_empty=False)
+        self.project_labels = self.filter_labels(dataset_labels, classes)
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, None)
 
         # Instead of using list data_infos as in CustomDataset, this implementation of dataset
@@ -145,16 +123,18 @@ class OTEDataset(CustomDataset):
         self.pipeline = Compose(pipeline)
 
     @staticmethod
-    def get_project_labels(label_names):
-        converted_labels = []
+    def filter_labels(all_labels, label_names):
+        filtered_labels = []
         for label_name in label_names:
-            converted_labels.append(LabelEntity(
-                name=label_name,
-                domain=Domain.SEGMENTATION,
-                id=len(converted_labels)
-            ))
+            matches = [label for label in all_labels if label.name == label_name]
+            if len(matches) == 0:
+                continue
 
-        return converted_labels
+            assert len(matches) == 1
+
+            filtered_labels.append(matches[0])
+
+        return filtered_labels
 
     def __len__(self):
         """Total number of samples of data."""
@@ -345,6 +325,7 @@ def load_dataset_items(ann_file_path: str,
                             pipeline=pipeline,
                             classes=get_sorted_label_names(labels_list),
                             test_mode=test_mode)
+    dataset.test_mode = False
 
     dataset_items = []
     for item in dataset:
