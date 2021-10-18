@@ -624,7 +624,9 @@ class LiteHRModule(nn.Module):
             conv_cfg=None,
             norm_cfg=dict(type='BN'),
             with_cp=False,
-            dropout=None
+            dropout=None,
+            cr_version='v1',
+            sw_version='v1'
     ):
         super().__init__()
         self._check_branches(num_branches, in_channels)
@@ -638,6 +640,8 @@ class LiteHRModule(nn.Module):
         self.norm_cfg = norm_cfg
         self.conv_cfg = conv_cfg
         self.with_cp = with_cp
+        self.cr_version = cr_version
+        self.sw_version = sw_version
 
         if self.module_type == 'LITE':
             self.layers = self._make_weighting_blocks(num_blocks, reduce_ratio, dropout=dropout)
@@ -666,7 +670,9 @@ class LiteHRModule(nn.Module):
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
-                dropout=dropout
+                dropout=dropout,
+                cr_version=self.cr_version,
+                sw_version=self.sw_version
             ))
 
         return nn.Sequential(*layers)
@@ -1032,6 +1038,8 @@ class LiteHRNet(nn.Module):
         reduce_ratio = stages_spec['reduce_ratios'][stage_index]
         with_fuse = stages_spec['with_fuse'][stage_index]
         module_type = stages_spec['module_type'][stage_index]
+        cr_version = stages_spec.get('cr_version', 'v1')
+        sw_version = stages_spec.get('sw_version', 'v1')
 
         modules = []
         for i in range(num_modules):
@@ -1052,7 +1060,9 @@ class LiteHRNet(nn.Module):
                 conv_cfg=self.conv_cfg,
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
-                dropout=dropout
+                dropout=dropout,
+                cr_version=cr_version,
+                sw_version=sw_version
             ))
             in_channels = modules[-1].in_channels
 

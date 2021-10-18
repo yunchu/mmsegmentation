@@ -23,8 +23,8 @@ model = dict(
             ),
             num_stages=3,
             stages_spec=dict(
-                cr_version='v1',
-                sw_version='v1',
+                cr_version='v2',
+                sw_version='v2',
                 num_modules=(2, 4, 2),
                 num_branches=(2, 3, 4),
                 num_blocks=(2, 2, 2),
