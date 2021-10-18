@@ -204,7 +204,7 @@ class SpatialWeightingV2(nn.Module):
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, x):
-        h, w = [int(_) for _ in x.size()[:-2]]
+        h, w = [int(_) for _ in x.size()[-2:]]
 
         v = self.v_conv(x)
         v = v.view(-1, self.internal_channels, h * w)
