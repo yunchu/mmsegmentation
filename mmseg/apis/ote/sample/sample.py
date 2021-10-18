@@ -18,7 +18,9 @@ import os.path as osp
 import sys
 
 from ote_sdk.configuration.helper import create
+from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
+from ote_sdk.entities.label_schema import LabelSchemaEntity
 from ote_sdk.entities.model import (ModelEntity,
                                     ModelPrecision,
                                     ModelStatus,
@@ -31,11 +33,10 @@ from ote_sdk.entities.subset import Subset
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
 from ote_sdk.entities.task_environment import TaskEnvironment
-from sc_sdk.entities.dataset_storage import NullDatasetStorage
 
 from mmseg.apis.ote.apis.segmentation.config_utils import set_values_as_default
-from mmseg.apis.ote.apis.segmentation.ote_utils import generate_label_schema, get_task_class
-from mmseg.apis.ote.extension.datasets.mmdataset import MMDatasetAdapter
+from mmseg.apis.ote.apis.segmentation.ote_utils import get_task_class
+from mmseg.apis.ote.extension.datasets.mmdataset import load_dataset_items
 
 
 logger = logging.getLogger(__name__)
@@ -51,17 +52,25 @@ def parse_args():
 
 def main(args):
     logger.info('Initialize dataset')
-    dataset = MMDatasetAdapter(train_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
-                               train_data_root=osp.join(args.data_dir, 'kvasir_seg/images/training'),
-                               val_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-                               val_data_root=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-                               test_ann_file=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-                               test_data_root=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
-                               dataset_storage=NullDatasetStorage)
+    labels_list = []
+    items = load_dataset_items(
+        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/training'),
+        subset=Subset.TRAINING,
+        labels_list=labels_list)
+    items.extend(load_dataset_items(
+        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+        subset=Subset.VALIDATION,
+        labels_list=labels_list))
+    items.extend(load_dataset_items(
+        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+        subset=Subset.TESTING,
+        labels_list=labels_list))
+    dataset = DatasetEntity(items=items)
 
-    labels_schema = generate_label_schema(dataset.get_labels())
-    labels_list = labels_schema.get_labels(include_empty=False)
-    dataset.set_project_labels(labels_list)
+    labels_schema = LabelSchemaEntity.from_labels(labels_list)
 
     logger.info(f'Train dataset: {len(dataset.get_subset(Subset.TRAINING))} items')
     logger.info(f'Validation dataset: {len(dataset.get_subset(Subset.VALIDATION))} items')

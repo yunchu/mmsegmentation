@@ -14,28 +14,26 @@
 
 import json
 import os
-from copy import deepcopy
-from typing import List
+from typing import List, Optional
 
 import cv2
 import numpy as np
 from ote_sdk.utils.segmentation_utils import mask_from_dataset_item
-from ote_sdk.entities.annotation import Annotation, AnnotationSceneKind
-from ote_sdk.entities.label import LabelEntity
+from ote_sdk.entities.annotation import Annotation, AnnotationSceneEntity, AnnotationSceneKind
+from ote_sdk.entities.dataset_item import DatasetItemEntity
+from ote_sdk.entities.datasets import DatasetEntity
+from ote_sdk.entities.image import Image
+from ote_sdk.entities.label import LabelEntity, Domain
 from ote_sdk.entities.scored_label import ScoredLabel
 from ote_sdk.entities.shapes.polygon import Point, Polygon
 from ote_sdk.entities.subset import Subset
-from sc_sdk.entities.annotation import AnnotationScene, NullMediaIdentifier
-from sc_sdk.entities.dataset_storage import NullDatasetStorage
-from sc_sdk.entities.datasets import Dataset, DatasetItem, NullDataset
-from sc_sdk.entities.image import Image
 
 from mmseg.datasets.builder import DATASETS
 from mmseg.datasets.custom import CustomDataset
 from mmseg.datasets.pipelines import Compose
 
 
-def get_annotation_mmseg_format(dataset_item: DatasetItem, labels: List[LabelEntity]) -> dict:
+def get_annotation_mmseg_format(dataset_item: DatasetItemEntity, labels: List[LabelEntity]) -> dict:
     """
     Function to convert a OTE annotation to mmsegmentation format. This is used both
     in the OTEDataset class defined in this file as in the custom pipeline
@@ -52,6 +50,28 @@ def get_annotation_mmseg_format(dataset_item: DatasetItem, labels: List[LabelEnt
     ann_info = dict(gt_semantic_seg=gt_seg_map)
 
     return ann_info
+
+
+def get_annotation_mmseg_format_from_names(dataset_item: DatasetItemEntity, labels: List[str]) -> dict:
+    """
+    Function to convert a OTE annotation to mmsegmentation format. This is used both
+    in the OTEDataset class defined in this file as in the custom pipeline
+    element 'LoadAnnotationFromOTEDataset'
+
+    :param dataset_item: DatasetItem for which to get annotations
+    :param labels: List of labels in the project
+    :return dict: annotation information dict in mmseg format
+    """
+
+    converted_labels = []
+    for label_name in labels:
+        converted_labels.append(LabelEntity(
+            name=label_name,
+            domain=Domain.SEGMENTATION,
+            id=len(converted_labels)
+        ))
+
+    return get_annotation_mmseg_format(dataset_item, converted_labels)
 
 
 @DATASETS.register_module()
@@ -101,7 +121,7 @@ class OTEDataset(CustomDataset):
 
             return data_info
 
-    def __init__(self, ote_dataset: Dataset, pipeline, classes=None, test_mode: bool = False):
+    def __init__(self, ote_dataset: DatasetEntity, pipeline, classes=None, test_mode: bool = False):
         self.ote_dataset = ote_dataset
         self.test_mode = test_mode
 
@@ -109,11 +129,8 @@ class OTEDataset(CustomDataset):
         self.reduce_zero_label = False
         self.label_map = None
 
-        project_labels = None
-        if hasattr(self.ote_dataset, 'project_labels'):
-            project_labels = self.ote_dataset.project_labels
-
-        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, project_labels)
+        self.project_labels = self.get_project_labels(classes)
+        self.CLASSES, self.PALETTE = self.get_classes_and_palette(classes, None)
 
         # Instead of using list data_infos as in CustomDataset, this implementation of dataset
         # uses a proxy class with overriden __len__ and __getitem__; this proxy class
@@ -123,24 +140,21 @@ class OTEDataset(CustomDataset):
         # even if we need only checking aspect ratio of the image; due to it
         # this implementation of dataset does not uses such tricks as skipping images with wrong aspect ratios or
         # small image size, since otherwise reading the whole dataset during initialization will be required.
-        self.data_infos = OTEDataset._DataInfoProxy(ote_dataset, project_labels)
+        self.data_infos = OTEDataset._DataInfoProxy(self.ote_dataset, self.project_labels)
 
         self.pipeline = Compose(pipeline)
 
-    def get_classes_and_palette(self, classes: List[str], project_labels: List[LabelEntity] = None):
-        if project_labels is None:
-            return super().get_classes_and_palette(classes, None)
+    @staticmethod
+    def get_project_labels(label_names):
+        converted_labels = []
+        for label_name in label_names:
+            converted_labels.append(LabelEntity(
+                name=label_name,
+                domain=Domain.SEGMENTATION,
+                id=len(converted_labels)
+            ))
 
-        out_classes, out_palette = [], []
-
-        for class_name in classes:
-            matches = [label for label in project_labels if label.name == class_name]
-            assert len(matches) == 1
-
-            out_classes.append(class_name)
-            out_palette.append(matches[0].color)
-
-        return out_classes, out_palette
+        return converted_labels
 
     def __len__(self):
         """Total number of samples of data."""
@@ -196,7 +210,7 @@ class OTEDataset(CustomDataset):
         """
 
         dataset_item = self.ote_dataset[idx]
-        ann_info = get_annotation_mmseg_format(dataset_item, self.ote_dataset.project_labels)
+        ann_info = get_annotation_mmseg_format(dataset_item, self.project_labels)
 
         return ann_info
 
@@ -216,7 +230,7 @@ def get_classes_from_annotation(annot_path):
         content = json.load(input_stream)
         labels_map = content['labels_map']
 
-        categories = [v['name'] for v in sorted(labels_map, key=lambda tup: int(tup['id']))]
+        categories = [(v['name'], v['id']) for v in sorted(labels_map, key=lambda tup: int(tup['id']))]
 
     return categories
 
@@ -273,103 +287,74 @@ def create_annotation_from_hard_seg_map(hard_seg_map: np.ndarray, labels: List[L
     return annotations
 
 
-class MMDatasetAdapter(Dataset):
-    def __init__(self,
-                 train_ann_file=None,
-                 train_data_root=None,
-                 val_ann_file=None,
-                 val_data_root=None,
-                 test_ann_file=None,
-                 test_data_root=None,
-                 **kwargs):
-        super().__init__(**kwargs)
+def load_labels_from_annotation(ann_dir):
+    if ann_dir is None:
+        return []
 
-        self.img_dirs = {
-            Subset.TRAINING: abs_path_if_valid(train_data_root),
-            Subset.VALIDATION: abs_path_if_valid(val_data_root),
-            Subset.TESTING: abs_path_if_valid(test_data_root),
-        }
-        self.ann_dirs = {
-            Subset.TRAINING: abs_path_if_valid(train_ann_file),
-            Subset.VALIDATION: abs_path_if_valid(val_ann_file),
-            Subset.TESTING: abs_path_if_valid(test_ann_file),
-        }
+    labels_map_path = os.path.join(ann_dir, 'meta.json')
+    labels = get_classes_from_annotation(labels_map_path)
 
-        self.labels = self.load_labels_from_annotation(self.ann_dirs)
-        assert self.labels is not None
+    return labels
 
-        self.dataset = None
-        self.project_labels = None
 
-    @staticmethod
-    def load_labels_from_annotation(ann_dirs):
-        out_labels = None
-        for subset in (Subset.TRAINING, Subset.VALIDATION, Subset.TESTING):
-            dir_path = ann_dirs[subset]
-            if dir_path is None:
-                continue
+def add_labels(cur_labels, new_labels):
+    for label_name, label_id in new_labels:
+        matching_labels = [label for label in cur_labels if label.name == label_name]
+        if len(matching_labels) > 1:
+            raise ValueError("Found multiple matching labels")
+        elif len(matching_labels) == 0:
+            label_id = label_id if label_id is not None else len(cur_labels)
+            label = LabelEntity(name=label_name,
+                                domain=Domain.SEGMENTATION,
+                                id=label_id)
+            cur_labels.append(label)
 
-            labels_map_path = os.path.join(dir_path, 'meta.json')
-            labels = get_classes_from_annotation(labels_map_path)
 
-            if out_labels and out_labels != labels:
-                raise RuntimeError('Labels are different from annotation file to annotation file.')
+def check_labels(cur_labels, new_labels):
+    cur_names = {label.name for label in cur_labels}
+    new_names = {label[0] for label in new_labels}
+    if cur_names != new_names:
+        raise ValueError("Class names don't match from file to file")
 
-            out_labels = labels
 
-        return out_labels
+def get_sorted_label_names(labels):
+    return [v.name for v in sorted(labels, key=lambda x: x.id)]
 
-    def set_project_labels(self, project_labels):
-        self.project_labels = project_labels
 
-    def init_as_subset(self, subset: Subset):
-        test_mode = subset in {Subset.VALIDATION, Subset.TESTING}
-        if self.ann_dirs[subset] is None:
-            return False
+def load_dataset_items(ann_file_path: str,
+                       data_root_dir: str,
+                       subset: Subset = Subset.NONE,
+                       labels_list: Optional[List[LabelEntity]] = None):
+    ann_dir = abs_path_if_valid(ann_file_path)
+    img_dir = abs_path_if_valid(data_root_dir)
 
-        pipeline = [dict(type='LoadImageFromFile'),
-                    dict(type='LoadAnnotations')]
+    annot_labels = load_labels_from_annotation(ann_dir)
 
-        self.dataset = CustomDataset(img_dir=self.img_dirs[subset],
-                                     ann_dir=self.ann_dirs[subset],
-                                     pipeline=pipeline,
-                                     classes=self.labels,
-                                     test_mode=test_mode)
-        self.dataset.test_mode = False
+    if labels_list is None:
+        labels_list = []
+    if len(labels_list) == 0:
+        add_labels(labels_list, annot_labels)
+    else:
+        check_labels(labels_list, annot_labels)
 
-        return True
+    test_mode = subset in {Subset.VALIDATION, Subset.TESTING}
+    pipeline = [dict(type='LoadImageFromFile'),
+                dict(type='LoadAnnotations')]
+    dataset = CustomDataset(img_dir=img_dir,
+                            ann_dir=ann_dir,
+                            pipeline=pipeline,
+                            classes=get_sorted_label_names(labels_list),
+                            test_mode=test_mode)
 
-    def __getitem__(self, indx) -> DatasetItem:
-        item = self.dataset[indx]
-
+    dataset_items = []
+    for item in dataset:
         annotations = create_annotation_from_hard_seg_map(hard_seg_map=item['gt_semantic_seg'],
-                                                          labels=self.project_labels)
-        image = Image(name=None,
-                      numpy=item['img'],
-                      dataset_storage=NullDatasetStorage())
+                                                          labels=labels_list)
+        image = Image(data=item['img'])
+        annotation_scene = AnnotationSceneEntity(kind=AnnotationSceneKind.ANNOTATION,
+                                                 annotations=annotations)
+        dataset_items.append(DatasetItemEntity(media=image,
+                                               annotation_scene=annotation_scene,
+                                               subset=subset))
 
-        annotation_scene = AnnotationScene(kind=AnnotationSceneKind.ANNOTATION,
-                                           media_identifier=NullMediaIdentifier(),
-                                           annotations=annotations)
-        dataset_item = DatasetItem(image, annotation_scene)
-
-        return dataset_item
-
-    def __len__(self) -> int:
-        assert self.dataset is not None
-        return len(self.dataset)
-
-    def get_labels(self) -> list:
-        # TODO: Fix the logic: return List[str] or List[LabelEntity] only
-        if self.project_labels is None:
-            return self.labels
-        else:
-            return self.project_labels
-
-    def get_subset(self, subset: Subset) -> Dataset:
-        dataset = deepcopy(self)
-
-        if dataset.init_as_subset(subset):
-            return dataset
-        else:
-            return NullDataset()
+    return dataset_items
