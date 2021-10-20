@@ -106,17 +106,59 @@ def patch_config(config: Config,
 
 
 def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
+    config.data.samples_per_gpu = int(hyperparams.learning_parameters.batch_size)
+    config.data.workers_per_gpu = int(hyperparams.learning_parameters.num_workers)
     config.optimizer.lr = float(hyperparams.learning_parameters.learning_rate)
+
+    # set proper number of iterations
     config.params_config.iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
     config.lr_config.fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
     config.lr_config.warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
-    config.data.samples_per_gpu = int(hyperparams.learning_parameters.batch_size)
-    config.data.workers_per_gpu = int(hyperparams.learning_parameters.num_workers)
     total_iterations = int(hyperparams.learning_parameters.num_iters)
     if is_epoch_based_runner(config.runner):
+        init_num_iterations = config.runner.max_epochs
         config.runner.max_epochs = total_iterations
     else:
+        init_num_iterations = config.runner.max_iters
         config.runner.max_iters = total_iterations
+    assert config.lr_config.fixed_iters + config.lr_config.warmup_iters < total_iterations
+
+    # estimate the schedule scale
+    schedule_scale = float(total_iterations) / float(init_num_iterations)
+
+    # rescale number of iterations for lr scheduler
+    if config.lr_config.policy == 'customstep':
+        config.lr_config.step = [int(schedule_scale * step) for step in config.lr_config.step]
+    elif config.lr_config.policy == 'customcos':
+        config.lr_config.periods = [int(schedule_scale * period) for period in config.lr_config.periods]
+
+    # rescale number of iterations for
+    for head_type in ['decode_head', 'auxiliary_head']:
+        if not hasattr(config.model, head_type):
+            continue
+
+        heads = config.model[head_type]
+        if not isinstance(heads, (tuple, list)):
+            heads = [heads]
+
+        for head in heads:
+            losses = head.loss_decode
+            if not isinstance(losses, (tuple, list)):
+                losses = [losses]
+
+            for loss in losses:
+                for target_attr in ['scale_cfg', 'conf_penalty_weight']:
+                    if not hasattr(loss, target_attr):
+                        continue
+
+                    if not hasattr(loss[target_attr], 'num_iters'):
+                        continue
+
+                    loss[target_attr].num_iters = int(schedule_scale * loss[target_attr].num_iters)
+
+            head.loss_decode = losses
+
+        config.model[head_type] = heads
 
 
 def prepare_for_testing(config: Config, dataset: DatasetEntity) -> Config:
