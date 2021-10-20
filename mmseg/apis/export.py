@@ -165,11 +165,13 @@ def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None,
     onnx.save(onnx_model, onnx_model_path)
     output_names = ','.join(output_names)
 
+    mo_cmd = _get_mo_cmd()
+
     normalize = [v for v in cfg.data.test.pipeline[1].transforms if v['type'] == 'Normalize'][0]
 
     mean_values = normalize['mean']
     scale_values = normalize['std']
-    command_line = f'mo.py --input_model="{onnx_model_path}" ' \
+    command_line = f'{mo_cmd} --input_model="{onnx_model_path}" ' \
                    f'--mean_values="{mean_values}" ' \
                    f'--scale_values="{scale_values}" ' \
                    f'--output_dir="{output_dir_path}" ' \
@@ -183,13 +185,6 @@ def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None,
     if normalize['to_rgb'] and input_format.lower() == 'bgr' or \
             not normalize['to_rgb'] and input_format.lower() == 'rgb':
         command_line += ' --reverse_input_channels'
-
-    try:
-        run('mo.py -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
-    except CalledProcessError:
-        print('OpenVINO Model Optimizer not found, please source '
-              'openvino/bin/setupvars.sh before running this script.')
-        return
 
     print(command_line)
     run(command_line, shell=True, check=True)
