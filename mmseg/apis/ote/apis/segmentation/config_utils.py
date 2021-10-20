@@ -93,9 +93,9 @@ def patch_config(config: Config,
     config.checkpoint_config.max_keep_ckpts = 5
     config.checkpoint_config.interval = config.evaluation.get('interval', 1)
 
-    label_names = [label.name for label in labels]
+    label_names = ['background'] + [label.name for label in labels]
     set_data_classes(config, label_names)
-    set_num_classes(config, len(labels))
+    set_num_classes(config, len(label_names))
 
     set_distributed_mode(config, distributed)
     remove_from_config(config, 'norm_cfg')
@@ -121,7 +121,6 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
     else:
         init_num_iterations = config.runner.max_iters
         config.runner.max_iters = total_iterations
-    assert config.lr_config.fixed_iters + config.lr_config.warmup_iters < total_iterations
 
     # estimate the schedule scale
     schedule_scale = float(total_iterations) / float(init_num_iterations)

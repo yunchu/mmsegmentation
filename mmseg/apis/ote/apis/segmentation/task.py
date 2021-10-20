@@ -187,20 +187,16 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
         for dataset_item, soft_prediction in zip(dataset, prediction_results):
             soft_prediction = np.transpose(soft_prediction, axes=(1, 2, 0))
-            pred_size = soft_prediction.shape[:2]
-
-            extra_prediction = np.concatenate([np.zeros(pred_size + (1,), dtype=soft_prediction.dtype),
-                                               soft_prediction], axis=2)
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
-                soft_prediction=extra_prediction,
+                soft_prediction=soft_prediction,
                 soft_threshold=self._hyperparams.postprocessing.soft_threshold,
                 blur_strength=self._hyperparams.postprocessing.blur_strength,
             )
 
             annotations = create_annotation_from_segmentation_map(
                 hard_prediction=hard_prediction,
-                soft_prediction=extra_prediction,
+                soft_prediction=soft_prediction,
                 label_map=label_dictionary,
             )
 

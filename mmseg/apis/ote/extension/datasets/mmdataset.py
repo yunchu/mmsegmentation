@@ -45,7 +45,7 @@ def get_annotation_mmseg_format(dataset_item: DatasetItemEntity, labels: List[La
     """
 
     gt_seg_map = mask_from_dataset_item(dataset_item, labels)
-    gt_seg_map = gt_seg_map.squeeze(2).astype(np.uint8) - 1  # replace the ignore label from 0 to 255
+    gt_seg_map = gt_seg_map.squeeze(2).astype(np.uint8)
 
     ann_info = dict(gt_semantic_seg=gt_seg_map)
 
@@ -297,8 +297,10 @@ def check_labels(cur_labels, new_labels):
         raise ValueError("Class names don't match from file to file")
 
 
-def get_sorted_label_names(labels):
-    return [v.name for v in sorted(labels, key=lambda x: x.id)]
+def get_extended_label_names(labels):
+    target_labels = [v.name for v in sorted(labels, key=lambda x: x.id)]
+    all_labels = ['background'] + target_labels
+    return all_labels
 
 
 def load_dataset_items(ann_file_path: str,
@@ -323,7 +325,7 @@ def load_dataset_items(ann_file_path: str,
     dataset = CustomDataset(img_dir=img_dir,
                             ann_dir=ann_dir,
                             pipeline=pipeline,
-                            classes=get_sorted_label_names(labels_list),
+                            classes=get_extended_label_names(labels_list),
                             test_mode=test_mode)
     dataset.test_mode = False
 

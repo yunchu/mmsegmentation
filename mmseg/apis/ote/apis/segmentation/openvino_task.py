@@ -125,13 +125,9 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
         pred_class_map = pred_class_maps[0]
 
         soft_prediction = np.transpose(pred_class_map, axes=(1, 2, 0))
-        pred_size = soft_prediction.shape[:2]
-
-        extra_prediction = np.concatenate([np.zeros(pred_size + (1,), dtype=soft_prediction.dtype),
-                                           soft_prediction], axis=2)
 
         hard_prediction = create_hard_prediction_from_soft_prediction(
-            soft_prediction=extra_prediction,
+            soft_prediction=soft_prediction,
             soft_threshold=self.soft_threshold,
             blur_strength=self.blur_strength
         )
@@ -139,7 +135,7 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
         label_dictionary = {i + 1: self.labels[i] for i in range(len(self.labels))}
         annotations = create_annotation_from_segmentation_map(
             hard_prediction=hard_prediction,
-            soft_prediction=extra_prediction,
+            soft_prediction=soft_prediction,
             label_map=label_dictionary
         )
 
