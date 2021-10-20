@@ -189,8 +189,7 @@ log_config = dict(
 # yapf:enable
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-# load_from = 'https://storage.openvinotoolkit.org/repositories/openvino_training_extensions/models/custom_semantic_segmentation/litehrnet18_imagenet1k_rsc.pth'
-load_from = '/media/experiments/segmentation/kvasir_seg/v77/iter_21000.pth'
+load_from = 'https://storage.openvinotoolkit.org/repositories/openvino_training_extensions/models/custom_semantic_segmentation/litehrnet18_imagenet1k_rsc.pth'
 resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True
