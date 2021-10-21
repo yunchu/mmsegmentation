@@ -79,7 +79,6 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.align_corners = align_corners
         self.fp16_enabled = False
         self.enable_out_norm = enable_out_norm
-        self.epoch_size = 1
 
         loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
         assert len(loss_configs) > 0
