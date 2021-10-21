@@ -132,19 +132,12 @@ def main(args):
                                     ground_truth_dataset=validation_dataset,
                                     prediction_dataset=predicted_validation_dataset)
         logger.info('Estimate quality on validation set')
-        performance = openvino_task.evaluate(resultset)
-        logger.info(str(performance))
+        openvino_task.evaluate(resultset)
+        logger.info(str(resultset.performance))
 
         logger.info('Run POT optimization')
         optimized_model = ModelEntity(dataset,
                                       environment.get_model_configuration(),
-                                      optimization_type=ModelOptimizationType.POT,
-                                      optimization_methods=OptimizationMethod.QUANTIZATION,
-                                      optimization_objectives={},
-                                      precision=[ModelPrecision.INT8],
-                                      target_device=TargetDevice.CPU,
-                                      performance_improvement={},
-                                      model_size_reduction=1.0,
                                       model_status=ModelStatus.NOT_READY)
         openvino_task.optimize(OptimizationType.POT,
                                dataset.get_subset(Subset.TRAINING),
@@ -158,8 +151,8 @@ def main(args):
                                     ground_truth_dataset=validation_dataset,
                                     prediction_dataset=predicted_validation_dataset)
         logger.info('Performance of optimized model:')
-        performance = openvino_task.evaluate(resultset)
-        logger.info(str(performance))
+        openvino_task.evaluate(resultset)
+        logger.info(str(resultset.performance))
 
 
 if __name__ == '__main__':
