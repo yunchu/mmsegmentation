@@ -122,7 +122,7 @@ model = dict(
     ),
 )
 evaluation = dict(
-    metric='mDice',
+    metric='mIoU',
 )
 
 find_unused_parameters = True
