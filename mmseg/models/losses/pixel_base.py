@@ -74,7 +74,7 @@ class BasePixelLoss(BaseWeightedLoss):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
 
-        self._last_scale = self._scale_scheduler(self.iter)
+        self._last_scale = self._scale_scheduler(self.iter, self.epoch_size)
 
         if self.with_pr_product:
             output = self._pr_product(output)
@@ -86,7 +86,7 @@ class BasePixelLoss(BaseWeightedLoss):
         losses, updated_output = self._calculate(output, valid_labels, self._last_scale)
 
         if self.with_regularization:
-            self._last_reg_weight = self._reg_weight_scheduler(self.iter)
+            self._last_reg_weight = self._reg_weight_scheduler(self.iter, self.epoch_size)
             regularization = self._regularization(updated_output, self._last_scale, self._last_reg_weight)
             losses = torch.clamp_min(losses + regularization, 0.0)
 

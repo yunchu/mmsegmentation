@@ -46,6 +46,17 @@ class CascadeEncoderDecoder(EncoderDecoder):
         self.align_corners = self.decode_head[-1].align_corners
         self.num_classes = self.decode_head[-1].num_classes
 
+    def set_step_params(self, init_iter, epoch_size):
+        for decode_head in self.decode_head:
+            decode_head.set_step_params(init_iter, epoch_size)
+
+        if self.auxiliary_head is not None:
+            if isinstance(self.auxiliary_head, list):
+                for aux_head in self.auxiliary_head:
+                    aux_head.set_step_params(init_iter, epoch_size)
+            else:
+                self.auxiliary_head.set_step_params(init_iter, epoch_size)
+
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone and heads.
 

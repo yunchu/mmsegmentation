@@ -48,6 +48,14 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
 
         self._iter = 0
         self._last_loss_weight = 0
+        self._epoch_size = 1
+
+    def set_step_params(self, init_iter, epoch_size):
+        assert init_iter >= 0
+        assert epoch_size > 0
+
+        self._iter = init_iter
+        self._epoch_size = epoch_size
 
     @property
     def with_loss_jitter(self):
@@ -56,6 +64,10 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
     @property
     def iter(self):
         return self._iter
+
+    @property
+    def epoch_size(self):
+        return self._epoch_size
 
     @property
     def last_loss_weight(self):
@@ -91,7 +103,7 @@ class BaseWeightedLoss(nn.Module, metaclass=ABCMeta):
             jitter_point = torch.normal(0.0, jitter_sigma, [], device=loss.device, dtype=loss.dtype)
             loss = (loss - jitter_point).abs() + jitter_point
 
-        self._last_loss_weight = self._loss_weight_scheduler(self.iter)
+        self._last_loss_weight = self._loss_weight_scheduler(self.iter, self.epoch_size)
         out_loss = self._last_loss_weight * loss
 
         self._iter += 1

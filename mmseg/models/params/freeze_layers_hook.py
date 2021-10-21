@@ -19,11 +19,24 @@ class FreezeLayers(Hook):
         self.enable = self.iters > 0 and self.open_layers is not None and len(self.open_layers) > 0
         self.finish = False
 
-    def before_train_iter(self, runner):
-        if not self.enable or self.finish:
+    def before_train_epoch(self, runner):
+        if not self.by_epoch:
             return
 
-        cur_iter = runner.epoch if self.by_epoch else runner.iter
+        cur_epoch = runner.epoch
+
+        model = runner.model.module
+        if self.enable and cur_epoch < self.iters:
+            runner.logger.info('* Only train {} (epoch: {}/{})'.format(self.open_layers, cur_epoch + 1, self.iters))
+            self.open_specified_layers(model, self.open_layers)
+        else:
+            self.open_all_layers(model)
+
+    def before_train_iter(self, runner):
+        if self.by_epoch or not self.enable or self.finish:
+            return
+
+        cur_iter = runner.iter
 
         model = runner.model.module
         if cur_iter < self.iters:

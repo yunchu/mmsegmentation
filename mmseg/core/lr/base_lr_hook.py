@@ -131,8 +131,14 @@ class BaseLrUpdaterHook(Hook, metaclass=ABCMeta):
     def _init_states(self, runner):
         if self.by_epoch:
             self.epoch_len = len(runner.data_loader)
+            assert self.epoch_len > 0
+
             self.fixed_iters = self.fixed_iters * self.epoch_len
             self.warmup_iters = self.warmup_iters * self.epoch_len
+        else:
+            self.epoch_len = 1
+
+        runner.model.module.set_step_params(runner.iter, self.epoch_len)
 
     def before_train_iter(self, runner):
         if self.need_update:
