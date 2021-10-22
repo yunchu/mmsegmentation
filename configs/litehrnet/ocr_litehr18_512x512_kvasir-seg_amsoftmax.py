@@ -47,7 +47,7 @@ model = dict(
                           start_scale=30,
                           end_scale=5,
                           by_epoch=True,
-                          num_iters=700,
+                          num_iters=500,
                           power=1.2
                       ),
                       margin_type='cos',
@@ -61,7 +61,7 @@ model = dict(
                           start_scale=0.2,
                           end_scale=0.15,
                           by_epoch=True,
-                          num_iters=500,
+                          num_iters=400,
                           power=1.2
                       ),
                       loss_jitter_prob=0.01,

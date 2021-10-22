@@ -26,7 +26,7 @@ lr_config = dict(
     policy='customstep',
     by_epoch=True,
     gamma=0.1,
-    step=[500, 700],
+    step=[400, 500],
     fixed='constant',
     fixed_iters=40,
     fixed_ratio=10.0,
@@ -38,7 +38,7 @@ lr_config = dict(
 # runtime settings
 runner = dict(
     type='EpochBasedRunner',
-    max_epochs=800
+    max_epochs=600
 )
 checkpoint_config = dict(
     by_epoch=True,
