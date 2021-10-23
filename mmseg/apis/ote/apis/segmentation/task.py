@@ -78,14 +78,14 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         self._task_environment = task_environment
         self._hyperparams = task_environment.get_hyper_parameters(OTESegmentationConfig)
 
-        self._model_name = self._hyperparams.algo_backend.model_name
+        self._model_name = task_environment.model_template.name
         self._labels = task_environment.get_labels(include_empty=False)
 
         template_file_path = task_environment.model_template.model_template_path
 
         # Get and prepare mmseg config.
         base_dir = os.path.abspath(os.path.dirname(template_file_path))
-        config_file_path = os.path.join(base_dir, self._hyperparams.algo_backend.model)
+        config_file_path = os.path.join(base_dir, "model.py")
         self._config = Config.fromfile(config_file_path)
 
         distributed = torch.distributed.is_initialized()
