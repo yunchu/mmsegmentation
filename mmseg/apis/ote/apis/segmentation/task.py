@@ -328,9 +328,11 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             self.save_model(output_model)
             output_model.performance = performance
+            output_model.precision = [ModelPrecision.FP32]
             output_model.model_status = ModelStatus.SUCCESS
         else:
             logger.info("Model performance has not improved while training. No new model has been saved.")
+            output_model.model_status = ModelStatus.NOT_IMPROVED
             # Restore old training model if training from scratch and not improved
             self._model = old_model
 
@@ -416,7 +418,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
     def export(self, export_type: ExportType, output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
 
-        optimized_model_precision = ModelPrecision.FP32
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = ModelOptimizationType.MO
 
@@ -438,7 +439,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                              self._config,
                              tempdir,
                              target='openvino',
-                             precision=optimized_model_precision.name,
                              output_logits=True,
                              input_format='bgr')
 
@@ -448,7 +448,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                     output_model.set_data("openvino.bin", f.read())
                 with open(os.path.join(tempdir, xml_file), "rb") as f:
                     output_model.set_data("openvino.xml", f.read())
-                output_model.precision = [optimized_model_precision]
+                output_model.precision = [ModelPrecision.FP32]
+                output_model.optimization_methods = []
                 output_model.model_status = ModelStatus.SUCCESS
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
