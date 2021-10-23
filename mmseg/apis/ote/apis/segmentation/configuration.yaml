@@ -26,20 +26,20 @@ learning_parameters:
   header: Learning Parameters
   learning_rate:
     affects_outcome_of: TRAINING
-    default_value: 1.0e-03
+    default_value: 0.001
     description: Increasing this value will speed up training convergence but might
       make it unstable.
     editable: true
     header: Learning rate
     max_value: 0.1
-    min_value: 1.0e-07
+    min_value: 1.0e-05
     type: FLOAT
     ui_rules:
       action: DISABLE_EDITING
       operator: AND
       rules: []
       type: UI_RULES
-    value: 1.0e-03
+    value: 0.001
     visible_in_ui: true
     warning: null
   learning_rate_fixed_iters:
@@ -144,7 +144,7 @@ postprocessing:
     header: Blur strength
     max_value: 25
     min_value: 1
-    type: FLOAT
+    type: INTEGER
     ui_rules:
       action: DISABLE_EDITING
       operator: AND
