@@ -33,13 +33,15 @@ from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_p
                                               create_annotation_from_segmentation_map)
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
+from ote_sdk.entities.inference_parameters import default_progress_callback as default_infer_progress_callback
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
-from ote_sdk.entities.train_parameters import TrainParameters, default_progress_callback
+from ote_sdk.entities.train_parameters import TrainParameters
+from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
@@ -167,7 +169,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         if inference_parameters is not None:
             update_progress_callback = inference_parameters.update_progress
         else:
-            update_progress_callback = default_progress_callback
+            update_progress_callback = default_infer_progress_callback
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
 
@@ -287,7 +289,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         if train_parameters is not None:
             update_progress_callback = train_parameters.update_progress
         else:
-            update_progress_callback = default_progress_callback
+            update_progress_callback = default_train_progress_callback
         time_monitor = TrainingProgressCallback(update_progress_callback)
         learning_curves = defaultdict(OTELoggerHook.Curve)
         training_config = prepare_for_training(config, train_dataset, val_dataset, time_monitor, learning_curves)
