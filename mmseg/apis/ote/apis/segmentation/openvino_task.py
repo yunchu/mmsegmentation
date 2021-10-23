@@ -174,9 +174,12 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
     def __init__(self,
                  task_environment: TaskEnvironment):
         self.task_environment = task_environment
-        self.hparams = self.task_environment.get_hyper_parameters(OTESegmentationConfig)
         self.model = self.task_environment.model
         self.inferencer = self.load_inferencer()
+
+    @property
+    def hparams(self):
+        return self.task_environment.get_hyper_parameters(OTESegmentationConfig)
 
     def load_inferencer(self) -> OpenVINOSegmentationInferencer:
         labels = self.task_environment.label_schema.get_labels(include_empty=False)

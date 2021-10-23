@@ -76,7 +76,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         logger.info(f"Scratch space created at {self._scratch_space}")
 
         self._task_environment = task_environment
-        self._hyperparams = task_environment.get_hyper_parameters(OTESegmentationConfig)
 
         self._model_name = task_environment.model_template.name
         self._labels = task_environment.get_labels(include_empty=False)
@@ -100,6 +99,10 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         self._training_work_dir = None
         self._is_training = False
         self._should_stop = False
+
+    @property
+    def _hyperparams(self):
+        return self._task_environment.get_hyper_parameters(OTESegmentationConfig)
 
     def _load_model(self, model: ModelEntity):
         if model is not None:
@@ -339,8 +342,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         self._is_training = False
 
     def save_model(self, output_model: ModelEntity):
-        hyperparams = self._task_environment.get_hyper_parameters(OTESegmentationConfig)
-        hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
+        hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
         labels = {label.name: label.color.rgb_tuple for label in self._labels}
         model_info = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
 
