@@ -250,12 +250,12 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         """ Computes performance on a resultset """
 
         logger.info('Computing mDice')
-        m_dice_metrics = MetricsHelper.compute_dice_averaged_over_pixels(
+        metrics = MetricsHelper.compute_dice_averaged_over_pixels(
             output_result_set
         )
-        logger.info(f"mDice after evaluation: {m_dice_metrics.overall_dice.value}")
+        logger.info(f"mDice after evaluation: {metrics.overall_dice.value}")
 
-        output_result_set.performance = m_dice_metrics.get_performance()
+        output_result_set.performance = metrics.get_performance()
 
     def train(self, dataset: DatasetEntity,
               output_model: ModelEntity,
@@ -311,7 +311,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         # Load the best weights and check if model has improved.
         training_metrics = self._generate_training_metrics_group(learning_curves)
-        best_checkpoint_path = os.path.join(training_config.work_dir, 'latest.pth')
+        best_checkpoint_path = self._find_best_checkpoint(training_config.work_dir, config.evaluation.metric)
         best_checkpoint = torch.load(best_checkpoint_path)
         self._model.load_state_dict(best_checkpoint['state_dict'])
 
@@ -342,6 +342,21 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             self._model = old_model
 
         self._is_training = False
+
+    @staticmethod
+    def _find_best_checkpoint(work_dir, metric):
+        all_files = [f for f in os.listdir(work_dir) if os.path.isfile(os.path.join(work_dir, f))]
+
+        name_prefix = f'best_{metric}_'
+        candidates = [f for f in all_files if f.startswith(name_prefix) and f.endswith('.pth')]
+
+        if len(candidates) == 0:
+            out_name = 'latest.pth'
+        else:
+            assert len(candidates) == 1
+            out_name = candidates[0]
+
+        return os.path.join(work_dir, out_name)
 
     def save_model(self, output_model: ModelEntity):
         hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
@@ -444,7 +459,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                              tempdir,
                              target='openvino',
                              output_logits=True,
-                             input_format='bgr')
+                             input_format='bgr')  # ote expects RGB but mmseg uses BGR, so invert it
 
                 bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
                 xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]

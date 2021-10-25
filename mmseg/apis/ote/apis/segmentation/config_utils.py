@@ -98,7 +98,7 @@ def patch_config(config: Config,
     set_num_classes(config, len(label_names))
 
     set_distributed_mode(config, distributed)
-    remove_from_config(config, 'norm_cfg')
+    remove_from_config(config, 'img_norm_cfg')
 
     config.gpu_ids = range(1)
     config.work_dir = work_dir
@@ -111,10 +111,14 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
     config.optimizer.lr = float(hyperparams.learning_parameters.learning_rate)
 
     # set proper number of iterations
-    config.params_config.iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
-    config.lr_config.fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
-    config.lr_config.warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
-    total_iterations = int(hyperparams.learning_parameters.num_iters)
+    fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
+    warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
+    main_iters = int(hyperparams.learning_parameters.num_iters)
+    total_iterations = fixed_iters + warmup_iters + main_iters
+
+    config.params_config.iters = fixed_iters
+    config.lr_config.fixed_iters = fixed_iters
+    config.lr_config.warmup_iters = warmup_iters
     if is_epoch_based_runner(config.runner):
         init_num_iterations = config.runner.max_epochs
         config.runner.max_epochs = total_iterations
@@ -288,6 +292,19 @@ def set_num_classes(config: Config, num_classes: int):
             head.num_classes = num_classes
 
 
+def patch_color_conversion(pipeline):
+    # Default data format for OTE is RGB, while mmseg uses BGR, so negate the color conversion flag.
+    for pipeline_step in pipeline:
+        if pipeline_step.type == 'Normalize':
+            to_rgb = False
+            if 'to_rgb' in pipeline_step:
+                to_rgb = pipeline_step.to_rgb
+            to_rgb = not bool(to_rgb)
+            pipeline_step.to_rgb = to_rgb
+        elif pipeline_step.type == 'MultiScaleFlipAug':
+            patch_color_conversion(pipeline_step.transforms)
+
+
 def patch_datasets(config: Config):
     assert 'data' in config
     for subset in ('train', 'val', 'test'):
@@ -306,6 +323,8 @@ def patch_datasets(config: Config):
                 pipeline_step.type = 'LoadImageFromOTEDataset'
             elif pipeline_step.type == 'LoadAnnotations':
                 pipeline_step.type = 'LoadAnnotationFromOTEDataset'
+
+        patch_color_conversion(cfg.pipeline)
 
 
 def remove_from_config(config, key: str):

@@ -6,7 +6,7 @@ from .base import BaseScalarScheduler
 
 @SCALAR_SCHEDULERS.register_module()
 class PolyScalarScheduler(BaseScalarScheduler):
-    def __init__(self, start_scale, end_scale, num_iters, power=1.2):
+    def __init__(self, start_scale, end_scale, num_iters, power=1.2, by_epoch=False):
         super(PolyScalarScheduler, self).__init__()
 
         self._start_s = start_scale
@@ -17,15 +17,21 @@ class PolyScalarScheduler(BaseScalarScheduler):
         assert self._num_iters > 0
         self._power = power
         assert self._power >= 0.0
+        self.by_epoch = by_epoch
 
-    def _get_value(self, step):
+    def _get_value(self, step, epoch_size):
         if step is None:
             return float(self._end_s)
 
-        if step < self._num_iters:
+        if self.by_epoch:
+            num_iters = epoch_size * self._num_iters
+        else:
+            num_iters = self._num_iters
+
+        if step < num_iters:
             factor = (self._end_s - self._start_s) / (1.0 - self._power)
-            var_a = factor / (self._num_iters ** self._power)
-            var_b = -factor * self._power / float(self._num_iters)
+            var_a = factor / (num_iters ** self._power)
+            var_b = -factor * self._power / float(num_iters)
 
             out_value = var_a * np.power(step, self._power) + var_b * step + self._start_s
         else:

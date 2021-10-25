@@ -199,7 +199,12 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
     def evaluate(self,
                  output_result_set: ResultSetEntity,
                  evaluation_metric: Optional[str] = None):
-        metrics = MetricsHelper.compute_dice_averaged_over_pixels(output_result_set)
+        logger.info('Computing mDice')
+        metrics = MetricsHelper.compute_dice_averaged_over_pixels(
+            output_result_set
+        )
+        logger.info(f"mDice after evaluation: {metrics.overall_dice.value}")
+
         output_result_set.performance = metrics.get_performance()
 
     def optimize(self,

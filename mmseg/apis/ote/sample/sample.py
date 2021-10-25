@@ -50,18 +50,18 @@ def main(args):
     logger.info('Initialize dataset')
     labels_list = []
     items = load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/training'),
-        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/training'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/training'),
         subset=Subset.TRAINING,
         labels_list=labels_list)
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
         subset=Subset.VALIDATION,
         labels_list=labels_list))
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'kvasir_seg/annotations/validation'),
-        data_root_dir=osp.join(args.data_dir, 'kvasir_seg/images/validation'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
         subset=Subset.TESTING,
         labels_list=labels_list))
     dataset = DatasetEntity(items=items)
@@ -80,7 +80,9 @@ def main(args):
     logger.info('Setup environment')
     params = create(hyper_parameters)
     logger.info('Set hyperparameters')
-    params.learning_parameters.num_iters = 10
+    params.learning_parameters.learning_rate_fixed_iters = 30
+    params.learning_parameters.learning_rate_warmup_iters = 30
+    params.learning_parameters.num_iters = 30
     environment = TaskEnvironment(model=None,
                                   hyper_parameters=params,
                                   label_schema=labels_schema,

@@ -17,21 +17,26 @@ class CustomstepLrUpdaterHook(BaseLrUpdaterHook):
         else:
             raise TypeError('"step" must be a list or integer')
 
-        self.step = step
+        self.steps = step if isinstance(step, (tuple, list)) else [step]
         self.gamma = gamma
 
+    def _init_states(self, runner):
+        super(CustomstepLrUpdaterHook, self)._init_states(runner)
+
+        if self.by_epoch:
+            self.steps = [
+                step * self.epoch_len for step in self.steps
+            ]
+
     def get_lr(self, runner, base_lr):
-        progress = runner.epoch if self.by_epoch else runner.iter
+        progress = runner.iter
 
         skip_iters = self.fixed_iters + self.warmup_iters
         if progress <= skip_iters:
             return base_lr
 
-        if isinstance(self.step, int):
-            return base_lr * (self.gamma**(progress // self.step))
-
-        exp = len(self.step)
-        for i, s in enumerate(self.step):
+        exp = len(self.steps)
+        for i, s in enumerate(self.steps):
             if progress < s:
                 exp = i
                 break

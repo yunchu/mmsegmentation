@@ -43,12 +43,15 @@ class EncoderDecoder(BaseSegmentor):
 
     def _init_decode_head(self, decode_head):
         """Initialize ``decode_head``"""
+
         self.decode_head = builder.build_head(decode_head)
         self.align_corners = self.decode_head.align_corners
         self.num_classes = self.decode_head.num_classes
 
     def _init_auxiliary_head(self, auxiliary_head):
         """Initialize ``auxiliary_head``"""
+
+        self.auxiliary_head = None
         if auxiliary_head is not None:
             if isinstance(auxiliary_head, list):
                 self.auxiliary_head = nn.ModuleList()
@@ -56,6 +59,16 @@ class EncoderDecoder(BaseSegmentor):
                     self.auxiliary_head.append(builder.build_head(head_cfg))
             else:
                 self.auxiliary_head = builder.build_head(auxiliary_head)
+
+    def set_step_params(self, init_iter, epoch_size):
+        self.decode_head.set_step_params(init_iter, epoch_size)
+
+        if self.auxiliary_head is not None:
+            if isinstance(self.auxiliary_head, list):
+                for aux_head in self.auxiliary_head:
+                    aux_head.set_step_params(init_iter, epoch_size)
+            else:
+                self.auxiliary_head.set_step_params(init_iter, epoch_size)
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone and heads.

@@ -167,6 +167,11 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
             self.in_channels = in_channels
 
+    def set_step_params(self, init_iter, epoch_size):
+        for loss_module in self.loss_modules:
+            if hasattr(loss_module, 'set_step_params'):
+                loss_module.set_step_params(init_iter, epoch_size)
+
     def init_weights(self):
         """Initialize weights of classification layer."""
 

@@ -63,6 +63,10 @@ class BaseSegmentor(nn.Module):
         """Placeholder for augmentation test."""
         pass
 
+    @abstractmethod
+    def set_step_params(self, init_iter, epoch_size):
+        pass
+
     def init_weights(self, pretrained=None):
         """Initialize the weights in segmentor.
 
