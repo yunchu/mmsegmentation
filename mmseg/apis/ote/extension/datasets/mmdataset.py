@@ -321,6 +321,7 @@ def load_dataset_items(ann_file_path: str,
 
     test_mode = subset in {Subset.VALIDATION, Subset.TESTING}
     pipeline = [dict(type='LoadImageFromFile'),
+                dict(type='Normalize', mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0], to_rgb=True),
                 dict(type='LoadAnnotations')]
     dataset = CustomDataset(img_dir=img_dir,
                             ann_dir=ann_dir,

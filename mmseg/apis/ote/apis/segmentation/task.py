@@ -250,12 +250,12 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         """ Computes performance on a resultset """
 
         logger.info('Computing mDice')
-        m_dice_metrics = MetricsHelper.compute_dice_averaged_over_pixels(
+        metrics = MetricsHelper.compute_dice_averaged_over_pixels(
             output_result_set
         )
-        logger.info(f"mDice after evaluation: {m_dice_metrics.overall_dice.value}")
+        logger.info(f"mDice after evaluation: {metrics.overall_dice.value}")
 
-        output_result_set.performance = m_dice_metrics.get_performance()
+        output_result_set.performance = metrics.get_performance()
 
     def train(self, dataset: DatasetEntity,
               output_model: ModelEntity,
@@ -459,7 +459,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                              tempdir,
                              target='openvino',
                              output_logits=True,
-                             input_format='bgr')
+                             input_format='bgr')  # ote expects RGB but mmseg uses BGR, so invert it
 
                 bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
                 xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]
