@@ -33,13 +33,15 @@ from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_p
                                               create_annotation_from_segmentation_map)
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
+from ote_sdk.entities.inference_parameters import default_progress_callback as default_infer_progress_callback
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
-from ote_sdk.entities.train_parameters import TrainParameters, default_progress_callback
+from ote_sdk.entities.train_parameters import TrainParameters
+from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
@@ -76,16 +78,15 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         logger.info(f"Scratch space created at {self._scratch_space}")
 
         self._task_environment = task_environment
-        self._hyperparams = task_environment.get_hyper_parameters(OTESegmentationConfig)
 
-        self._model_name = self._hyperparams.algo_backend.model_name
+        self._model_name = task_environment.model_template.name
         self._labels = task_environment.get_labels(include_empty=False)
 
         template_file_path = task_environment.model_template.model_template_path
 
         # Get and prepare mmseg config.
         base_dir = os.path.abspath(os.path.dirname(template_file_path))
-        config_file_path = os.path.join(base_dir, self._hyperparams.algo_backend.model)
+        config_file_path = os.path.join(base_dir, "model.py")
         self._config = Config.fromfile(config_file_path)
 
         distributed = torch.distributed.is_initialized()
@@ -100,6 +101,10 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         self._training_work_dir = None
         self._is_training = False
         self._should_stop = False
+
+    @property
+    def _hyperparams(self):
+        return self._task_environment.get_hyper_parameters(OTESegmentationConfig)
 
     def _load_model(self, model: ModelEntity):
         if model is not None:
@@ -164,7 +169,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         if inference_parameters is not None:
             update_progress_callback = inference_parameters.update_progress
         else:
-            update_progress_callback = default_progress_callback
+            update_progress_callback = default_infer_progress_callback
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
 
@@ -284,7 +289,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         if train_parameters is not None:
             update_progress_callback = train_parameters.update_progress
         else:
-            update_progress_callback = default_progress_callback
+            update_progress_callback = default_train_progress_callback
         time_monitor = TrainingProgressCallback(update_progress_callback)
         learning_curves = defaultdict(OTELoggerHook.Curve)
         training_config = prepare_for_training(config, train_dataset, val_dataset, time_monitor, learning_curves)
@@ -328,17 +333,18 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             self.save_model(output_model)
             output_model.performance = performance
+            output_model.precision = [ModelPrecision.FP32]
             output_model.model_status = ModelStatus.SUCCESS
         else:
             logger.info("Model performance has not improved while training. No new model has been saved.")
+            output_model.model_status = ModelStatus.NOT_IMPROVED
             # Restore old training model if training from scratch and not improved
             self._model = old_model
 
         self._is_training = False
 
     def save_model(self, output_model: ModelEntity):
-        hyperparams = self._task_environment.get_hyper_parameters(OTESegmentationConfig)
-        hyperparams_str = ids_to_strings(cfg_helper.convert(hyperparams, dict, enum_to_str=True))
+        hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
         labels = {label.name: label.color.rgb_tuple for label in self._labels}
         model_info = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
 
@@ -416,7 +422,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
     def export(self, export_type: ExportType, output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
 
-        optimized_model_precision = ModelPrecision.FP32
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = ModelOptimizationType.MO
 
@@ -438,7 +443,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                              self._config,
                              tempdir,
                              target='openvino',
-                             precision=optimized_model_precision.name,
                              output_logits=True,
                              input_format='bgr')
 
@@ -448,7 +452,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                     output_model.set_data("openvino.bin", f.read())
                 with open(os.path.join(tempdir, xml_file), "rb") as f:
                     output_model.set_data("openvino.xml", f.read())
-                output_model.precision = [optimized_model_precision]
+                output_model.precision = [ModelPrecision.FP32]
+                output_model.optimization_methods = []
                 output_model.model_status = ModelStatus.SUCCESS
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED

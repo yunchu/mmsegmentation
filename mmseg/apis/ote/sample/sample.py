@@ -21,12 +21,8 @@ from ote_sdk.configuration.helper import create
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.label_schema import LabelSchemaEntity
-from ote_sdk.entities.model import (ModelEntity,
-                                    ModelPrecision,
-                                    ModelStatus,
-                                    ModelOptimizationType,
-                                    OptimizationMethod)
-from ote_sdk.entities.model_template import parse_model_template, TargetDevice
+from ote_sdk.entities.model import ModelEntity, ModelStatus
+from ote_sdk.entities.model_template import parse_model_template
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.subset import Subset
