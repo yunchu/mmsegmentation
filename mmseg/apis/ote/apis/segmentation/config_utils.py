@@ -111,10 +111,14 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
     config.optimizer.lr = float(hyperparams.learning_parameters.learning_rate)
 
     # set proper number of iterations
-    config.params_config.iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
-    config.lr_config.fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
-    config.lr_config.warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
-    total_iterations = int(hyperparams.learning_parameters.num_iters)
+    fixed_iters = int(hyperparams.learning_parameters.learning_rate_fixed_iters)
+    warmup_iters = int(hyperparams.learning_parameters.learning_rate_warmup_iters)
+    main_iters = int(hyperparams.learning_parameters.num_iters)
+    total_iterations = fixed_iters + warmup_iters + main_iters
+
+    config.params_config.iters = fixed_iters
+    config.lr_config.fixed_iters = fixed_iters
+    config.lr_config.warmup_iters = warmup_iters
     if is_epoch_based_runner(config.runner):
         init_num_iterations = config.runner.max_epochs
         config.runner.max_epochs = total_iterations

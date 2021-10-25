@@ -311,7 +311,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         # Load the best weights and check if model has improved.
         training_metrics = self._generate_training_metrics_group(learning_curves)
-        best_checkpoint_path = os.path.join(training_config.work_dir, 'latest.pth')
+        best_checkpoint_path = self._find_best_checkpoint(training_config.work_dir, config.evaluation.metric)
         best_checkpoint = torch.load(best_checkpoint_path)
         self._model.load_state_dict(best_checkpoint['state_dict'])
 
@@ -342,6 +342,21 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             self._model = old_model
 
         self._is_training = False
+
+    @staticmethod
+    def _find_best_checkpoint(work_dir, metric):
+        all_files = [f for f in os.listdir(work_dir) if os.path.isfile(os.path.join(work_dir, f))]
+
+        name_prefix = f'best_{metric}_'
+        candidates = [f for f in all_files if f.startswith(name_prefix) and f.endswith('.pth')]
+
+        if len(candidates) == 0:
+            out_name = 'latest.pth'
+        else:
+            assert len(candidates) == 1
+            out_name = candidates[0]
+
+        return os.path.join(work_dir, out_name)
 
     def save_model(self, output_model: ModelEntity):
         hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
