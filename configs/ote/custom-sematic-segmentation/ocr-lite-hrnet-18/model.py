@@ -94,7 +94,8 @@ model = dict(
                           type='PolyScalarScheduler',
                           start_scale=30,
                           end_scale=5,
-                          num_iters=30000,
+                          by_epoch=True,
+                          num_iters=500,
                           power=1.2
                       ),
                       margin_type='cos',
@@ -107,7 +108,8 @@ model = dict(
                           type='PolyScalarScheduler',
                           start_scale=0.2,
                           end_scale=0.15,
-                          num_iters=20000,
+                          by_epoch=True,
+                          num_iters=400,
                           power=1.2
                       ),
                       loss_jitter_prob=0.01,
@@ -145,44 +147,45 @@ optimizer_config = dict(
 # parameter manager
 params_config = dict(
     type='FreezeLayers',
-    by_epoch=False,
-    iters=2000,
+    by_epoch=True,
+    iters=40,
     open_layers=[r'backbone\.aggregator\.', r'neck\.', r'decode_head\.', r'auxiliary_head\.']
 )
 
 # learning policy
 lr_config = dict(
     policy='customstep',
-    by_epoch=False,
     gamma=0.1,
-    step=[20000, 30000],
+    by_epoch=True,
+    step=[400, 500],
     fixed='constant',
-    fixed_iters=2000,
+    fixed_iters=40,
     fixed_ratio=10.0,
     warmup='cos',
-    warmup_iters=4000,
+    warmup_iters=80,
     warmup_ratio=1e-2,
 )
 
 # runtime settings
 runner = dict(
-    type='IterBasedRunner',
-    max_iters=40000
+    type='EpochBasedRunner',
+    max_epochs=600
 )
 checkpoint_config = dict(
-    by_epoch=False,
-    interval=1000
+    by_epoch=True,
+    interval=20
 )
 evaluation = dict(
-    interval=1000,
-    metric='mIoU'
+    by_epoch=True,
+    interval=20,
+    metric='mDice'
 )
 
 # yapf:disable
 log_config = dict(
-    interval=50,
+    interval=10,
     hooks=[
-        dict(type='TextLoggerHook', by_epoch=False),
+        dict(type='TextLoggerHook', by_epoch=True),
         dict(type='TensorboardLoggerHook')
     ])
 
