@@ -24,8 +24,7 @@ model = dict(
             ),
             num_stages=3,
             stages_spec=dict(
-                cr_version='v1',
-                sw_version='v1',
+                weighting_module_version='v1',
                 num_modules=(2, 4, 2),
                 num_branches=(2, 3, 4),
                 num_blocks=(2, 2, 2),

@@ -66,78 +66,12 @@ class CrossResolutionWeighting(nn.Module):
         return out
 
 
-class CrossResolutionWeightingV2(nn.Module):
-    """The original repo: https://github.com/DeLightCMU/PSA
-    """
-
-    def __init__(self,
-                 channels,
-                 ratio=16,
-                 conv_cfg=None,
-                 norm_cfg=None):
-        super().__init__()
-
-        self.channels = channels
-        self.total_channel = sum(channels)
-        self.internal_channels = int(self.total_channel / ratio)
-
-        self.v_conv = ConvModule(
-            in_channels=self.total_channel,
-            out_channels=self.internal_channels,
-            kernel_size=1,
-            stride=1,
-            bias=False,
-            conv_cfg=conv_cfg,
-            norm_cfg=None,
-            act_cfg=None)
-        self.q_conv = ConvModule(
-            in_channels=self.total_channel,
-            out_channels=1,
-            kernel_size=1,
-            stride=1,
-            bias=False,
-            conv_cfg=conv_cfg,
-            norm_cfg=None,
-            act_cfg=None)
-        self.out_conv = ConvModule(
-            in_channels=self.internal_channels,
-            out_channels=self.total_channel,
-            kernel_size=1,
-            stride=1,
-            conv_cfg=conv_cfg,
-            norm_cfg=norm_cfg,
-            act_cfg=dict(type='Sigmoid'))
-
-    def forward(self, x):
-        min_size = [int(_) for _ in x[-1].size()[-2:]]
-
-        downscaled_x = [F.adaptive_avg_pool2d(s, min_size) for s in x[:-1]] + [x[-1]]
-        y = torch.cat(downscaled_x, dim=1)
-        h, w = y.size()[-2:]
-
-        v = self.v_conv(y).view(-1, self.internal_channels, h * w)
-
-        q = self.q_conv(y).view(-1, h * w, 1)
-        q = torch.softmax(q, dim=1)
-
-        y = torch.matmul(v, q)
-        y = y.view(-1, self.internal_channels, 1, 1)
-        y = self.out_conv(y)
-
-        out = torch.split(y, self.channels, dim=1)
-        out = [
-            s * F.interpolate(a, size=s.size()[-2:], mode='nearest')
-            for s, a in zip(x, out)
-        ]
-
-        return out
-
-
 class SpatialWeighting(nn.Module):
     def __init__(self,
                  channels,
                  ratio=16,
                  conv_cfg=None,
+                 norm_cfg=None,
                  act_cfg=(dict(type='ReLU'), dict(type='Sigmoid'))):
         super().__init__()
 
@@ -177,13 +111,15 @@ class SpatialWeightingV2(nn.Module):
     def __init__(self,
                  channels,
                  ratio=16,
-                 conv_cfg=None):
+                 conv_cfg=None,
+                 norm_cfg=None):
         super().__init__()
 
         self.in_channels = channels
         self.internal_channels = int(channels / ratio)
 
-        self.v_conv = ConvModule(
+        # channel-only branch
+        self.v_channel = ConvModule(
             in_channels=self.in_channels,
             out_channels=self.internal_channels,
             kernel_size=1,
@@ -192,7 +128,35 @@ class SpatialWeightingV2(nn.Module):
             conv_cfg=conv_cfg,
             norm_cfg=None,
             act_cfg=None)
-        self.q_conv = ConvModule(
+        self.q_channel = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=1,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.out_channel = ConvModule(
+            in_channels=self.internal_channels,
+            out_channels=self.in_channels,
+            kernel_size=1,
+            stride=1,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg,
+            act_cfg=dict(type='Sigmoid'))
+
+        # spatial-only branch
+        self.v_spatial = ConvModule(
+            in_channels=self.in_channels,
+            out_channels=self.internal_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+            conv_cfg=conv_cfg,
+            norm_cfg=None,
+            act_cfg=None)
+        self.q_spatial = ConvModule(
             in_channels=self.in_channels,
             out_channels=self.internal_channels,
             kernel_size=1,
@@ -203,13 +167,29 @@ class SpatialWeightingV2(nn.Module):
             act_cfg=None)
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
 
-    def forward(self, x):
+    def _channel_weighting(self, x):
         h, w = [int(_) for _ in x.size()[-2:]]
 
-        v = self.v_conv(x)
+        v = self.v_channel(x).view(-1, self.internal_channels, h * w)
+
+        q = self.q_channel(x).view(-1, h * w, 1)
+        q = torch.softmax(q, dim=1)
+
+        y = torch.matmul(v, q)
+        y = y.view(-1, self.internal_channels, 1, 1)
+        y = self.out_channel(y)
+
+        out = x * y
+
+        return out
+
+    def _spatial_weighting(self, x):
+        h, w = [int(_) for _ in x.size()[-2:]]
+
+        v = self.v_spatial(x)
         v = v.view(-1, self.internal_channels, h * w)
 
-        q = self.q_conv(x)
+        q = self.q_spatial(x)
         q = self.global_avgpool(q)
         q = torch.softmax(q, dim=1)
         q = q.view(-1, 1, self.internal_channels)
@@ -219,6 +199,13 @@ class SpatialWeightingV2(nn.Module):
         y = torch.sigmoid(y)
 
         out = x * y
+
+        return out
+
+    def forward(self, x):
+        y_channel = self._channel_weighting(x)
+        y_spatial = self._spatial_weighting(x)
+        out = y_channel + y_spatial
 
         return out
 
@@ -232,20 +219,17 @@ class ConditionalChannelWeighting(nn.Module):
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
                  dropout=None,
-                 cr_version='v1',
-                 sw_version='v1'):
+                 weighting_module_version='v1'):
         super().__init__()
 
         self.with_cp = with_cp
         self.stride = stride
         assert stride in [1, 2]
 
-        cross_resolution_module = CrossResolutionWeighting if cr_version == 'v1' else CrossResolutionWeightingV2
-        spatial_weighting_module = SpatialWeighting if sw_version == 'v1' else SpatialWeightingV2
-
+        spatial_weighting_module = SpatialWeighting if weighting_module_version == 'v1' else SpatialWeightingV2
         branch_channels = [channel // 2 for channel in in_channels]
 
-        self.cross_resolution_weighting = cross_resolution_module(
+        self.cross_resolution_weighting = CrossResolutionWeighting(
             branch_channels,
             ratio=reduce_ratio,
             conv_cfg=conv_cfg,
@@ -265,7 +249,11 @@ class ConditionalChannelWeighting(nn.Module):
             for channel in branch_channels
         ])
         self.spatial_weighting = nn.ModuleList([
-            spatial_weighting_module(channels=channel, ratio=4)
+            spatial_weighting_module(
+                channels=channel,
+                ratio=4,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg)
             for channel in branch_channels
         ])
 
@@ -625,8 +613,7 @@ class LiteHRModule(nn.Module):
             norm_cfg=dict(type='BN'),
             with_cp=False,
             dropout=None,
-            cr_version='v1',
-            sw_version='v1'
+            weighting_module_version='v1'
     ):
         super().__init__()
         self._check_branches(num_branches, in_channels)
@@ -640,8 +627,7 @@ class LiteHRModule(nn.Module):
         self.norm_cfg = norm_cfg
         self.conv_cfg = conv_cfg
         self.with_cp = with_cp
-        self.cr_version = cr_version
-        self.sw_version = sw_version
+        self.weighting_module_version = weighting_module_version
 
         if self.module_type == 'LITE':
             self.layers = self._make_weighting_blocks(num_blocks, reduce_ratio, dropout=dropout)
@@ -671,8 +657,7 @@ class LiteHRModule(nn.Module):
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
                 dropout=dropout,
-                cr_version=self.cr_version,
-                sw_version=self.sw_version
+                weighting_module_version=self.weighting_module_version
             ))
 
         return nn.Sequential(*layers)
@@ -738,9 +723,6 @@ class LiteHRModule(nn.Module):
                         build_norm_layer(
                             self.norm_cfg,
                             in_channels[i])[1],
-                        # nn.Upsample(
-                        #     scale_factor=2**(j - i),
-                        #     mode='nearest')
                     ))
                 elif j == i:
                     fuse_layer.append(None)
@@ -832,7 +814,9 @@ class LiteHRModule(nn.Module):
                         fuse_y = F.interpolate(fuse_y, size=y.size()[-2:], mode='nearest')
 
                     y += fuse_y
+
                 out_fuse.append(self.relu(y))
+
             out = out_fuse
         elif not self.multiscale_output:
             out = [out[0]]
@@ -1038,8 +1022,7 @@ class LiteHRNet(nn.Module):
         reduce_ratio = stages_spec['reduce_ratios'][stage_index]
         with_fuse = stages_spec['with_fuse'][stage_index]
         module_type = stages_spec['module_type'][stage_index]
-        cr_version = stages_spec.get('cr_version', 'v1')
-        sw_version = stages_spec.get('sw_version', 'v1')
+        weighting_module_version = stages_spec.get('weighting_module_version', 'v1')
 
         modules = []
         for i in range(num_modules):
@@ -1061,8 +1044,7 @@ class LiteHRNet(nn.Module):
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
                 dropout=dropout,
-                cr_version=cr_version,
-                sw_version=sw_version
+                weighting_module_version=weighting_module_version
             ))
             in_channels = modules[-1].in_channels
 
