@@ -433,6 +433,149 @@ class Stem(nn.Module):
         return out
 
 
+class StemV2(nn.Module):
+    def __init__(self,
+                 in_channels,
+                 stem_channels,
+                 out_channels,
+                 expand_ratio,
+                 conv_cfg=None,
+                 norm_cfg=dict(type='BN'),
+                 with_cp=False,
+                 num_stages=1,
+                 strides=(2, 2),
+                 extra_stride=False,
+                 input_norm=False):
+        super().__init__()
+
+        assert num_stages > 0
+        assert isinstance(strides, (tuple, list))
+        assert len(strides) == 1 + num_stages
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.conv_cfg = conv_cfg
+        self.norm_cfg = norm_cfg
+        self.with_cp = with_cp
+        self.num_stages = num_stages
+
+        self.input_norm = None
+        if input_norm:
+            self.input_norm = nn.InstanceNorm2d(in_channels)
+
+        self.conv1 = ConvModule(
+            in_channels=in_channels,
+            out_channels=stem_channels,
+            kernel_size=3,
+            stride=strides[0],
+            padding=1,
+            conv_cfg=self.conv_cfg,
+            norm_cfg=self.norm_cfg,
+            act_cfg=dict(type='ReLU')
+        )
+
+        self.conv2 = None
+        if extra_stride:
+            self.conv2 = ConvModule(
+                in_channels=stem_channels,
+                out_channels=stem_channels,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                conv_cfg=self.conv_cfg,
+                norm_cfg=self.norm_cfg,
+                act_cfg=dict(type='ReLU')
+            )
+
+        mid_channels = int(round(stem_channels * expand_ratio))
+        internal_branch_channels = stem_channels // 2
+        out_branch_channels = self.out_channels // 2
+
+        self.branch1, self.branch2 = nn.ModuleList(), nn.ModuleList()
+        for stage in range(1, num_stages + 1):
+            self.branch1.append(nn.Sequential(
+                ConvModule(
+                    internal_branch_channels,
+                    internal_branch_channels,
+                    kernel_size=3,
+                    stride=strides[stage],
+                    padding=1,
+                    groups=internal_branch_channels,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=None),
+                ConvModule(
+                    internal_branch_channels,
+                    out_branch_channels if stage == num_stages else internal_branch_channels,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=dict(type='ReLU')),
+            ))
+
+            self.branch2.append(nn.Sequential(
+                ConvModule(
+                    internal_branch_channels,
+                    mid_channels,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=dict(type='ReLU')),
+                ConvModule(
+                    mid_channels,
+                    mid_channels,
+                    kernel_size=3,
+                    stride=strides[stage],
+                    padding=1,
+                    groups=mid_channels,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=None),
+                ConvModule(
+                    mid_channels,
+                    out_branch_channels if stage == num_stages else internal_branch_channels,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=dict(type='ReLU'))
+            ))
+
+    def _inner_forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
+
+        y = self.conv1(x)
+        if self.conv2 is not None:
+            y = self.conv2(y)
+
+        out_list = [y]
+        for stage in range(self.num_stages):
+            y1, y2 = y.chunk(2, dim=1)
+
+            y1 = self.branch1[stage](y1)
+            y2 = self.branch2[stage](y2)
+
+            y = torch.cat((y1, y2), dim=1)
+            y = channel_shuffle(y, 2)
+            out_list.append(y)
+
+        return out_list
+
+    def forward(self, x):
+        if self.with_cp and x.requires_grad:
+            out = cp.checkpoint(self._inner_forward, x)
+        else:
+            out = self._inner_forward(x)
+
+        return out
+
+
 class IterativeAggregator(nn.Module):
     def __init__(self, in_channels, conv_cfg=None, norm_cfg=dict(type='BN')):
         super().__init__()
@@ -863,7 +1006,7 @@ class LiteHRNet(nn.Module):
         self.with_cp = with_cp
         self.zero_init_residual = zero_init_residual
 
-        self.stem = Stem(
+        self.stem = StemV2(
             in_channels,
             input_norm=self.extra['stem']['input_norm'],
             stem_channels=self.extra['stem']['stem_channels'],
@@ -871,6 +1014,7 @@ class LiteHRNet(nn.Module):
             expand_ratio=self.extra['stem']['expand_ratio'],
             strides=self.extra['stem']['strides'],
             extra_stride=self.extra['stem']['extra_stride'],
+            num_stages=self.extra['stem'].get('num_stages', 1),
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg
         )
@@ -1110,8 +1254,9 @@ class LiteHRNet(nn.Module):
     def forward(self, x):
         """Forward function."""
 
-        y = self.stem(x)
-        y_stem = y
+        stem_outputs = self.stem(x)
+        y_x2, y_x4 = stem_outputs[-2:]
+        y = y_x4
 
         if self.enable_stem_pool:
             y = self.stem_pool(y)
@@ -1137,7 +1282,7 @@ class LiteHRNet(nn.Module):
             y_list.append(self.out_modules(y_list[-1]))
 
         if self.add_stem_features:
-            y_stem = self.stem_transition(y_stem)
+            y_stem = self.stem_transition(y_x2)
             y_list = [y_stem] + y_list
 
         out = y_list
