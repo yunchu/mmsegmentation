@@ -78,8 +78,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Generates toy dataset')
     parser.add_argument('output_dir', help='output dir')
     parser.add_argument('-r', '--resolution', type=int, default=544, help='Image resolution')
-    parser.add_argument('-nte', '--num_test', type=int, default=4, help='Number of test images')
-    parser.add_argument('-ntr', '--num_train', type=int, default=8, help='Number of train images')
+    parser.add_argument('-nte', '--num_test', type=int, default=3, help='Number of test images')
+    parser.add_argument('-ntr', '--num_train', type=int, default=6, help='Number of train images')
     args = parser.parse_args()
     return args
 
