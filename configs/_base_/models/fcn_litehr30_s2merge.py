@@ -18,9 +18,10 @@ model = dict(
                 stem_channels=32,
                 out_channels=32,
                 expand_ratio=1,
-                strides=(2, 2),
+                strides=(2, 1),
                 extra_stride=False,
                 input_norm=False,
+                out_pool=True,
             ),
             num_stages=3,
             stages_spec=dict(
@@ -55,6 +56,7 @@ model = dict(
             out_aggregator=dict(
                 enable=True
             ),
+            add_stem_features=True,
             add_input=False
         )
     ),

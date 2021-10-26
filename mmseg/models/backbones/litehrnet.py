@@ -875,6 +875,10 @@ class LiteHRNet(nn.Module):
             norm_cfg=self.norm_cfg
         )
 
+        self.enable_stem_pool = self.extra['stem'].get('out_pool', False)
+        if self.enable_stem_pool:
+            self.stem_pool = nn.AvgPool2d(kernel_size=3, stride=2)
+
         self.num_stages = self.extra['num_stages']
         self.stages_spec = self.extra['stages_spec']
 
@@ -932,6 +936,32 @@ class LiteHRNet(nn.Module):
             if len(out_modules) > 0:
                 self.out_modules = nn.Sequential(*out_modules)
                 num_channels_last.append(in_modules_channels)
+
+        self.add_stem_features = self.extra.get('add_stem_features', False)
+        if self.add_stem_features:
+            self.stem_transition = nn.Sequential(
+                ConvModule(
+                    self.stem.out_channels,
+                    self.stem.out_channels,
+                    kernel_size=3,
+                    stride=1,
+                    padding=1,
+                    groups=self.stem.out_channels,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=None),
+                ConvModule(
+                    self.stem.out_channels,
+                    num_channels_last[0],
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg,
+                    act_cfg=dict(type='ReLU')),
+            )
+
+            num_channels_last = [num_channels_last[0]] + num_channels_last
 
         self.with_aggregator = self.extra.get('out_aggregator') and self.extra['out_aggregator']['enable']
         if self.with_aggregator:
@@ -1081,6 +1111,10 @@ class LiteHRNet(nn.Module):
         """Forward function."""
 
         y = self.stem(x)
+        y_stem = y
+
+        if self.enable_stem_pool:
+            y = self.stem_pool(y)
 
         y_list = [y]
         for i in range(self.num_stages):
@@ -1101,6 +1135,10 @@ class LiteHRNet(nn.Module):
 
         if self.out_modules is not None:
             y_list.append(self.out_modules(y_list[-1]))
+
+        if self.add_stem_features:
+            y_stem = self.stem_transition(y_stem)
+            y_list = [y_stem] + y_list
 
         out = y_list
         if self.with_aggregator:
