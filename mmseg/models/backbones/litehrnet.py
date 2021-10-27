@@ -1006,7 +1006,7 @@ class LiteHRNet(nn.Module):
         self.with_cp = with_cp
         self.zero_init_residual = zero_init_residual
 
-        self.stem = StemV2(
+        self.stem = Stem(
             in_channels,
             input_norm=self.extra['stem']['input_norm'],
             stem_channels=self.extra['stem']['stem_channels'],
@@ -1014,7 +1014,6 @@ class LiteHRNet(nn.Module):
             expand_ratio=self.extra['stem']['expand_ratio'],
             strides=self.extra['stem']['strides'],
             extra_stride=self.extra['stem']['extra_stride'],
-            num_stages=self.extra['stem'].get('num_stages', 1),
             conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg
         )
@@ -1255,7 +1254,8 @@ class LiteHRNet(nn.Module):
         """Forward function."""
 
         stem_outputs = self.stem(x)
-        y_x2, y_x4 = stem_outputs[-2:]
+        y_x2 = y_x4 = stem_outputs
+        # y_x2, y_x4 = stem_outputs[-2:]
         y = y_x4
 
         if self.enable_stem_pool:
