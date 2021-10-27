@@ -71,8 +71,8 @@ class SpatialWeighting(nn.Module):
                  channels,
                  ratio=16,
                  conv_cfg=None,
-                 norm_cfg=None,
-                 act_cfg=(dict(type='ReLU'), dict(type='Sigmoid'))):
+                 act_cfg=(dict(type='ReLU'), dict(type='Sigmoid')),
+                 **kwargs):
         super().__init__()
 
         if isinstance(act_cfg, dict):
@@ -112,7 +112,9 @@ class SpatialWeightingV2(nn.Module):
                  channels,
                  ratio=16,
                  conv_cfg=None,
-                 norm_cfg=None):
+                 norm_cfg=None,
+                 enable_norm=False,
+                 **kwargs):
         super().__init__()
 
         self.in_channels = channels
@@ -126,7 +128,7 @@ class SpatialWeightingV2(nn.Module):
             stride=1,
             bias=False,
             conv_cfg=conv_cfg,
-            norm_cfg=None,
+            norm_cfg=norm_cfg if enable_norm else None,
             act_cfg=None)
         self.q_channel = ConvModule(
             in_channels=self.in_channels,
@@ -135,7 +137,7 @@ class SpatialWeightingV2(nn.Module):
             stride=1,
             bias=False,
             conv_cfg=conv_cfg,
-            norm_cfg=None,
+            norm_cfg=norm_cfg if enable_norm else None,
             act_cfg=None)
         self.out_channel = ConvModule(
             in_channels=self.internal_channels,
@@ -154,7 +156,7 @@ class SpatialWeightingV2(nn.Module):
             stride=1,
             bias=False,
             conv_cfg=conv_cfg,
-            norm_cfg=None,
+            norm_cfg=norm_cfg if enable_norm else None,
             act_cfg=None)
         self.q_spatial = ConvModule(
             in_channels=self.in_channels,
@@ -163,7 +165,7 @@ class SpatialWeightingV2(nn.Module):
             stride=1,
             bias=False,
             conv_cfg=conv_cfg,
-            norm_cfg=None,
+            norm_cfg=norm_cfg if enable_norm else None,
             act_cfg=None)
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
 
@@ -253,7 +255,8 @@ class ConditionalChannelWeighting(nn.Module):
                 channels=channel,
                 ratio=4,
                 conv_cfg=conv_cfg,
-                norm_cfg=norm_cfg)
+                norm_cfg=norm_cfg,
+                enable_norm=True)
             for channel in branch_channels
         ])
 
