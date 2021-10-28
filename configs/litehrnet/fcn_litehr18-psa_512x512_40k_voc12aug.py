@@ -21,7 +21,7 @@ model = dict(
         loss_decode=[
             dict(
                 type='CrossEntropyLoss',
-                gamma=2.0,
+                gamma=0.0,
                 loss_jitter_prob=0.01,
                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                 loss_weight=1.0
