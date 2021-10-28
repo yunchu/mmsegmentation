@@ -256,7 +256,7 @@ class ConditionalChannelWeighting(nn.Module):
                 ratio=4,
                 conv_cfg=conv_cfg,
                 norm_cfg=norm_cfg,
-                enable_norm=False)
+                enable_norm=True)
             for channel in branch_channels
         ])
 

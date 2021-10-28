@@ -29,10 +29,10 @@ class SpatialGatherModule(nn.Module):
         channels = feats.size(1)
 
         prev_logits = prev_logits.view(batch_size, num_classes, -1)
-        feats = feats.view(batch_size, channels, -1)
-
-        feats = feats.permute(0, 2, 1)  # [batch_size, height*width, channels]
         probs = F.softmax(self.scale * prev_logits, dim=2)  # [batch_size, num_classes, height*width]
+
+        feats = feats.view(batch_size, channels, -1)
+        feats = feats.permute(0, 2, 1)  # [batch_size, height*width, channels]
 
         out_context = torch.matmul(probs, feats)  # [batch_size, num_classes, channels]
         out_context = out_context.permute(0, 2, 1).contiguous().unsqueeze(3)  # [batch_size, channels, num_classes, 1]
