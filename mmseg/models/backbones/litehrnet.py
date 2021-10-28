@@ -16,6 +16,81 @@ from ..builder import BACKBONES
 from .resnet import BasicBlock, Bottleneck
 
 
+class NeighbourSupport(nn.Module):
+    def __init__(self, channels, kernel_size=3, key_ratio=8, value_ratio=8, conv_cfg=None, norm_cfg=None):
+        super().__init__()
+
+        self.in_channels = channels
+        self.key_channels = int(channels / key_ratio)
+        self.value_channels = int(channels / value_ratio)
+        self.kernel_size = kernel_size
+
+        self.key = nn.Sequential(
+            ConvModule(
+                in_channels=self.in_channels,
+                out_channels=self.key_channels,
+                kernel_size=1,
+                stride=1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=dict(type='ReLU')),
+            ConvModule(
+                self.key_channels,
+                self.key_channels,
+                kernel_size=self.kernel_size,
+                stride=1,
+                padding=(self.kernel_size - 1) // 2,
+                groups=self.key_channels,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=None),
+            ConvModule(
+                in_channels=self.key_channels,
+                out_channels=self.kernel_size * self.kernel_size,
+                kernel_size=1,
+                stride=1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=None)
+        )
+        self.value = nn.Sequential(
+            ConvModule(
+                in_channels=self.in_channels,
+                out_channels=self.value_channels,
+                kernel_size=1,
+                stride=1,
+                conv_cfg=conv_cfg,
+                norm_cfg=norm_cfg,
+                act_cfg=None),
+            nn.Unfold(kernel_size=self.kernel_size,
+                      stride=1,
+                      padding=1)
+        )
+        self.out_conv = ConvModule(
+            in_channels=self.value_channels,
+            out_channels=self.in_channels,
+            kernel_size=1,
+            stride=1,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg,
+            act_cfg=None
+        )
+
+    def forward(self, x):
+        h, w = [int(_) for _ in x.size()[-2:]]
+
+        key = self.key(x).view(-1, 1, self.kernel_size ** 2, h, w)
+        weights = torch.softmax(key, dim=2)
+
+        value = self.value(x).view(-1, self.value_channels, self.kernel_size ** 2, h, w)
+        y = torch.sum(weights * value, dim=2)
+        y = self.out_conv(y)
+
+        out = x + y
+
+        return out
+
+
 class CrossResolutionWeighting(nn.Module):
     def __init__(self,
                  channels,
@@ -221,7 +296,8 @@ class ConditionalChannelWeighting(nn.Module):
                  norm_cfg=dict(type='BN'),
                  with_cp=False,
                  dropout=None,
-                 weighting_module_version='v1'):
+                 weighting_module_version='v1',
+                 neighbour_weighting=False):
         super().__init__()
 
         self.with_cp = with_cp
@@ -260,6 +336,19 @@ class ConditionalChannelWeighting(nn.Module):
             for channel in branch_channels
         ])
 
+        self.neighbour_weighting = None
+        if neighbour_weighting:
+            self.neighbour_weighting = nn.ModuleList([
+                NeighbourSupport(
+                    channel,
+                    kernel_size=3,
+                    key_ratio=8,
+                    value_ratio=4,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=norm_cfg)
+                for channel in branch_channels
+            ])
+
         self.dropout = None
         if dropout is not None and dropout > 0:
             self.dropout = nn.ModuleList([
@@ -274,6 +363,10 @@ class ConditionalChannelWeighting(nn.Module):
 
         x2 = self.cross_resolution_weighting(x2)
         x2 = [dw(s) for s, dw in zip(x2, self.depthwise_convs)]
+
+        if self.neighbour_weighting is not None:
+            x2 = [nw(s) for s, nw in zip(x2, self.neighbour_weighting)]
+
         x2 = [sw(s) for s, sw in zip(x2, self.spatial_weighting)]
 
         if self.dropout is not None:
@@ -759,7 +852,8 @@ class LiteHRModule(nn.Module):
             norm_cfg=dict(type='BN'),
             with_cp=False,
             dropout=None,
-            weighting_module_version='v1'
+            weighting_module_version='v1',
+            neighbour_weighting=False
     ):
         super().__init__()
         self._check_branches(num_branches, in_channels)
@@ -774,6 +868,7 @@ class LiteHRModule(nn.Module):
         self.conv_cfg = conv_cfg
         self.with_cp = with_cp
         self.weighting_module_version = weighting_module_version
+        self.neighbour_weighting = neighbour_weighting
 
         if self.module_type == 'LITE':
             self.layers = self._make_weighting_blocks(num_blocks, reduce_ratio, dropout=dropout)
@@ -803,7 +898,8 @@ class LiteHRModule(nn.Module):
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
                 dropout=dropout,
-                weighting_module_version=self.weighting_module_version
+                weighting_module_version=self.weighting_module_version,
+                neighbour_weighting=self.neighbour_weighting
             ))
 
         return nn.Sequential(*layers)
@@ -1199,6 +1295,7 @@ class LiteHRNet(nn.Module):
         with_fuse = stages_spec['with_fuse'][stage_index]
         module_type = stages_spec['module_type'][stage_index]
         weighting_module_version = stages_spec.get('weighting_module_version', 'v1')
+        neighbour_weighting = stages_spec.get('neighbour_weighting', False)
 
         modules = []
         for i in range(num_modules):
@@ -1220,7 +1317,8 @@ class LiteHRNet(nn.Module):
                 norm_cfg=self.norm_cfg,
                 with_cp=self.with_cp,
                 dropout=dropout,
-                weighting_module_version=weighting_module_version
+                weighting_module_version=weighting_module_version,
+                neighbour_weighting=neighbour_weighting
             ))
             in_channels = modules[-1].in_channels
 
