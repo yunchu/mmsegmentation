@@ -60,7 +60,7 @@ class BasePixelLoss(BaseWeightedLoss):
         entropy_values = entropy(probs, dim=1)
         out_values = -weight * entropy_values
 
-        return out_values
+        return out_values.detach()
 
     @staticmethod
     def _sparsity(values, valid_mask):
