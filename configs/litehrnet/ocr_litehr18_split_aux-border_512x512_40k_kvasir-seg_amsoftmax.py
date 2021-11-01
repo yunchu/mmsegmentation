@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/fcn_litehr18_no-aggregator.py', '../_base_/datasets/kvasir.py',
+    '../_base_/models/fcn_litehr18_no-aggregator.py', '../_base_/datasets/kvasir_extra.py',
     '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
 ]
 
@@ -85,12 +85,13 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=False,
+             loss_target='gt_class_borders',
              loss_decode=[
                  dict(type='CrossEntropyLoss',
                       use_sigmoid=False,
                       loss_jitter_prob=0.01,
-                      sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-                      loss_weight=1.0),
+                      sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
+                      loss_weight=10.0),
              ]),
     ],
     train_cfg=dict(
