@@ -103,13 +103,14 @@ class EncoderDecoder(BaseSegmentor):
 
         return out
 
-    def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg, pixel_weights=None):
+    def _decode_head_forward_train(self, x, img_metas, pixel_weights=None, **kwargs):
         """Run forward function and calculate loss for decode head in training."""
 
+        trg_map = self._found_trg_argument(self.decode_head.loss_target_name, **kwargs)
         loss_decode = self.decode_head.forward_train(
             x,
             img_metas,
-            gt_semantic_seg,
+            trg_map,
             self.train_cfg,
             pixel_weights
         )
@@ -125,22 +126,37 @@ class EncoderDecoder(BaseSegmentor):
         seg_logits = self.decode_head.forward_test(x, img_metas, self.test_cfg)
         return seg_logits
 
-    def _auxiliary_head_forward_train(self, x, img_metas, gt_semantic_seg):
-        """Run forward function and calculate loss for auxiliary head in
-        training."""
+    def _auxiliary_head_forward_train(self, x, img_metas, **kwargs):
+        """Run forward function and calculate loss for auxiliary head in training."""
+
         losses = dict()
         if isinstance(self.auxiliary_head, nn.ModuleList):
             for idx, aux_head in enumerate(self.auxiliary_head):
-                loss_aux = aux_head.forward_train(x, img_metas,
-                                                  gt_semantic_seg,
-                                                  self.train_cfg)
+                trg_map = self._found_trg_argument(aux_head.loss_target_name, **kwargs)
+                loss_aux = aux_head.forward_train(
+                    x,
+                    img_metas,
+                    trg_map,
+                    self.train_cfg
+                )
                 losses.update(add_prefix(loss_aux, f'aux_{idx}'))
         else:
+            trg_map = self._found_trg_argument(self.auxiliary_head.loss_target_name, **kwargs)
             loss_aux = self.auxiliary_head.forward_train(
-                x, img_metas, gt_semantic_seg, self.train_cfg)
+                x,
+                img_metas,
+                trg_map,
+                self.train_cfg
+            )
             losses.update(add_prefix(loss_aux, 'aux'))
 
         return losses
+
+    @staticmethod
+    def _found_trg_argument(trg_name, **arguments):
+        assert trg_name in arguments.keys()
+
+        return arguments[trg_name]
 
     def forward_dummy(self, img):
         """Dummy forward function."""
@@ -148,7 +164,7 @@ class EncoderDecoder(BaseSegmentor):
 
         return seg_logit
 
-    def forward_train(self, img, img_metas, gt_semantic_seg, aux_img=None, pixel_weights=None):
+    def forward_train(self, img, img_metas, gt_semantic_seg, aux_img=None, pixel_weights=None, **kwargs):
         """Forward function for training.
 
         Args:
@@ -177,11 +193,13 @@ class EncoderDecoder(BaseSegmentor):
 
         x = self.extract_feat(img)
 
-        loss_decode = self._decode_head_forward_train(x, img_metas, gt_semantic_seg, pixel_weights)
+        loss_decode = self._decode_head_forward_train(x, img_metas, pixel_weights,
+                                                      gt_semantic_seg=gt_semantic_seg, **kwargs)
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
-            loss_aux = self._auxiliary_head_forward_train(x, img_metas, gt_semantic_seg)
+            loss_aux = self._auxiliary_head_forward_train(x, img_metas,
+                                                          gt_semantic_seg=gt_semantic_seg, **kwargs)
             losses.update(loss_aux)
 
         return losses

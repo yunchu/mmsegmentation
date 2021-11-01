@@ -65,6 +65,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  enable_aggregator=False,
                  enable_out_seg=True,
                  enable_out_norm=False,
+                 loss_target='gt_semantic_seg',
                  **kwargs):
         super(BaseDecodeHead, self).__init__()
 
@@ -80,6 +81,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.align_corners = align_corners
         self.fp16_enabled = False
         self.enable_out_norm = enable_out_norm
+        self.loss_target = loss_target
 
         loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
         assert len(loss_configs) > 0
@@ -118,6 +120,10 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                 norm_cfg=self.norm_cfg
             )
             self.in_channels = in_channels[0]
+
+    @property
+    def loss_target_name(self):
+        return self.loss_target
 
     @property
     def last_scale(self):
