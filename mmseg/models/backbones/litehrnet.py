@@ -5,8 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
-from mmcv.cnn import (ConvModule, DepthwiseSeparableConvModule,
-                      build_conv_layer, build_norm_layer, constant_init, normal_init)
+from mmcv.cnn import ConvModule, build_conv_layer, build_norm_layer, constant_init, normal_init
 from mmcv.runner import load_checkpoint
 from mmcv.utils.parrots_wrapper import _BatchNorm
 

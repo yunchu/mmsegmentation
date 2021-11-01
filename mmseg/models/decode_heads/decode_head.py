@@ -7,6 +7,7 @@ from mmcv.cnn import normal_init
 from mmcv.runner import auto_fp16, force_fp32
 
 from mmseg.core import normalize, add_prefix, AngularPWConv
+from mmseg.models.utils import IterativeAggregator
 from mmseg.ops import resize
 from ..builder import build_loss
 from ..losses import accuracy
@@ -61,6 +62,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                      loss_weight=1.0),
                  ignore_index=255,
                  align_corners=False,
+                 enable_aggregator=False,
                  enable_out_seg=True,
                  enable_out_norm=False,
                  **kwargs):
@@ -74,7 +76,6 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
-        self.in_index = in_index
         self.ignore_index = ignore_index
         self.align_corners = align_corners
         self.fp16_enabled = False
@@ -105,6 +106,18 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                     num_classes,
                     kernel_size=1
                 )
+
+        self.aggregator = None
+        if enable_aggregator:
+            assert isinstance(in_channels, (tuple, list))
+            assert len(in_channels) > 1
+
+            self.aggregator = IterativeAggregator(
+                in_channels=in_channels,
+                conv_cfg=self.conv_cfg,
+                norm_cfg=self.norm_cfg
+            )
+            self.in_channels = in_channels[0]
 
     @property
     def last_scale(self):
@@ -197,6 +210,9 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
             inputs = [inputs[i] for i in self.in_index]
         else:
             inputs = inputs[self.in_index]
+
+        if self.aggregator is not None:
+            inputs = self.aggregator(inputs)[0]
 
         return inputs
 
