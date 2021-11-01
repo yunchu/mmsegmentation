@@ -1,3 +1,4 @@
+from .aggregator import IterativeAggregator
 from .drop import DropPath
 from .inverted_residual import InvertedResidual, InvertedResidualV3
 from .make_divisible import make_divisible
@@ -14,6 +15,7 @@ from .psp_layer import PSPModule
 from .asymmetric_position_attention import AsymmetricPositionAttentionModule
 
 __all__ = [
+    'IterativeAggregator',
     'ResLayer',
     'SelfAttentionBlock',
     'make_divisible',
