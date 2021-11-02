@@ -1,5 +1,3 @@
-"""Modified from https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/losses/tversky.html"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,17 +6,19 @@ from ..builder import LOSSES
 from .utils import get_class_weight
 
 
-def tversky_loss(pred,
-                 target,
-                 valid_mask,
-                 alpha,
-                 beta,
-                 eps=1e-6,
-                 class_weight=None,
-                 reduction='mean',
-                 avg_factor=None,
-                 ignore_index=255,
-                 **kwargs):
+def target_loss(pred,
+                target,
+                valid_mask,
+                smooth,
+                gamma,
+                alpha,
+                beta,
+                focal_gamma=None,
+                class_weight=None,
+                reduction='mean',
+                avg_factor=None,
+                ignore_index=255,
+                **kwargs):
     assert pred.shape[0] == target.shape[0]
 
     num_classes = pred.shape[1]
@@ -32,19 +32,23 @@ def tversky_loss(pred,
 
     class_losses = []
     for i in class_ids:
-        tversky_loss_value = binary_tversky_loss(
+        target_loss_value = binary_target_loss(
             pred[:, i],
             target[..., i],
             valid_mask=valid_mask,
+            smooth=smooth,
+            gamma=gamma,
             alpha=alpha,
             beta=beta,
-            eps=eps,
         )
 
-        if class_weight is not None:
-            tversky_loss_value *= class_weight[i]
+        if focal_gamma is not None and focal_gamma != 1.0:
+            target_loss_value = target_loss_value.pow(focal_gamma)
 
-        class_losses.append(tversky_loss_value)
+        if class_weight is not None:
+            target_loss_value = class_weight[i] * target_loss_value
+
+        class_losses.append(target_loss_value)
 
     if avg_factor is None:
         if reduction == 'mean':
@@ -58,13 +62,15 @@ def tversky_loss(pred,
     else:
         if reduction == 'mean':
             loss = sum(class_losses) / avg_factor
-        elif reduction != 'none':
+        elif reduction == 'none':
+            loss = class_losses
+        else:
             raise ValueError('avg_factor can not be used with reduction="sum"')
 
     return loss
 
 
-def binary_tversky_loss(pred, target, valid_mask, alpha, beta, eps=1e-6):
+def binary_target_loss(pred, target, valid_mask, smooth, gamma, alpha, beta):
     assert pred.shape[0] == target.shape[0]
 
     pred = pred.reshape(pred.shape[0], -1)
@@ -74,36 +80,57 @@ def binary_tversky_loss(pred, target, valid_mask, alpha, beta, eps=1e-6):
     valid_pred = torch.mul(pred, valid_mask)
     valid_target = torch.mul(target, valid_mask)
 
-    intersection = torch.sum(valid_pred * valid_target, dim=1)
-    fps = torch.sum(valid_pred * (1.0 - valid_target), dim=1)
-    fns = torch.sum((1.0 - valid_pred) * valid_target, dim=1)
+    tps = torch.sum(valid_pred * valid_target, dim=1)
+    fps = torch.sum((valid_pred * (1.0 - valid_target)).pow(gamma), dim=1)
+    fns = torch.sum(((1.0 - valid_pred) * valid_target).pow(gamma), dim=1)
 
-    numerator = intersection
-    denominator = intersection + alpha * fps + beta * fns
+    numerator = 2.0 * tps + smooth
+    denominator = 2.0 * tps + alpha * fps + beta * fns + smooth
 
-    return 1.0 - numerator / (denominator + eps)
+    return 1.0 - numerator / denominator
 
 
 @LOSSES.register_module()
-class TverskyLoss(nn.Module):
-    """TverskyLoss.
+class GeneralizedDiceLoss(nn.Module):
+    """GeneralizedDiceLoss.
 
-    This loss is proposed in `Tversky loss function for image segmentation
-    using 3D fully convolutional deep networks <https://arxiv.org/abs/1706.05721>`_.
+    Implements several common losses:
+
+    * Dice loss. This loss is proposed in `V-Net: Fully Convolutional Neural Networks for
+      Volumetric Medical Image Segmentation <https://arxiv.org/abs/1606.04797>`_.
+
+      Parameter values: gamma = 1, alpha = 1, beta = 1
+
+    * Tversky loss. This loss is proposed in `Tversky loss function for image segmentation
+      using 3D fully convolutional deep networks <https://arxiv.org/abs/1706.05721>`_.
+      Modified from https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/losses/tversky.html
+
+      Parameter values: gamma = 1, alpha = 0.6, beta = 1.4
+
+    * Dice++ loss. his loss is proposed in 'Calibrating the Dice loss to handle neural network
+       overconfidence for biomedical image segmentation <https://arxiv.org/abs/2111.00528>'.
+
+       Parameter values: gamma = 2, alpha = 1, beta = 1
+
+
     """
 
     def __init__(self,
-                 alpha=0.3,
-                 beta=0.7,
-                 eps=1e-6,
+                 smooth=1,
+                 gamma=1,
+                 alpha=1,
+                 beta=1,
+                 focal_gamma=1,
                  reduction='mean',
                  class_weight=None,
                  loss_weight=1.0):
-        super(TverskyLoss, self).__init__()
+        super(GeneralizedDiceLoss, self).__init__()
 
-        self.alpha = alpha
-        self.beta = beta
-        self.eps = eps
+        self.smooth = float(smooth)
+        self.gamma = float(gamma)
+        self.alpha = float(alpha)
+        self.beta = float(beta)
+        self.focal_gamma = float(focal_gamma)
         self.reduction = reduction
         self.class_weight = get_class_weight(class_weight)
         self.loss_weight = loss_weight
@@ -136,13 +163,15 @@ class TverskyLoss(nn.Module):
 
         valid_mask = (target != ignore_index).long()
 
-        loss = self.loss_weight * tversky_loss(
+        loss = self.loss_weight * target_loss(
             pred,
             one_hot_target,
             valid_mask=valid_mask,
+            smooth=self.smooth,
+            gamma=self.gamma,
             alpha=self.alpha,
             beta=self.beta,
-            eps=self.eps,
+            focal_gamma=self.focal_gamma,
             class_weight=class_weight,
             reduction=reduction,
             avg_factor=avg_factor,
