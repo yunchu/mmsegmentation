@@ -1,24 +1,13 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from ..builder import LOSSES
 from .utils import get_class_weight
+from .base import BaseWeightedLoss
 
 
-def target_loss(pred,
-                target,
-                valid_mask,
-                smooth,
-                gamma,
-                alpha,
-                beta,
-                focal_gamma=None,
-                class_weight=None,
-                reduction='mean',
-                avg_factor=None,
-                ignore_index=255,
-                **kwargs):
+def compute_loss(pred, target, valid_mask, smooth, gamma, alpha, beta, focal_gamma=None,
+                 class_weight=None, reduction='mean', avg_factor=None, ignore_index=255):
     assert pred.shape[0] == target.shape[0]
 
     num_classes = pred.shape[1]
@@ -84,14 +73,14 @@ def binary_target_loss(pred, target, valid_mask, smooth, gamma, alpha, beta):
     fps = torch.sum((valid_pred * (1.0 - valid_target)).pow(gamma), dim=1)
     fns = torch.sum(((1.0 - valid_pred) * valid_target).pow(gamma), dim=1)
 
-    numerator = 2.0 * tps + smooth
-    denominator = 2.0 * tps + alpha * fps + beta * fns + smooth
+    numerator = tps + smooth
+    denominator = tps + alpha * fps + beta * fns + smooth
 
-    return 1.0 - numerator / denominator
+    return torch.mean(1.0 - numerator / denominator)
 
 
 @LOSSES.register_module()
-class GeneralizedDiceLoss(nn.Module):
+class GeneralizedDiceLoss(BaseWeightedLoss):
     """GeneralizedDiceLoss.
 
     Implements several common losses:
@@ -99,53 +88,49 @@ class GeneralizedDiceLoss(nn.Module):
     * Dice loss. This loss is proposed in `V-Net: Fully Convolutional Neural Networks for
       Volumetric Medical Image Segmentation <https://arxiv.org/abs/1606.04797>`_.
 
-      Parameter values: gamma = 1, alpha = 1, beta = 1
+      Parameter values: gamma = 1.0, alpha = 0.5, beta = 0.5
 
     * Tversky loss. This loss is proposed in `Tversky loss function for image segmentation
       using 3D fully convolutional deep networks <https://arxiv.org/abs/1706.05721>`_.
       Modified from https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/losses/tversky.html
 
-      Parameter values: gamma = 1, alpha = 0.6, beta = 1.4
+      Parameter values: gamma = 1.0, alpha = 0.3, beta = 0.7
 
     * Dice++ loss. his loss is proposed in 'Calibrating the Dice loss to handle neural network
        overconfidence for biomedical image segmentation <https://arxiv.org/abs/2111.00528>'.
 
-       Parameter values: gamma = 2, alpha = 1, beta = 1
+       Parameter values: gamma = 2.0, alpha = 0.5, beta = 0.5
 
 
     """
 
     def __init__(self,
-                 smooth=1,
-                 gamma=1,
-                 alpha=1,
-                 beta=1,
-                 focal_gamma=1,
-                 reduction='mean',
+                 smooth=1.0,
+                 gamma=1.0,
+                 alpha=0.5,
+                 beta=0.5,
+                 focal_gamma=1.0,
                  class_weight=None,
-                 loss_weight=1.0):
-        super(GeneralizedDiceLoss, self).__init__()
+                 **kwargs):
+        super(GeneralizedDiceLoss, self).__init__(**kwargs)
 
         self.smooth = float(smooth)
         self.gamma = float(gamma)
         self.alpha = float(alpha)
         self.beta = float(beta)
         self.focal_gamma = float(focal_gamma)
-        self.reduction = reduction
         self.class_weight = get_class_weight(class_weight)
-        self.loss_weight = loss_weight
 
     @property
     def name(self):
-        return 'tversky'
+        return 'gdice'
 
-    def forward(self,
-                pred,
-                target,
-                avg_factor=None,
-                reduction_override=None,
-                ignore_index=255,
-                **kwargs):
+    def _forward(self,
+                 pred,
+                 target,
+                 avg_factor=None,
+                 reduction_override=None,
+                 **kwargs):
         assert reduction_override in (None, 'none', 'mean', 'sum')
         reduction = (reduction_override if reduction_override else self.reduction)
 
@@ -161,9 +146,9 @@ class GeneralizedDiceLoss(nn.Module):
             num_classes=num_classes
         )
 
-        valid_mask = (target != ignore_index).long()
+        valid_mask = (target != self.ignore_index).long()
 
-        loss = self.loss_weight * target_loss(
+        loss = compute_loss(
             pred,
             one_hot_target,
             valid_mask=valid_mask,
@@ -175,8 +160,8 @@ class GeneralizedDiceLoss(nn.Module):
             class_weight=class_weight,
             reduction=reduction,
             avg_factor=avg_factor,
-            ignore_index=ignore_index,
-            **kwargs
+            ignore_index=self.ignore_index
         )
+        meta = dict()
 
-        return loss
+        return loss, meta
