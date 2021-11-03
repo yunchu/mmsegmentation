@@ -123,3 +123,36 @@ def weighted_loss(loss_func):
         return loss
 
     return wrapper
+
+
+class LossEqualizer:
+    def __init__(self, momentum=0.1):
+        self.momentum = momentum
+
+        self._smoothed_values = dict()
+
+    def reweight(self, losses):
+        assert isinstance(losses, dict)
+
+        if len(losses) == 0:
+            return losses
+
+        for loss_name, loss_value in losses.items():
+            if loss_name not in self._smoothed_values:
+                self._smoothed_values[loss_name] = loss_value.item()
+            else:
+                smoothed_loss = self._smoothed_values[loss_name]
+                self._smoothed_values[loss_name] = (1.0 - self.momentum) * smoothed_loss + \
+                                                   self.momentum * loss_value.item()
+
+        if len(self._smoothed_values) == 1:
+            return losses
+
+        trg_value = sum(self._smoothed_values.values()) / float(len(self._smoothed_values))
+
+        weighted_losses = dict()
+        for loss_name, loss_value in losses.items():
+            loss_weight = trg_value / loss_value.item()
+            weighted_losses[loss_name] = loss_weight * loss_value
+
+        return weighted_losses

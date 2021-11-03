@@ -22,6 +22,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=False,
+             enable_loss_equalizer=True,
              loss_decode=[
                  dict(type='CrossEntropyLoss',
                       use_sigmoid=False,
@@ -76,14 +77,6 @@ model = dict(
                       border_reweighting=False,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                       loss_weight=1.0),
-                 # dict(type='GeneralizedDiceLoss',
-                 #      smooth=1.0,
-                 #      gamma=5.0,
-                 #      alpha=0.5,
-                 #      beta=0.5,
-                 #      focal_gamma=1.0,
-                 #      loss_jitter_prob=0.01,
-                 #      loss_weight=1.0),
              ]),
     ],
     auxiliary_head=[
@@ -101,6 +94,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=False,
+             enable_loss_equalizer=True,
              loss_target='gt_class_borders',
              loss_decode=[
                  dict(type='CrossEntropyLoss',

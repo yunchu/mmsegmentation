@@ -10,7 +10,7 @@ from mmseg.core import normalize, add_prefix, AngularPWConv
 from mmseg.models.utils import IterativeAggregator
 from mmseg.ops import resize
 from ..builder import build_loss
-from ..losses import accuracy
+from ..losses import accuracy, LossEqualizer
 
 
 class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
@@ -65,6 +65,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                  enable_aggregator=False,
                  enable_out_seg=True,
                  enable_out_norm=False,
+                 enable_loss_equalizer=False,
                  loss_target='gt_semantic_seg',
                  **kwargs):
         super(BaseDecodeHead, self).__init__()
@@ -81,6 +82,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         self.align_corners = align_corners
         self.fp16_enabled = False
         self.enable_out_norm = enable_out_norm
+        self.enable_loss_equalizer = enable_loss_equalizer
         self.loss_target = loss_target
 
         loss_configs = loss_decode if isinstance(loss_decode, (tuple, list)) else [loss_decode]
@@ -120,6 +122,10 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
                 norm_cfg=self.norm_cfg
             )
             self.in_channels = in_channels[0]
+
+        self.loss_equalizer = None
+        if enable_loss_equalizer:
+            self.loss_equalizer = LossEqualizer()
 
     @property
     def loss_target_name(self):
@@ -314,20 +320,25 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
 
         seg_label = seg_label.squeeze(1)
 
-        loss_values = []
+        out_losses = dict()
         for loss_idx, loss_module in enumerate(self.loss_modules):
             loss_value, loss_meta = loss_module(
                 seg_logit,
                 seg_label,
                 pixel_weights=pixel_weights
             )
-            loss_values.append(loss_value)
 
             loss_name = loss_module.name + f'-{loss_idx}'
-            loss[loss_name] = loss_value
+            out_losses[loss_name] = loss_value
             loss.update(add_prefix(loss_meta, loss_name))
 
-        loss['loss_seg'] = sum(loss_values)
+        if self.enable_loss_equalizer and len(self.loss_modules) > 1:
+            out_losses = self.loss_equalizer.reweight(out_losses)
+
+        for loss_name, loss_value in out_losses.items():
+            loss[loss_name] = loss_value
+
+        loss['loss_seg'] = sum(out_losses.values())
         loss['acc_seg'] = accuracy(seg_logit, seg_label)
 
         if train_cfg.mix_loss.enable:

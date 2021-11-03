@@ -4,7 +4,7 @@ from .lovasz_loss import LovaszLoss
 from .generalized_dice_loss import GeneralizedDiceLoss
 from .boundary_loss import BoundaryLoss
 from .am_softmax import AMSoftmaxLoss
-from .utils import reduce_loss, weight_reduce_loss, weighted_loss
+from .utils import reduce_loss, weight_reduce_loss, weighted_loss, LossEqualizer
 
 __all__ = [
     'accuracy',
@@ -20,4 +20,5 @@ __all__ = [
     'GeneralizedDiceLoss',
     'BoundaryLoss',
     'AMSoftmaxLoss',
+    'LossEqualizer',
 ]
