@@ -20,6 +20,7 @@ import shutil
 import tempfile
 import warnings
 from collections import defaultdict
+from subprocess import run
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -61,6 +62,7 @@ from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.parallel import MMDataCPU
+from mmseg.utils.collect_env import collect_env
 
 logger = get_logger(__name__)
 
@@ -75,6 +77,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         """
 
         logger.info("Loading OTESegmentationTask.")
+
+        print('ENVIRONMENT:')
+        for name, val in collect_env().items():
+            print(f'{name}: {val}')
+        print('pip list:')
+        run('pip list', shell=True, check=True)
+
         self._scratch_space = tempfile.mkdtemp(prefix="ote-seg-scratch-")
         logger.info(f"Scratch space created at {self._scratch_space}")
 
