@@ -152,7 +152,8 @@ class LossEqualizer:
 
         weighted_losses = dict()
         for loss_name, loss_value in losses.items():
-            loss_weight = trg_value / loss_value.item()
+            loss_weight = trg_value / self._smoothed_values[loss_name]
+            # loss_weight = trg_value / loss_value.item()
             weighted_losses[loss_name] = loss_weight * loss_value
 
         return weighted_losses
