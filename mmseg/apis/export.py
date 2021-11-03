@@ -25,6 +25,10 @@ from mmcv.onnx import register_extra_symbolics
 from onnxoptimizer import optimize
 from torch.onnx.symbolic_helper import _onnx_stable_opsets as available_opsets
 
+from mmseg.utils.logger import get_root_logger
+
+logger = get_root_logger()
+
 
 def _convert_batchnorm(module):
     module_output = module
@@ -255,22 +259,27 @@ def export_model(model, config, output_dir, target='openvino', onnx_opset=11,
     mmcv.mkdir_or_exist(osp.abspath(output_dir))
     onnx_model_path = osp.join(output_dir, config.get('model_name', 'model') + '.onnx')
 
+    logger.info('Start export to ONNX')
     export_to_onnx(model,
                    fake_inputs,
                    output_logits=output_logits,
                    export_name=onnx_model_path,
                    opset=onnx_opset,
                    verbose=False)
-    print(f'ONNX model has been saved to "{onnx_model_path}"')
+    logger.info(f'ONNX model has been saved to "{onnx_model_path}"')
 
+    logger.info('Optimize ONNX graph')
     optimize_onnx_graph(onnx_model_path)
+    logger.info('Optimization completed')
 
     if target == 'openvino':
+        logger.info('Start export to OpenVINO')
         export_to_openvino(config,
                            onnx_model_path,
                            output_dir,
                            input_shape,
                            input_format,
                            precision)
+        logger.info('Export to OpenVINO completed')
     else:
         check_onnx_model(onnx_model_path)

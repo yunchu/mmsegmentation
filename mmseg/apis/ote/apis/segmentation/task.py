@@ -24,6 +24,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
+from mmcv import get_logger
 from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
 from mmcv.utils import Config
@@ -61,7 +62,7 @@ from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.parallel import MMDataCPU
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
@@ -73,7 +74,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         """
 
-        logger.info(f"Loading OTESegmentationTask.")
+        logger.info("Loading OTESegmentationTask.")
         self._scratch_space = tempfile.mkdtemp(prefix="ote-seg-scratch-")
         logger.info(f"Scratch space created at {self._scratch_space}")
 
@@ -95,12 +96,14 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         set_hyperparams(self._config, self._hyperparams)
 
         # Create and initialize PyTorch model.
+        logger.info("Loading the model.")
         self._model = self._load_model(task_environment.model)
 
         # Extra control variables.
         self._training_work_dir = None
         self._is_training = False
         self._should_stop = False
+        logger.info("Task initialization completed.")
 
     @property
     def _hyperparams(self):
@@ -164,6 +167,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
               inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
         """ Analyzes a dataset using the latest inference model. """
 
+        logger.info("Infer the model on the dataset")
+
         set_hyperparams(self._config, self._hyperparams)
 
         if inference_parameters is not None:
@@ -209,6 +214,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         pre_hook_handle.remove()
         hook_handle.remove()
+
+        logger.info("Inference completed")
 
         return dataset
 
@@ -262,6 +269,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
               train_parameters: Optional[TrainParameters] = None):
         """ Trains a model on a dataset """
 
+        logger.info("Training the model")
         set_hyperparams(self._config, self._hyperparams)
 
         train_dataset = dataset.get_subset(Subset.TRAINING)
@@ -298,7 +306,9 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         self._is_training = True
         self._model.train()
 
+        logger.info("Start training")
         train_segmentor(model=self._model, dataset=mm_train_dataset, cfg=training_config, validate=True)
+        logger.info("Training completed")
 
         # Check for stop signal when training has stopped. If should_stop is true, training was cancelled and no new
         # model should be returned. Old train model is restored.
@@ -435,6 +445,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                            f"Torch is still occupying {torch.cuda.memory_allocated()} bytes of GPU memory")
 
     def export(self, export_type: ExportType, output_model: ModelEntity):
+        logger.info("Exporting the model")
         assert export_type == ExportType.OPENVINO
 
         output_model.model_format = ModelFormat.OPENVINO
@@ -473,6 +484,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
+        logger.info("Export completed")
 
     def _delete_scratch_space(self):
         """
