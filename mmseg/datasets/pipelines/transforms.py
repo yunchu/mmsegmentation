@@ -1087,19 +1087,23 @@ class ClassBordersExtractor(object):
         self.ignore_index = ignore_index
 
     def _extract_edges(self, gt_labels):
-        invalid_mask = (gt_labels == self.ignore_index).astype(np.float32)
+        invalid_mask = gt_labels == self.ignore_index
+        invalid_mask_float = invalid_mask.astype(np.float32)
         gt_labels = np.copy(gt_labels).astype(np.float32)
 
         kernel = np.ones([3, 3], dtype=np.float32) / 8.0
         kernel[1, 1] = 0.0
 
         pos_conv = convolve2d(gt_labels, kernel, boundary='symm', mode='same')
-        neg_conv = convolve2d(invalid_mask, kernel, boundary='symm', mode='same')
+        neg_conv = convolve2d(invalid_mask_float, kernel, boundary='symm', mode='same')
 
         out = gt_labels != pos_conv
-        out[invalid_mask != neg_conv] = False
+        out[invalid_mask_float != neg_conv] = False
 
-        return out.astype(np.uint8)
+        out = out.astype(np.uint8)
+        out[invalid_mask] = self.ignore_index
+
+        return out
 
     def __call__(self, results):
         gt_labels = results['gt_semantic_seg']
