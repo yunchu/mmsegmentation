@@ -101,7 +101,7 @@ model = dict(
                       use_sigmoid=False,
                       loss_jitter_prob=0.01,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.1, p=1.7),
-                      loss_weight=1.0),
+                      loss_weight=5.0),
                  dict(type='GeneralizedDiceLoss',
                       smooth=1.0,
                       gamma=5.0,
@@ -109,7 +109,7 @@ model = dict(
                       beta=0.5,
                       focal_gamma=1.0,
                       loss_jitter_prob=0.01,
-                      loss_weight=1.0),
+                      loss_weight=5.0),
              ]),
     ],
     train_cfg=dict(

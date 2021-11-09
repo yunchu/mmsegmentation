@@ -254,7 +254,7 @@ class BaseDecodeHead(nn.Module, metaclass=ABCMeta):
         seg_logits = self.forward(inputs)
         losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, pixel_weights)
 
-        return losses
+        return losses, seg_logits
 
     def forward_test(self, inputs, img_metas, test_cfg):
         """Forward function for testing.

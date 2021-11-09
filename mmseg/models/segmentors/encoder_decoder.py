@@ -107,7 +107,7 @@ class EncoderDecoder(BaseSegmentor):
         """Run forward function and calculate loss for decode head in training."""
 
         trg_map = self._found_trg_argument(self.decode_head.loss_target_name, **kwargs)
-        loss_decode = self.decode_head.forward_train(
+        loss_decode, logits_decode = self.decode_head.forward_train(
             x,
             img_metas,
             trg_map,
@@ -133,7 +133,7 @@ class EncoderDecoder(BaseSegmentor):
         if isinstance(self.auxiliary_head, nn.ModuleList):
             for idx, aux_head in enumerate(self.auxiliary_head):
                 trg_map = self._found_trg_argument(aux_head.loss_target_name, **kwargs)
-                loss_aux = aux_head.forward_train(
+                loss_aux, logits_aux = aux_head.forward_train(
                     x,
                     img_metas,
                     trg_map,
@@ -142,7 +142,7 @@ class EncoderDecoder(BaseSegmentor):
                 losses.update(add_prefix(loss_aux, f'aux_{idx}'))
         else:
             trg_map = self._found_trg_argument(self.auxiliary_head.loss_target_name, **kwargs)
-            loss_aux = self.auxiliary_head.forward_train(
+            loss_aux, logits_aux = self.auxiliary_head.forward_train(
                 x,
                 img_metas,
                 trg_map,
