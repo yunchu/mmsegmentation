@@ -80,7 +80,7 @@ def main(args):
     logger.info('Setup environment')
     params = create(hyper_parameters)
     logger.info('Set hyperparameters')
-    params.learning_parameters.learning_rate_fixed_iters = 30
+    params.learning_parameters.learning_rate_fixed_iters = 0
     params.learning_parameters.learning_rate_warmup_iters = 30
     params.learning_parameters.num_iters = 30
     environment = TaskEnvironment(model=None,
