@@ -37,6 +37,7 @@ from ote_sdk.entities.inference_parameters import default_progress_callback as d
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
+from ote_sdk.entities.result_media import ResultMediaEntity
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
@@ -168,8 +169,11 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         if inference_parameters is not None:
             update_progress_callback = inference_parameters.update_progress
+            is_evaluation = inference_parameters.is_evaluation
         else:
             update_progress_callback = default_infer_progress_callback
+            is_evaluation = False
+        dump_features = not is_evaluation
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
 
@@ -206,6 +210,29 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             )
 
             dataset_item.append_annotations(annotations=annotations)
+
+            if dump_features:
+                for label_index, label in label_dictionary.items():
+                    if label_index == 0:
+                        continue
+
+                    if len(soft_prediction.shape) == 3:
+                        current_label_soft_prediction = soft_prediction[:, :, label_index]
+                    else:
+                        current_label_soft_prediction = soft_prediction
+
+                    min_soft_score = np.min(current_label_soft_prediction)
+                    max_soft_score = np.max(current_label_soft_prediction)
+                    factor = 255.0 / (max_soft_score - min_soft_score + 1e-12)
+                    result_media_numpy = (factor * (current_label_soft_prediction - min_soft_score)).astype(np.uint8)
+
+                    result_media = ResultMediaEntity(name=f'{label.name}',
+                                                     type='Soft Prediction',
+                                                     label=label,
+                                                     annotation_scene=dataset_item.annotation_scene,
+                                                     roi=dataset_item.roi,
+                                                     numpy=result_media_numpy)
+                    dataset_item.append_metadata_item(data=result_media)
 
         pre_hook_handle.remove()
         hook_handle.remove()
