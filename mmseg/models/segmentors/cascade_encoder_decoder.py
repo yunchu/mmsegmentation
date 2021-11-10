@@ -87,24 +87,29 @@ class CascadeEncoderDecoder(EncoderDecoder):
         """Run forward function and calculate loss for decode head in
         training."""
 
-        losses = dict()
+        losses, meta = dict(), dict()
 
-        trg_map = self._found_trg_argument(self.decode_head[0].loss_target_name, **kwargs)
+        trg_map = self._get_argument_by_name(self.decode_head[0].loss_target_name, **kwargs)
         loss_decode, prev_logits = self.decode_head[0].forward_train(
             x, img_metas, trg_map, self.train_cfg, pixel_weights
         )
-        losses.update(add_prefix(loss_decode, 'decode_0'))
+
+        name_prefix = 'decode_0'
+        losses.update(add_prefix(loss_decode, name_prefix))
+        meta[f'{name_prefix}_logits'] = prev_logits
 
         for i in range(1, self.num_stages):
-            trg_map = self._found_trg_argument(self.decode_head[i].loss_target_name, **kwargs)
+            trg_map = self._get_argument_by_name(self.decode_head[i].loss_target_name, **kwargs)
 
             prev_scale = self.decode_head[i - 1].last_scale
-            # prev_logits = self.decode_head[i - 1].forward_test(x, img_metas, self.test_cfg)
             prev_scaled_logits = prev_scale * prev_logits
 
             loss_decode, prev_logits = self.decode_head[i].forward_train(
                 x, prev_scaled_logits, img_metas, trg_map, self.train_cfg, pixel_weights
             )
-            losses.update(add_prefix(loss_decode, f'decode_{i}'))
 
-        return losses
+            name_prefix = f'decode_{i}'
+            losses.update(add_prefix(loss_decode, name_prefix))
+            meta[f'{name_prefix}_logits'] = prev_logits
+
+        return losses, meta

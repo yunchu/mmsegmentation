@@ -106,7 +106,7 @@ class EncoderDecoder(BaseSegmentor):
     def _decode_head_forward_train(self, x, img_metas, pixel_weights=None, **kwargs):
         """Run forward function and calculate loss for decode head in training."""
 
-        trg_map = self._found_trg_argument(self.decode_head.loss_target_name, **kwargs)
+        trg_map = self._get_argument_by_name(self.decode_head.loss_target_name, **kwargs)
         loss_decode, logits_decode = self.decode_head.forward_train(
             x,
             img_metas,
@@ -115,10 +115,13 @@ class EncoderDecoder(BaseSegmentor):
             pixel_weights
         )
 
-        losses = dict()
-        losses.update(add_prefix(loss_decode, 'decode'))
+        name_prefix = 'decode'
 
-        return losses
+        losses, meta = dict(), dict()
+        losses.update(add_prefix(loss_decode, name_prefix))
+        meta[f'{name_prefix}_logits'] = logits_decode
+
+        return losses, meta
 
     def _decode_head_forward_test(self, x, img_metas):
         """Run forward function and calculate loss for decode head in
@@ -129,31 +132,37 @@ class EncoderDecoder(BaseSegmentor):
     def _auxiliary_head_forward_train(self, x, img_metas, **kwargs):
         """Run forward function and calculate loss for auxiliary head in training."""
 
-        losses = dict()
+        losses, meta = dict(), dict()
         if isinstance(self.auxiliary_head, nn.ModuleList):
             for idx, aux_head in enumerate(self.auxiliary_head):
-                trg_map = self._found_trg_argument(aux_head.loss_target_name, **kwargs)
+                trg_map = self._get_argument_by_name(aux_head.loss_target_name, **kwargs)
                 loss_aux, logits_aux = aux_head.forward_train(
                     x,
                     img_metas,
                     trg_map,
                     self.train_cfg
                 )
-                losses.update(add_prefix(loss_aux, f'aux_{idx}'))
+
+                name_prefix = f'aux_{idx}'
+                losses.update(add_prefix(loss_aux, name_prefix))
+                meta[f'{name_prefix}_logits'] = logits_aux
         else:
-            trg_map = self._found_trg_argument(self.auxiliary_head.loss_target_name, **kwargs)
+            trg_map = self._get_argument_by_name(self.auxiliary_head.loss_target_name, **kwargs)
             loss_aux, logits_aux = self.auxiliary_head.forward_train(
                 x,
                 img_metas,
                 trg_map,
                 self.train_cfg
             )
-            losses.update(add_prefix(loss_aux, 'aux'))
 
-        return losses
+            name_prefix = 'aux'
+            losses.update(add_prefix(loss_aux, name_prefix))
+            meta[f'{name_prefix}_logits'] = logits_aux
+
+        return losses, meta
 
     @staticmethod
-    def _found_trg_argument(trg_name, **arguments):
+    def _get_argument_by_name(trg_name, **arguments):
         assert trg_name in arguments.keys()
 
         return arguments[trg_name]
@@ -193,13 +202,15 @@ class EncoderDecoder(BaseSegmentor):
 
         x = self.extract_feat(img)
 
-        loss_decode = self._decode_head_forward_train(x, img_metas, pixel_weights,
-                                                      gt_semantic_seg=gt_semantic_seg, **kwargs)
+        loss_decode, meta_decode = self._decode_head_forward_train(
+            x, img_metas, pixel_weights, gt_semantic_seg=gt_semantic_seg, **kwargs
+        )
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
-            loss_aux = self._auxiliary_head_forward_train(x, img_metas,
-                                                          gt_semantic_seg=gt_semantic_seg, **kwargs)
+            loss_aux, meta_aux = self._auxiliary_head_forward_train(
+                x, img_metas, gt_semantic_seg=gt_semantic_seg, **kwargs
+            )
             losses.update(loss_aux)
 
         return losses
