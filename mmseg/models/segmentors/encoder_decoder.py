@@ -31,11 +31,19 @@ class EncoderDecoder(BaseSegmentor):
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             self.neck = builder.build_neck(neck)
+
         self._init_decode_head(decode_head)
         self._init_auxiliary_head(auxiliary_head)
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
+
+        mutual_loss_configs = self.train_cfg.get('mutual_loss')
+        if mutual_loss_configs:
+            if isinstance(mutual_loss_configs, dict):
+                mutual_loss_configs = [mutual_loss_configs]
+
+
 
         self.init_weights(pretrained=pretrained)
 
@@ -115,11 +123,14 @@ class EncoderDecoder(BaseSegmentor):
             pixel_weights
         )
 
+        scale = self.decode_head.last_scale
+        scaled_logits_decode = scale * logits_decode
+
         name_prefix = 'decode'
 
         losses, meta = dict(), dict()
         losses.update(add_prefix(loss_decode, name_prefix))
-        meta[f'{name_prefix}_logits'] = logits_decode
+        meta[f'{name_prefix}_scaled_logits'] = scaled_logits_decode
 
         return losses, meta
 
@@ -143,9 +154,12 @@ class EncoderDecoder(BaseSegmentor):
                     self.train_cfg
                 )
 
+                scale = aux_head.last_scale
+                scaled_logits_aux = scale * logits_aux
+
                 name_prefix = f'aux_{idx}'
                 losses.update(add_prefix(loss_aux, name_prefix))
-                meta[f'{name_prefix}_logits'] = logits_aux
+                meta[f'{name_prefix}_scaled_logits'] = scaled_logits_aux
         else:
             trg_map = self._get_argument_by_name(self.auxiliary_head.loss_target_name, **kwargs)
             loss_aux, logits_aux = self.auxiliary_head.forward_train(
@@ -155,9 +169,12 @@ class EncoderDecoder(BaseSegmentor):
                 self.train_cfg
             )
 
+            scale = self.auxiliary_head.last_scale
+            scaled_logits_aux = scale * logits_aux
+
             name_prefix = 'aux'
             losses.update(add_prefix(loss_aux, name_prefix))
-            meta[f'{name_prefix}_logits'] = logits_aux
+            meta[f'{name_prefix}_scaled_logits'] = scaled_logits_aux
 
         return losses, meta
 
@@ -212,6 +229,12 @@ class EncoderDecoder(BaseSegmentor):
                 x, img_metas, gt_semantic_seg=gt_semantic_seg, **kwargs
             )
             losses.update(loss_aux)
+
+        enable_mutual_loss = self.train_cfg.get('mutual_loss')
+        if enable_mutual_loss:
+            mutual_losses = self.train_cfg.get('mutual_loss')
+            if isinstance(mutual_losses, dict):
+                mutual_losses = [mutual_losses]
 
         return losses
 
