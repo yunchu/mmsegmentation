@@ -28,7 +28,7 @@ model = dict(
                       use_sigmoid=False,
                       loss_jitter_prob=0.01,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-                      loss_weight=2.0),
+                      loss_weight=4.0),
                  # dict(type='GeneralizedDiceLoss',
                  #      smooth=1.0,
                  #      gamma=5.0,
@@ -100,7 +100,7 @@ model = dict(
                       use_sigmoid=False,
                       loss_jitter_prob=0.01,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-                      loss_weight=2.0),
+                      loss_weight=4.0),
                  # dict(type='GeneralizedDiceLoss',
                  #      smooth=1.0,
                  #      gamma=5.0,
@@ -152,7 +152,7 @@ model = dict(
                  head_a_name='decode_0',
                  head_b_name='aux_0',
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
-                 loss_weight=1.0),
+                 loss_weight=2.0),
         ]
     ),
 )
