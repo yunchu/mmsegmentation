@@ -39,11 +39,14 @@ class EncoderDecoder(BaseSegmentor):
         self.test_cfg = test_cfg
 
         mutual_loss_configs = self.train_cfg.get('mutual_loss')
+        self.mutual_losses = None
         if mutual_loss_configs:
             if isinstance(mutual_loss_configs, dict):
                 mutual_loss_configs = [mutual_loss_configs]
 
-
+            self.mutual_losses = nn.ModuleList()
+            for mutual_loss_config in mutual_loss_configs:
+                self.mutual_losses.append(builder.build_loss(mutual_loss_config))
 
         self.init_weights(pretrained=pretrained)
 
@@ -114,7 +117,7 @@ class EncoderDecoder(BaseSegmentor):
     def _decode_head_forward_train(self, x, img_metas, pixel_weights=None, **kwargs):
         """Run forward function and calculate loss for decode head in training."""
 
-        trg_map = self._get_argument_by_name(self.decode_head.loss_target_name, **kwargs)
+        trg_map = self._get_argument_by_name(self.decode_head.loss_target_name, kwargs)
         loss_decode, logits_decode = self.decode_head.forward_train(
             x,
             img_metas,
@@ -146,7 +149,7 @@ class EncoderDecoder(BaseSegmentor):
         losses, meta = dict(), dict()
         if isinstance(self.auxiliary_head, nn.ModuleList):
             for idx, aux_head in enumerate(self.auxiliary_head):
-                trg_map = self._get_argument_by_name(aux_head.loss_target_name, **kwargs)
+                trg_map = self._get_argument_by_name(aux_head.loss_target_name, kwargs)
                 loss_aux, logits_aux = aux_head.forward_train(
                     x,
                     img_metas,
@@ -161,7 +164,7 @@ class EncoderDecoder(BaseSegmentor):
                 losses.update(add_prefix(loss_aux, name_prefix))
                 meta[f'{name_prefix}_scaled_logits'] = scaled_logits_aux
         else:
-            trg_map = self._get_argument_by_name(self.auxiliary_head.loss_target_name, **kwargs)
+            trg_map = self._get_argument_by_name(self.auxiliary_head.loss_target_name, kwargs)
             loss_aux, logits_aux = self.auxiliary_head.forward_train(
                 x,
                 img_metas,
@@ -179,7 +182,7 @@ class EncoderDecoder(BaseSegmentor):
         return losses, meta
 
     @staticmethod
-    def _get_argument_by_name(trg_name, **arguments):
+    def _get_argument_by_name(trg_name, arguments):
         assert trg_name in arguments.keys()
 
         return arguments[trg_name]
@@ -217,24 +220,43 @@ class EncoderDecoder(BaseSegmentor):
             img = torch.cat([img, aux_img], dim=0)
             gt_semantic_seg = torch.cat([gt_semantic_seg, gt_semantic_seg], dim=0)
 
-        x = self.extract_feat(img)
+        features = self.extract_feat(img)
 
         loss_decode, meta_decode = self._decode_head_forward_train(
-            x, img_metas, pixel_weights, gt_semantic_seg=gt_semantic_seg, **kwargs
+            features, img_metas, pixel_weights, gt_semantic_seg=gt_semantic_seg, **kwargs
         )
         losses.update(loss_decode)
 
         if self.with_auxiliary_head:
             loss_aux, meta_aux = self._auxiliary_head_forward_train(
-                x, img_metas, gt_semantic_seg=gt_semantic_seg, **kwargs
+                features, img_metas, gt_semantic_seg=gt_semantic_seg, **kwargs
             )
             losses.update(loss_aux)
 
-        enable_mutual_loss = self.train_cfg.get('mutual_loss')
-        if enable_mutual_loss:
-            mutual_losses = self.train_cfg.get('mutual_loss')
-            if isinstance(mutual_losses, dict):
-                mutual_losses = [mutual_losses]
+        if self.mutual_losses is not None and self.with_auxiliary_head:
+            meta = dict()
+            meta.update(meta_decode)
+            meta.update(meta_aux)
+
+            out_mutual_losses = dict()
+            for mutual_loss_idx, mutual_loss in enumerate(self.mutual_losses):
+                logits_a = self._get_argument_by_name(mutual_loss.trg_a_name, meta)
+                logits_b = self._get_argument_by_name(mutual_loss.trg_b_name, meta)
+
+                logits_a = resize(input=logits_a, size=gt_semantic_seg.shape[2:],
+                                  mode='bilinear', align_corners=self.align_corners)
+                logits_b = resize(input=logits_b, size=gt_semantic_seg.shape[2:],
+                                  mode='bilinear', align_corners=self.align_corners)
+
+                mutual_labels = gt_semantic_seg.squeeze(1)
+                mutual_loss_value, mutual_loss_meta = mutual_loss(logits_a, logits_b, mutual_labels)
+
+                mutual_loss_name = mutual_loss.name + f'-{mutual_loss_idx}'
+                out_mutual_losses[mutual_loss_name] = mutual_loss_value
+                losses[mutual_loss_name] = mutual_loss_value
+                losses.update(add_prefix(mutual_loss_meta, mutual_loss_name))
+
+            losses['loss_mutual'] = sum(out_mutual_losses.values())
 
         return losses
 

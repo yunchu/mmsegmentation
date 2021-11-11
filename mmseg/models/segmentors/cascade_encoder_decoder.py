@@ -89,7 +89,7 @@ class CascadeEncoderDecoder(EncoderDecoder):
 
         losses, meta = dict(), dict()
 
-        trg_map = self._get_argument_by_name(self.decode_head[0].loss_target_name, **kwargs)
+        trg_map = self._get_argument_by_name(self.decode_head[0].loss_target_name, kwargs)
         loss_decode, prev_logits = self.decode_head[0].forward_train(
             x, img_metas, trg_map, self.train_cfg, pixel_weights
         )
@@ -102,7 +102,7 @@ class CascadeEncoderDecoder(EncoderDecoder):
         meta[f'{name_prefix}_scaled_logits'] = prev_scaled_logits
 
         for i in range(1, self.num_stages):
-            trg_map = self._get_argument_by_name(self.decode_head[i].loss_target_name, **kwargs)
+            trg_map = self._get_argument_by_name(self.decode_head[i].loss_target_name, kwargs)
             loss_decode, prev_logits = self.decode_head[i].forward_train(
                 x, prev_scaled_logits, img_metas, trg_map, self.train_cfg, pixel_weights
             )
