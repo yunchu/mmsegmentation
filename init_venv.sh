@@ -117,11 +117,6 @@ MMSEGMENTATION_DIR=`realpath .`
 echo "export MMSEGMENTATION_DIR=${MMSEGMENTATION_DIR}" >> ${venv_dir}/bin/activate
 
 pip install -e $SC_SDK_REPO/src/ote_sdk -c ${CONSTRAINTS_FILE} || exit 1
-pip install -e $SC_SDK_REPO/src/sc_sdk -c ${CONSTRAINTS_FILE} || exit 1
-pip install -e $SC_SDK_REPO/src/common/users_handler -c ${CONSTRAINTS_FILE} || exit 1
-if [[ -z ${SKIP_SC_SDK_ADDITIONAL_PACKAGES} ]]; then
-  pip install `find $SC_SDK_REPO/.cache -name *.whl` || exit 1
-fi
 
 deactivate
 
