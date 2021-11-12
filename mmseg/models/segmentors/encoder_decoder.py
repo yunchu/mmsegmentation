@@ -38,7 +38,7 @@ class EncoderDecoder(BaseSegmentor):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
-        mutual_loss_configs = self.train_cfg.get('mutual_loss')
+        mutual_loss_configs = self.train_cfg.get('mutual_loss') if self.train_cfg else None
         self.mutual_losses = None
         if mutual_loss_configs:
             if isinstance(mutual_loss_configs, dict):
