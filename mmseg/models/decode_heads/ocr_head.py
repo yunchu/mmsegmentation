@@ -68,12 +68,19 @@ class AuxSpatialGatherModule(nn.Module):
                 torch.clamp(target.long(), 0, self.num_classes - 1),
                 num_classes=self.num_classes
             )
-            weights = one_hot_target.premute(0, 2, 1).float()  # [batch_size, num_classes, height*width]
+            weights = one_hot_target.permute(0, 2, 1).float()  # [batch_size, num_classes, height*width]
             weights = torch.where(valid_mask.unsqueeze(1), weights, torch.zeros_like(weights))
 
             sum_weights = torch.sum(weights, dim=2, keepdim=True)
-            normalizers = torch.where(sum_weights > 0.0, sum_weights, torch.ones_like(sum_weights))
-            weights = normalizers * normalizers  # [batch_size, num_classes, height*width]
+            weights = torch.where(sum_weights > 0.0, weights, torch.ones_like(weights))
+            weights = weights / torch.sum(weights, dim=2, keepdim=True)  # [batch_size, num_classes, height*width]
+
+            gt_height, gt_width = gt_seg_map.shape[-2:]
+            weights = resize(
+                input=weights.view(batch_size, self.num_classes, gt_height, gt_width),
+                size=feats.shape[-2:],
+                mode='nearest'
+            ).view(batch_size, self.num_classes, -1)
 
         feats = feats.view(batch_size, channels, -1)
         feats = feats.permute(0, 2, 1)  # [batch_size, height*width, channels]
@@ -270,3 +277,9 @@ class AuxOCRHead(BaseDecodeHead):
         output = self.cls_seg(augmented_feat)
 
         return output
+
+    def forward_train(self, inputs, img_metas, gt_semantic_seg, train_cfg, pixel_weights=None):
+        seg_logits = self.forward(inputs, gt_semantic_seg)
+        losses = self.losses(seg_logits, gt_semantic_seg, train_cfg, pixel_weights)
+
+        return losses, seg_logits
