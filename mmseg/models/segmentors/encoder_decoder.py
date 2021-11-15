@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from mmseg.core import add_prefix
 from mmseg.ops import resize
+from mmseg.models.losses import LossEqualizer
 from .. import builder
 from ..builder import SEGMENTORS
 from .base import BaseSegmentor
@@ -28,25 +29,16 @@ class EncoderDecoder(BaseSegmentor):
                  pretrained=None):
         super(EncoderDecoder, self).__init__()
 
+        self.train_cfg = train_cfg
+        self.test_cfg = test_cfg
+
         self.backbone = builder.build_backbone(backbone)
         if neck is not None:
             self.neck = builder.build_neck(neck)
 
         self._init_decode_head(decode_head)
         self._init_auxiliary_head(auxiliary_head)
-
-        self.train_cfg = train_cfg
-        self.test_cfg = test_cfg
-
-        mutual_loss_configs = self.train_cfg.get('mutual_loss') if self.train_cfg else None
-        self.mutual_losses = None
-        if mutual_loss_configs:
-            if isinstance(mutual_loss_configs, dict):
-                mutual_loss_configs = [mutual_loss_configs]
-
-            self.mutual_losses = nn.ModuleList()
-            for mutual_loss_config in mutual_loss_configs:
-                self.mutual_losses.append(builder.build_loss(mutual_loss_config))
+        self._init_train_components(self.train_cfg)
 
         self.init_weights(pretrained=pretrained)
 
@@ -67,6 +59,25 @@ class EncoderDecoder(BaseSegmentor):
                     self.auxiliary_head.append(builder.build_head(head_cfg))
             else:
                 self.auxiliary_head = builder.build_head(auxiliary_head)
+
+    def _init_train_components(self, train_cfg):
+        if train_cfg is None:
+            self.mutual_losses = None
+            self.loss_equalizer = None
+            return
+
+        mutual_loss_configs = train_cfg.get('mutual_loss')
+        if mutual_loss_configs:
+            if isinstance(mutual_loss_configs, dict):
+                mutual_loss_configs = [mutual_loss_configs]
+
+            self.mutual_losses = nn.ModuleList()
+            for mutual_loss_config in mutual_loss_configs:
+                self.mutual_losses.append(builder.build_loss(mutual_loss_config))
+
+        loss_reweighting_config = train_cfg.get('loss_reweighting')
+        if loss_reweighting_config:
+            self.loss_equalizer = LossEqualizer(**loss_reweighting_config)
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone and heads.
@@ -187,6 +198,9 @@ class EncoderDecoder(BaseSegmentor):
 
         return arguments[trg_name]
 
+    def _reweight_losses(self, losses):
+        pass
+
     def forward_dummy(self, img):
         """Dummy forward function."""
         seg_logit = self.encode_decode(img, None)
@@ -257,6 +271,13 @@ class EncoderDecoder(BaseSegmentor):
                 losses.update(add_prefix(mutual_loss_meta, mutual_loss_name))
 
             losses['loss_mutual'] = sum(out_mutual_losses.values())
+
+        if self.loss_equalizer is not None:
+            unweighted_losses = {loss_name: loss for loss_name, loss in losses.items() if 'loss' in loss_name}
+            weighted_losses = self.loss_equalizer.reweight(unweighted_losses)
+
+            for loss_name, loss_value in weighted_losses.items():
+                losses[loss_name] = loss_value
 
         return losses
 

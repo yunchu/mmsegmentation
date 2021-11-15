@@ -193,7 +193,15 @@ model = dict(
                  head_b_name='aux_0',
                  sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  loss_weight=2.0),
-        ]
+        ],
+        loss_reweighting=dict(
+            weights={'decode_0.loss_seg': 1.0,
+                     'decode_1.loss_seg': 1.0,
+                     'aux_0.loss_seg': 1.0,
+                     'aux_1.loss_seg': 0.5,
+                     'loss_mutual': 0.5},
+            momentum=0.1
+        ),
     ),
 )
 evaluation = dict(
