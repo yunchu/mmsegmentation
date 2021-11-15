@@ -126,8 +126,24 @@ def weighted_loss(loss_func):
 
 
 class LossEqualizer:
-    def __init__(self, momentum=0.1):
+    def __init__(self, weights=None, momentum=0.1):
         self.momentum = momentum
+
+        self.trg_ratios = None
+        if weights is not None:
+            assert isinstance(weights, dict)
+            assert len(weights) > 0
+
+            sum_weight = 0.0
+            for loss_weight in weights.values():
+                assert loss_weight > 0
+                sum_weight += float(loss_weight)
+            assert sum_weight > 0.0
+
+            self.trg_ratios = {
+                loss_name: float(loss_weight) / sum_weight
+                for loss_name, loss_weight in weights.items()
+            }
 
         self._smoothed_values = dict()
 
@@ -148,12 +164,18 @@ class LossEqualizer:
         if len(self._smoothed_values) == 1:
             return losses
 
-        trg_value = sum(self._smoothed_values.values()) / float(len(self._smoothed_values))
+        total_sum = sum(self._smoothed_values.values())
+        trg_value_default = total_sum / float(len(self._smoothed_values))
 
         weighted_losses = dict()
         for loss_name, loss_value in losses.items():
+            if self.trg_ratios is not None:
+                assert loss_name in self.trg_ratios.keys()
+                trg_value = self.trg_ratios[loss_name] * total_sum
+            else:
+                trg_value = trg_value_default
+
             loss_weight = trg_value / self._smoothed_values[loss_name]
-            # loss_weight = trg_value / loss_value.item()
             weighted_losses[loss_name] = loss_weight * loss_value
 
         return weighted_losses
