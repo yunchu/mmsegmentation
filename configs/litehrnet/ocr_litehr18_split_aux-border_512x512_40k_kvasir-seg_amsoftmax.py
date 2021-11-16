@@ -191,13 +191,14 @@ model = dict(
             dict(type='MutualLoss',
                  head_a_name='decode_1',
                  head_b_name='aux_0',
-                 sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                 # sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                 sampler=dict(type='OHEMPixelSampler', kept_ratio=0.1),
                  loss_weight=2.0),
         ],
         loss_reweighting=dict(
-            weights={'decode_0.loss_seg': 1.0,
+            weights={'decode_0.loss_seg': 0.5,
                      'decode_1.loss_seg': 1.0,
-                     'aux_0.loss_seg': 1.0,
+                     'aux_0.loss_seg': 0.9,
                      'aux_1.loss_seg': 0.5,
                      'loss_mutual': 0.5},
             momentum=0.1
