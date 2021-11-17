@@ -13,6 +13,7 @@
 # and limitations under the License.
 
 import logging
+import json
 import os
 import tempfile
 from addict import Dict as ADDict
@@ -177,6 +178,9 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
         self.model = self.task_environment.model
         self.inferencer = self.load_inferencer()
 
+        template_file_path = task_environment.model_template.model_template_path
+        self._base_dir = os.path.abspath(os.path.dirname(template_file_path))
+
     @property
     def hparams(self):
         return self.task_environment.get_hyper_parameters(OTESegmentationConfig)
@@ -243,19 +247,23 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
             'device': 'CPU'
         })
 
-        stat_subset_size = self.hparams.pot_parameters.stat_subset_size
-        preset = self.hparams.pot_parameters.preset.name.lower()
-
-        algorithms = [
-            {
-                'name': 'DefaultQuantization',
-                'params': {
-                    'target_device': 'ANY',
-                    'preset': preset,
-                    'stat_subset_size': min(stat_subset_size, len(data_loader))
-                }
-            }
-        ]
+        optimization_config_path = os.path.join(self._base_dir, 'pot_optimization_config.json')
+        if os.path.exists(optimization_config_path):
+            with open(optimization_config_path) as f_src:
+                algorithms = ADDict(json.load(f_src))['algorithms']
+        else:
+            algorithms = [
+                ADDict({
+                    'name': 'DefaultQuantization',
+                    'params': {
+                        'target_device': 'ANY'
+                    }
+                })
+            ]
+        for algo in algorithms:
+            if 'Quantization' in algo['name']:
+                algo.params.stat_subset_size = self.hparams.pot_parameters.stat_subset_size
+                algo.params.preset = self.hparams.pot_parameters.preset.name.lower()
 
         engine = IEEngine(config=engine_config, data_loader=data_loader, metric=None)
 

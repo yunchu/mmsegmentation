@@ -31,6 +31,9 @@ hyper_parameters:
         default_value: 80
       num_iters:
         default_value: 180
+    pot_parameters:
+      preset:
+        default_value: Mixed
 
 # Training resources.
 max_nodes: 1
