@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 
+import attr
 import logging
+import inspect
+import json
 import os
+from shutil import copyfile, copytree
+import sys
+import subprocess
 import tempfile
 from addict import Dict as ADDict
 from typing import Any, Dict, Tuple, List, Optional, Union
@@ -38,7 +44,8 @@ from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
-from ote_sdk.usecases.exportable_code.inference import BaseOpenVINOInferencer
+from ote_sdk.usecases.exportable_code.inference import BaseInferencer
+import ote_sdk.usecases.exportable_code.demo as demo
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import IOptimizationTask, OptimizationType
@@ -48,26 +55,14 @@ from compression.engines.ie_engine import IEEngine
 from compression.graph import load_model, save_model
 from compression.graph.model_utils import compress_model_weights, get_nodes_by_type
 from compression.pipeline.initializer import create_pipeline
-
+from openvino.inference_engine import ExecutableNetwork, IECore, InferRequest
 from .configuration import OTESegmentationConfig
-
-
+from openvino.model_zoo.model_api.models import Model
+from . import model_wrappers
 logger = logging.getLogger(__name__)
 
 
-def get_output(net, outputs, name):
-    try:
-        key = net.get_ov_name_for_tensor(name)
-        assert key in outputs, f'"{key}" is not a valid output identifier'
-    except KeyError:
-        if name not in outputs:
-            raise KeyError(f'Failed to identify output "{name}"')
-        key = name
-
-    return outputs[key]
-
-
-class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
+class OpenVINOSegmentationInferencer(BaseInferencer):
     def __init__(
         self,
         hparams: OTESegmentationConfig,
@@ -87,56 +82,25 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
             Good value is the number of available cores. Defaults to 1.
         """
 
-        super().__init__(model_file, weight_file, device, num_requests)
-
         self.labels = labels
-        self.input_blob_name = 'input'
-        self.n, self.c, self.h, self.w = self.net.input_info[self.input_blob_name].tensor_desc.dims
-        self.keep_aspect_ratio_resize = False
-        self.pad_value = 0
-        self.soft_threshold = float(hparams.postprocessing.soft_threshold)
-        self.blur_strength = int(hparams.postprocessing.blur_strength)
-
-    @staticmethod
-    def resize_image(image: np.ndarray, size: Tuple[int], keep_aspect_ratio: bool = False) -> np.ndarray:
-        if not keep_aspect_ratio:
-            resized_frame = cv2.resize(image, size)
-        else:
-            h, w = image.shape[:2]
-            scale = min(size[1] / h, size[0] / w)
-            resized_frame = cv2.resize(image, None, fx=scale, fy=scale)
-        return resized_frame
+        try:
+            self.ie = IECore()
+            self.configuration = {**attr.asdict(hparams.inference_parameters.postprocessing,
+                                           filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui'])}
+            self.model = Model.get_model(hparams.inference_parameters.class_name.value, self.ie,
+                                         model_file, weight_file, self.configuration)
+        except ValueError as e:
+            print(e)
+        self.exec_net = self.ie.load_network(self.model.net, device_name=device)
 
     def pre_process(self, image: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
-        resized_image = self.resize_image(image, (self.w, self.h), self.keep_aspect_ratio_resize)
-        meta = {'original_shape': image.shape,
-                'resized_shape': resized_image.shape}
-
-        h, w = resized_image.shape[:2]
-        if h != self.h or w != self.w:
-            resized_image = np.pad(resized_image,
-                                   ((0, self.h - h), (0, self.w - w), (0, 0)),
-                                   mode='constant',
-                                   constant_values=self.pad_value)
-
-        resized_image = resized_image.transpose((2, 0, 1))  # Change data layout from HWC to CHW
-        resized_image = resized_image.reshape((self.n, self.c, self.h, self.w))
-        dict_inputs = {self.input_blob_name: resized_image}
-
-        return dict_inputs, meta
+        return self.model.preprocess(image)
 
     def post_process(self, prediction: Dict[str, np.ndarray], metadata: Dict[str, Any]) -> AnnotationSceneEntity:
-        pred_class_maps = prediction['output']
-        assert pred_class_maps.shape[0] == 1
-        pred_class_map = pred_class_maps[0]
+        predictions = prediction[self.model.output_blob_name].squeeze()
+        soft_prediction = np.transpose(predictions, axes=(1, 2, 0))
 
-        soft_prediction = np.transpose(pred_class_map, axes=(1, 2, 0))
-
-        hard_prediction = create_hard_prediction_from_soft_prediction(
-            soft_prediction=soft_prediction,
-            soft_threshold=self.soft_threshold,
-            blur_strength=self.blur_strength
-        )
+        hard_prediction = self.model.postprocess(prediction, metadata)
 
         label_dictionary = {i + 1: self.labels[i] for i in range(len(self.labels))}
         annotations = create_annotation_from_segmentation_map(
@@ -151,11 +115,11 @@ class OpenVINOSegmentationInferencer(BaseOpenVINOInferencer):
         )
 
     def forward(self, inputs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        return self.model.infer(inputs)
+        return self.exec_net.infer(inputs)
 
 
 class OTEOpenVinoDataLoader(DataLoader):
-    def __init__(self, dataset: DatasetEntity, inferencer: BaseOpenVINOInferencer):
+    def __init__(self, dataset: DatasetEntity, inferencer: BaseInferencer):
         self.dataset = dataset
         self.inferencer = inferencer
 
@@ -175,6 +139,7 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
                  task_environment: TaskEnvironment):
         self.task_environment = task_environment
         self.model = self.task_environment.model
+        self.model_name = task_environment.model_template.name
         self.inferencer = self.load_inferencer()
 
     @property
@@ -206,6 +171,37 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
         logger.info(f"mDice after evaluation: {metrics.overall_dice.value}")
 
         output_result_set.performance = metrics.get_performance()
+
+    def deploy(self,
+               output_path: str):
+        work_dir = os.path.dirname(demo.__file__)
+        model_file = inspect.getfile(type(self.inferencer.model))
+        parameters = {}
+        is_new_model = 'model_api' not in model_file
+        parameters['name_of_model'] = self.model_name
+        parameters['type_of_model'] = self.hparams.inference_parameters.class_name.value
+        parameters['is_new_model'] = is_new_model
+        parameters['model_parameters'] = self.inferencer.configuration
+        name_of_package = parameters['name_of_model'].lower()
+        with tempfile.TemporaryDirectory() as tempdir:
+            copyfile(os.path.join(work_dir, "setup.py"), os.path.join(tempdir, "setup.py"))
+            copyfile(os.path.join(work_dir, "requirements.txt"), os.path.join(tempdir, "requirements.txt"))
+            copytree(os.path.join(work_dir, "demo_package"), os.path.join(tempdir, name_of_package))
+            xml_path = os.path.join(tempdir, name_of_package, "model.xml")
+            bin_path = os.path.join(tempdir, name_of_package, "model.bin")
+            config_path = os.path.join(tempdir, name_of_package, "config.json")
+            with open(xml_path, "wb") as f:
+                f.write(self.model.get_data("openvino.xml"))
+            with open(bin_path, "wb") as f:
+                f.write(self.model.get_data("openvino.bin"))
+            with open(config_path, "w") as f:
+                json.dump(parameters, f)
+            # generate model.py
+            if is_new_model:
+                copyfile(model_file, os.path.join(tempdir, name_of_package, "model.py"))
+            # create wheel package
+            subprocess.run([sys.executable, os.path.join(tempdir, "setup.py"), 'bdist_wheel',
+                            '--dist-dir', output_path, 'clean', '--all'])
 
     def optimize(self,
                  optimization_type: OptimizationType,

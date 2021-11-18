@@ -50,18 +50,18 @@ def main(args):
     logger.info('Initialize dataset')
     labels_list = []
     items = load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/training'),
-        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/training'),
+        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
         subset=Subset.TRAINING,
         labels_list=labels_list)
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
-        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
+        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
         subset=Subset.VALIDATION,
         labels_list=labels_list))
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
-        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
+        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
         subset=Subset.TESTING,
         labels_list=labels_list))
     dataset = DatasetEntity(items=items)
@@ -116,6 +116,12 @@ def main(args):
                                      environment.get_model_configuration(),
                                      model_status=ModelStatus.NOT_READY)
         task.export(ExportType.OPENVINO, exported_model)
+        xml_path = osp.join("/home/akorobei/" "model.xml")
+        bin_path = osp.join("/home/akorobei/", "model.bin")
+        with open(xml_path, "wb") as f:
+            f.write(exported_model.get_data("openvino.xml"))
+        with open(bin_path, "wb") as f:
+            f.write(exported_model.get_data("openvino.bin"))
 
         logger.info('Create OpenVINO Task')
         environment.model = exported_model

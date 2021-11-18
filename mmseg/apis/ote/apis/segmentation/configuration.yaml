@@ -132,45 +132,69 @@ learning_parameters:
     warning: null
   type: PARAMETER_GROUP
   visible_in_ui: true
-postprocessing:
-  description: Postprocessing
-  header: Postprocessing
-  blur_strength:
+inference_parameters:
+  description: Parameters for inference
+  header: Parameters for inference
+  class_name:
     affects_outcome_of: INFERENCE
-    default_value: 1
-    description: With a higher value, the segmentation output will be smoother, but
-      less accurate.
-    editable: true
-    header: Blur strength
-    max_value: 25
-    min_value: 1
-    type: INTEGER
+    default_value: blur_segmentation
+    description: Model classes with defined pre- and postprocessing
+    editable: false
+    enum_name: Models
+    header: Model class for inference
+    options:
+      Segmentation: segmentation
+      BlurSegmentation: blur_segmentation
+    type: SELECTABLE
     ui_rules:
       action: DISABLE_EDITING
       operator: AND
       rules: []
       type: UI_RULES
-    value: 1
-    visible_in_ui: true
+    value: ssd
+    visible_in_ui: True
     warning: null
-  soft_threshold:
-    affects_outcome_of: INFERENCE
-    default_value: 0.5
-    description: The threshold to apply to the probability output of the model, for
-      each pixel. A higher value means a stricter segmentation prediction.
-    editable: true
-    header: Soft threshold
-    max_value: 1.0
-    min_value: 0.0
-    type: FLOAT
-    ui_rules:
-      action: DISABLE_EDITING
-      operator: AND
-      rules: []
-      type: UI_RULES
-    value: 0.5
+  postprocessing:
+    description: Postprocessing
+    header: Postprocessing
+    blur_strength:
+      affects_outcome_of: INFERENCE
+      default_value: 1
+      description: With a higher value, the segmentation output will be smoother, but
+        less accurate.
+      editable: true
+      header: Blur strength
+      max_value: 25
+      min_value: 1
+      type: INTEGER
+      ui_rules:
+        action: DISABLE_EDITING
+        operator: AND
+        rules: []
+        type: UI_RULES
+      value: 1
+      visible_in_ui: true
+      warning: null
+    soft_threshold:
+      affects_outcome_of: INFERENCE
+      default_value: 0.5
+      description: The threshold to apply to the probability output of the model, for
+        each pixel. A higher value means a stricter segmentation prediction.
+      editable: true
+      header: Soft threshold
+      max_value: 1.0
+      min_value: 0.0
+      type: FLOAT
+      ui_rules:
+        action: DISABLE_EDITING
+        operator: AND
+        rules: []
+        type: UI_RULES
+      value: 0.5
+      visible_in_ui: true
+      warning: null
+    type: PARAMETER_GROUP
     visible_in_ui: true
-    warning: null
   type: PARAMETER_GROUP
   visible_in_ui: true
 type: CONFIGURABLE_PARAMETERS
