@@ -74,15 +74,13 @@ def main(args):
     logger.info('Load model template')
     model_template = parse_model_template(args.template_file_path)
 
-    hyper_parameters = model_template.hyper_parameters.data
-    set_values_as_default(hyper_parameters)
-
-    logger.info('Setup environment')
-    params = create(hyper_parameters)
     logger.info('Set hyperparameters')
+
+    params = create(model_template.hyper_parameters.data)
     params.learning_parameters.learning_rate_fixed_iters = 0
     params.learning_parameters.learning_rate_warmup_iters = 30
     params.learning_parameters.num_iters = 30
+    logger.info('Setup environment')
     environment = TaskEnvironment(model=None,
                                   hyper_parameters=params,
                                   label_schema=labels_schema,
