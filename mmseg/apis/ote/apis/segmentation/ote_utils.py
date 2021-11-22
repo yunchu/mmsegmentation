@@ -52,4 +52,4 @@ class InferenceProgressCallback(TimeMonitorCallback):
 
     def on_test_batch_end(self, batch=None, logs=None):
         super().on_test_batch_end(batch, logs)
-        self.update_progress_callback(self.get_progress())
+        self.update_progress_callback(int(self.get_progress()))
