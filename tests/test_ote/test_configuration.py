@@ -14,11 +14,13 @@
 
 import os.path as osp
 
+from e2e_test_system import e2e_pytest_api
 from ote_sdk.configuration.helper import convert, create
 
 from mmseg.apis.ote.apis.segmentation.configuration import OTESegmentationConfig
 
 
+@e2e_pytest_api
 def test_configuration_yaml():
     configuration = OTESegmentationConfig()
     configuration_yaml_str = convert(configuration, str)
