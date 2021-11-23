@@ -30,7 +30,6 @@ from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
 from ote_sdk.entities.task_environment import TaskEnvironment
 
-from mmseg.apis.ote.apis.segmentation.config_utils import set_values_as_default
 from mmseg.apis.ote.apis.segmentation.ote_utils import get_task_class
 from mmseg.apis.ote.extension.datasets.mmdataset import load_dataset_items
 
@@ -50,18 +49,18 @@ def main(args):
     logger.info('Initialize dataset')
     labels_list = []
     items = load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
-        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/training'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/training'),
         subset=Subset.TRAINING,
         labels_list=labels_list)
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
-        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
         subset=Subset.VALIDATION,
         labels_list=labels_list))
     items.extend(load_dataset_items(
-        ann_file_path=osp.join(args.data_dir, 'custom/annotations/training'),
-        data_root_dir=osp.join(args.data_dir, 'custom/images/training'),
+        ann_file_path=osp.join(args.data_dir, 'toy_dataset/annotations/validation'),
+        data_root_dir=osp.join(args.data_dir, 'toy_dataset/images/validation'),
         subset=Subset.TESTING,
         labels_list=labels_list))
     dataset = DatasetEntity(items=items)
@@ -74,19 +73,14 @@ def main(args):
     logger.info('Load model template')
     model_template = parse_model_template(args.template_file_path)
 
-    hyper_parameters = model_template.hyper_parameters.data
-    set_values_as_default(hyper_parameters)
-
-    logger.info('Setup environment')
-    params = create(hyper_parameters)
     logger.info('Set hyperparameters')
+
+    params = create(model_template.hyper_parameters.data)
     params.learning_parameters.learning_rate_fixed_iters = 0
     params.learning_parameters.learning_rate_warmup_iters = 30
     params.learning_parameters.num_iters = 30
-    environment = TaskEnvironment(model=None,
-                                  hyper_parameters=params,
-                                  label_schema=labels_schema,
-                                  model_template=model_template)
+    logger.info('Setup environment')
+    environment = TaskEnvironment(model=None, hyper_parameters=params, label_schema=labels_schema, model_template=model_template)
 
     logger.info('Create base Task')
     task_impl_path = model_template.entrypoints.base
@@ -94,34 +88,33 @@ def main(args):
     task = task_cls(task_environment=environment)
 
     logger.info('Train model')
-    output_model = ModelEntity(dataset,
-                               environment.get_model_configuration(),
-                               model_status=ModelStatus.NOT_READY)
+    output_model = ModelEntity(
+        dataset,
+        environment.get_model_configuration(),
+        model_status=ModelStatus.NOT_READY)
     task.train(dataset, output_model)
 
     logger.info('Get predictions on the validation set')
     validation_dataset = dataset.get_subset(Subset.VALIDATION)
-    predicted_validation_dataset = task.infer(validation_dataset.with_empty_annotations(),
-                                              InferenceParameters(is_evaluation=True))
-    resultset = ResultSetEntity(model=output_model,
-                                ground_truth_dataset=validation_dataset,
-                                prediction_dataset=predicted_validation_dataset)
+    predicted_validation_dataset = task.infer(
+        validation_dataset.with_empty_annotations(),
+        InferenceParameters(is_evaluation=True))
+    resultset = ResultSetEntity(
+        model=output_model,
+        ground_truth_dataset=validation_dataset,
+        prediction_dataset=predicted_validation_dataset,
+    )
     logger.info('Estimate quality on validation set')
     task.evaluate(resultset)
     logger.info(str(resultset.performance))
 
     if args.export:
         logger.info('Export model')
-        exported_model = ModelEntity(dataset,
-                                     environment.get_model_configuration(),
-                                     model_status=ModelStatus.NOT_READY)
+        exported_model = ModelEntity(
+            dataset,
+            environment.get_model_configuration(),
+            model_status=ModelStatus.NOT_READY)
         task.export(ExportType.OPENVINO, exported_model)
-        xml_path = osp.join("/home/akorobei/" "model.xml")
-        bin_path = osp.join("/home/akorobei/", "model.bin")
-        with open(xml_path, "wb") as f:
-            f.write(exported_model.get_data("openvino.xml"))
-        with open(bin_path, "wb") as f:
-            f.write(exported_model.get_data("openvino.bin"))
 
         logger.info('Create OpenVINO Task')
         environment.model = exported_model
@@ -130,34 +123,41 @@ def main(args):
         openvino_task = openvino_task_cls(environment)
 
         logger.info('Get predictions on the validation set')
-        predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
-                                                           InferenceParameters(is_evaluation=True))
-        resultset = ResultSetEntity(model=output_model,
-                                    ground_truth_dataset=validation_dataset,
-                                    prediction_dataset=predicted_validation_dataset)
+        predicted_validation_dataset = openvino_task.infer(
+            validation_dataset.with_empty_annotations(),
+            InferenceParameters(is_evaluation=True))
+        resultset = ResultSetEntity(
+            model=output_model,
+            ground_truth_dataset=validation_dataset,
+            prediction_dataset=predicted_validation_dataset,
+        )
         logger.info('Estimate quality on validation set')
         openvino_task.evaluate(resultset)
         logger.info(str(resultset.performance))
 
         logger.info('Run POT optimization')
-        optimized_model = ModelEntity(dataset,
-                                      environment.get_model_configuration(),
-                                      model_status=ModelStatus.NOT_READY)
-        openvino_task.optimize(OptimizationType.POT,
-                               dataset.get_subset(Subset.TRAINING),
-                               optimized_model,
-                               OptimizationParameters())
+        optimized_model = ModelEntity(
+            dataset,
+            environment.get_model_configuration(),
+            model_status=ModelStatus.NOT_READY)
+        openvino_task.optimize(
+            OptimizationType.POT,
+            dataset.get_subset(Subset.TRAINING),
+            optimized_model,
+            OptimizationParameters())
 
         logger.info('Get predictions on the validation set')
-        predicted_validation_dataset = openvino_task.infer(validation_dataset.with_empty_annotations(),
-                                                           InferenceParameters(is_evaluation=True))
-        resultset = ResultSetEntity(model=optimized_model,
-                                    ground_truth_dataset=validation_dataset,
-                                    prediction_dataset=predicted_validation_dataset)
+        predicted_validation_dataset = openvino_task.infer(
+            validation_dataset.with_empty_annotations(),
+            InferenceParameters(is_evaluation=True))
+        resultset = ResultSetEntity(
+            model=optimized_model,
+            ground_truth_dataset=validation_dataset,
+            prediction_dataset=predicted_validation_dataset,
+        )
         logger.info('Performance of optimized model:')
         openvino_task.evaluate(resultset)
         logger.info(str(resultset.performance))
-
 
 if __name__ == '__main__':
     sys.exit(main(parse_args()) or 0)
