@@ -14,12 +14,14 @@
 
 import glob
 import os
+import unittest
 
+from e2e_test_system import e2e_pytest_api
 from ote_sdk.entities.model_template import parse_model_template
 
 
 def gen_parse_model_template_tests():
-    class ModelTemplateTests:
+    class ModelTemplateTests(unittest.TestCase):
         pass
 
     base_dir = os.path.join('configs', 'ote')
@@ -27,9 +29,12 @@ def gen_parse_model_template_tests():
     templates = glob.glob(glob_path, recursive=True)
     for template in templates:
         path = os.path.relpath(template)
+
+        @e2e_pytest_api
         def test_template(self, path=path):
             template = parse_model_template(path)
             assert template.hyper_parameters.data
+
         setattr(ModelTemplateTests, 'test_' + path.replace(' ', '_').replace('/', '_'), test_template)
 
     return ModelTemplateTests

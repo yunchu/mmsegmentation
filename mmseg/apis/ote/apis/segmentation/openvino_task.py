@@ -31,7 +31,7 @@ from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_p
                                               create_annotation_from_segmentation_map)
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.annotation import AnnotationSceneEntity, AnnotationSceneKind
-from ote_sdk.entities.inference_parameters import InferenceParameters
+from ote_sdk.entities.inference_parameters import InferenceParameters, default_progress_callback
 from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.model import (
     ModelStatus,
@@ -133,6 +133,9 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
         self.model_name = task_environment.model_template.name.replace(" ", "_").replace('-', '_')
         self.inferencer = self.load_inferencer()
 
+        template_file_path = task_environment.model_template.model_template_path
+        self._base_dir = os.path.abspath(os.path.dirname(template_file_path))
+
     @property
     def hparams(self):
         return self.task_environment.get_hyper_parameters(OTESegmentationConfig)
@@ -147,9 +150,14 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
     def infer(self,
               dataset: DatasetEntity,
               inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
-        from tqdm import tqdm
-        for dataset_item in tqdm(dataset):
-            dataset_item.annotation_scene = self.inferencer.predict(dataset_item.numpy)
+        update_progress_callback = default_progress_callback
+        if inference_parameters is not None:
+            update_progress_callback = inference_parameters.update_progress
+        dataset_size = len(dataset)
+        for i, dataset_item in enumerate(dataset, 1):
+            predicted_scene = self.inferencer.predict(dataset_item.numpy)
+            dataset_item.append_annotations(predicted_scene.annotations)
+            update_progress_callback(int(i / dataset_size * 100))
         return dataset
 
     def evaluate(self,
@@ -230,19 +238,23 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
             'device': 'CPU'
         })
 
-        stat_subset_size = self.hparams.pot_parameters.stat_subset_size
-        preset = self.hparams.pot_parameters.preset.name.lower()
-
-        algorithms = [
-            {
-                'name': 'DefaultQuantization',
-                'params': {
-                    'target_device': 'ANY',
-                    'preset': preset,
-                    'stat_subset_size': min(stat_subset_size, len(data_loader))
-                }
-            }
-        ]
+        optimization_config_path = os.path.join(self._base_dir, 'pot_optimization_config.json')
+        if os.path.exists(optimization_config_path):
+            with open(optimization_config_path) as f_src:
+                algorithms = ADDict(json.load(f_src))['algorithms']
+        else:
+            algorithms = [
+                ADDict({
+                    'name': 'DefaultQuantization',
+                    'params': {
+                        'target_device': 'ANY'
+                    }
+                })
+            ]
+        for algo in algorithms:
+            if 'Quantization' in algo['name']:
+                algo.params.stat_subset_size = self.hparams.pot_parameters.stat_subset_size
+                algo.params.preset = self.hparams.pot_parameters.preset.name.lower()
 
         engine = IEEngine(config=engine_config, data_loader=data_loader, metric=None)
 
