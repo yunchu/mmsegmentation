@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 
+from .. import builder
 from ..builder import LOSSES
 from .utils import get_class_weight
 from .base import BaseWeightedLoss
@@ -111,6 +112,7 @@ class GeneralizedDiceLoss(BaseWeightedLoss):
                  beta=0.5,
                  focal_gamma=1.0,
                  class_weight=None,
+                 scale_cfg=None,
                  **kwargs):
         super(GeneralizedDiceLoss, self).__init__(**kwargs)
 
@@ -120,6 +122,14 @@ class GeneralizedDiceLoss(BaseWeightedLoss):
         self.beta = float(beta)
         self.focal_gamma = float(focal_gamma)
         self.class_weight = get_class_weight(class_weight)
+
+        self._scale_scheduler = builder.build_scheduler(scale_cfg, default_value=1.0)
+
+        self._last_scale = 0.0
+
+    @property
+    def last_scale(self):
+        return self._last_scale
 
     @property
     def name(self):
@@ -139,7 +149,9 @@ class GeneralizedDiceLoss(BaseWeightedLoss):
         else:
             class_weight = None
 
-        pred = F.softmax(pred, dim=1)
+        self._last_scale = self._scale_scheduler(self.iter)
+
+        pred = F.softmax(self._last_scale * pred, dim=1)
         num_classes = pred.shape[1]
         one_hot_target = F.one_hot(
             torch.clamp(target.long(), 0, num_classes - 1),

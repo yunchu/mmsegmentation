@@ -51,6 +51,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=True,
+             enable_loss_equalizer=True,
              loss_decode=[
                  dict(type='AMSoftmaxLoss',
                       scale_cfg=dict(
@@ -76,6 +77,21 @@ model = dict(
                       loss_jitter_prob=0.01,
                       border_reweighting=False,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                      loss_weight=1.0),
+                 dict(type='GeneralizedDiceLoss',
+                      scale_cfg=dict(
+                          type='PolyScalarScheduler',
+                          start_scale=30,
+                          end_scale=5,
+                          num_iters=30000,
+                          power=1.2
+                      ),
+                      smooth=1.0,
+                      gamma=5.0,
+                      alpha=0.5,
+                      beta=0.5,
+                      focal_gamma=1.0,
+                      loss_jitter_prob=0.01,
                       loss_weight=1.0),
              ]),
     ],
@@ -123,6 +139,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=True,
+             enable_loss_equalizer=True,
              loss_decode=[
                  dict(type='AMSoftmaxLoss',
                       scale_cfg=dict(
@@ -148,6 +165,21 @@ model = dict(
                       loss_jitter_prob=0.01,
                       border_reweighting=False,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
+                      loss_weight=1.0),
+                 dict(type='GeneralizedDiceLoss',
+                      scale_cfg=dict(
+                          type='PolyScalarScheduler',
+                          start_scale=30,
+                          end_scale=5,
+                          num_iters=30000,
+                          power=1.2
+                      ),
+                      smooth=1.0,
+                      gamma=5.0,
+                      alpha=0.5,
+                      beta=0.5,
+                      focal_gamma=1.0,
+                      loss_jitter_prob=0.01,
                       loss_weight=1.0),
              ]),
         dict(type='FCNHead',
@@ -191,7 +223,6 @@ model = dict(
             dict(type='MutualLoss',
                  head_a_name='decode_1',
                  head_b_name='aux_0',
-                 # sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                  sampler=dict(type='OHEMPixelSampler', kept_ratio=0.1),
                  loss_weight=2.0),
         ],
