@@ -30,7 +30,6 @@ from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
 from ote_sdk.entities.task_environment import TaskEnvironment
 
-from mmseg.apis.ote.apis.segmentation.config_utils import set_values_as_default
 from mmseg.apis.ote.apis.segmentation.ote_utils import get_task_class
 from mmseg.apis.ote.extension.datasets.mmdataset import load_dataset_items
 
