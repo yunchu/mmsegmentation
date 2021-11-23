@@ -45,6 +45,7 @@ from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.exportable_code.inference import BaseInferencer
+from ote_sdk.usecases.exportable_code.prediction_to_annotation_converter import SegmentationToAnnotationConverter
 import ote_sdk.usecases.exportable_code.demo as demo
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
@@ -58,6 +59,7 @@ from compression.pipeline.initializer import create_pipeline
 from openvino.inference_engine import ExecutableNetwork, IECore, InferRequest
 from .configuration import OTESegmentationConfig
 from openvino.model_zoo.model_api.models import Model
+from openvino.model_zoo.model_api.adapters import create_core, OpenvinoAdapter
 from . import model_wrappers
 logger = logging.getLogger(__name__)
 
@@ -84,38 +86,27 @@ class OpenVINOSegmentationInferencer(BaseInferencer):
 
         self.labels = labels
         try:
-            self.ie = IECore()
+            model_adapter = OpenvinoAdapter(create_core(), model_file, weight_file, device=device, max_num_requests=num_requests)
+            label_names = [label.name for label in self.labels]
             self.configuration = {**attr.asdict(hparams.inference_parameters.postprocessing,
-                                           filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui'])}
-            self.model = Model.get_model(hparams.inference_parameters.class_name.value, self.ie,
-                                         model_file, weight_file, self.configuration)
+                                  filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui']),
+                                  'labels': label_names}
+            self.model = Model.create_model(hparams.inference_parameters.class_name.value, model_adapter, self.configuration)
+            self.model.load()
         except ValueError as e:
             print(e)
-        self.exec_net = self.ie.load_network(self.model.net, device_name=device)
+        self.converter = SegmentationToAnnotationConverter(self.labels)
 
     def pre_process(self, image: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         return self.model.preprocess(image)
 
     def post_process(self, prediction: Dict[str, np.ndarray], metadata: Dict[str, Any]) -> AnnotationSceneEntity:
-        predictions = prediction[self.model.output_blob_name].squeeze()
-        soft_prediction = np.transpose(predictions, axes=(1, 2, 0))
-
         hard_prediction = self.model.postprocess(prediction, metadata)
 
-        label_dictionary = {i + 1: self.labels[i] for i in range(len(self.labels))}
-        annotations = create_annotation_from_segmentation_map(
-            hard_prediction=hard_prediction,
-            soft_prediction=soft_prediction,
-            label_map=label_dictionary
-        )
-
-        return AnnotationSceneEntity(
-            kind=AnnotationSceneKind.PREDICTION,
-            annotations=annotations
-        )
+        return self.converter.convert_to_annotation(hard_prediction, metadata)
 
     def forward(self, inputs: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
-        return self.exec_net.infer(inputs)
+        return self.model.infer_sync(inputs)
 
 
 class OTEOpenVinoDataLoader(DataLoader):
@@ -139,7 +130,7 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
                  task_environment: TaskEnvironment):
         self.task_environment = task_environment
         self.model = self.task_environment.model
-        self.model_name = task_environment.model_template.name
+        self.model_name = task_environment.model_template.name.replace(" ", "_").replace('-', '_')
         self.inferencer = self.load_inferencer()
 
     @property
@@ -177,11 +168,10 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
         work_dir = os.path.dirname(demo.__file__)
         model_file = inspect.getfile(type(self.inferencer.model))
         parameters = {}
-        is_new_model = 'model_api' not in model_file
         parameters['name_of_model'] = self.model_name
         parameters['type_of_model'] = self.hparams.inference_parameters.class_name.value
-        parameters['is_new_model'] = is_new_model
         parameters['model_parameters'] = self.inferencer.configuration
+        parameters['converter_type'] = 'SEGMENTATION'
         name_of_package = parameters['name_of_model'].lower()
         with tempfile.TemporaryDirectory() as tempdir:
             copyfile(os.path.join(work_dir, "setup.py"), os.path.join(tempdir, "setup.py"))
@@ -197,7 +187,8 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
             with open(config_path, "w") as f:
                 json.dump(parameters, f)
             # generate model.py
-            if is_new_model:
+            if (inspect.getmodule(self.inferencer.model) in
+                [module[1] for module in inspect.getmembers(model_wrappers, inspect.ismodule)]):
                 copyfile(model_file, os.path.join(tempdir, name_of_package, "model.py"))
             # create wheel package
             subprocess.run([sys.executable, os.path.join(tempdir, "setup.py"), 'bdist_wheel',

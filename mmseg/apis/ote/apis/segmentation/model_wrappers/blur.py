@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions
 # and limitations under the License.
 
+import cv2
 import numpy as np
 
-from openvino.model_zoo.model_api.models import SegmentationModel, NumericalValue
+from openvino.model_zoo.model_api.models import SegmentationModel
+from openvino.model_zoo.model_api.models.types import NumericalValue
 from ote_sdk.utils.segmentation_utils import create_hard_prediction_from_soft_prediction
 
 class BlurSegmentation(SegmentationModel):
     __model__ = 'blur_segmentation'
 
-    def __init__(self, ie, model_path, weights_path, configuration):
-        super().__init__(ie, model_path, weights_path, configuration)
+    def __init__(self, model_adapter, configuration=None):
+        super().__init__(model_adapter, configuration)
 
     @classmethod
     def parameters(cls):
         parameters = super().parameters()
         parameters.update({
             'soft_threshold': NumericalValue(default_value=0.5, min=0.0, max=1.0),
-            'blur_strength': NumericalValue(default_value=1, min=0, max=25)
+            'blur_strength': NumericalValue(value_type=int, default_value=1, min=0, max=25)
         })
 
         return parameters
@@ -42,4 +44,8 @@ class BlurSegmentation(SegmentationModel):
             soft_threshold=self.soft_threshold,
             blur_strength=self.blur_strength
         )
+        hard_prediction = cv2.resize(hard_prediction, meta['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
+        soft_prediction = cv2.resize(soft_prediction, meta['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
+        meta['soft_predictions'] = soft_prediction
+
         return hard_prediction
