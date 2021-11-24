@@ -87,7 +87,7 @@ model = dict(
                           power=1.2
                       ),
                       smooth=1.0,
-                      gamma=5.0,
+                      gamma=2.0,
                       alpha=0.5,
                       beta=0.5,
                       focal_gamma=1.0,
@@ -175,7 +175,7 @@ model = dict(
                           power=1.2
                       ),
                       smooth=1.0,
-                      gamma=5.0,
+                      gamma=2.0,
                       alpha=0.5,
                       beta=0.5,
                       focal_gamma=1.0,
