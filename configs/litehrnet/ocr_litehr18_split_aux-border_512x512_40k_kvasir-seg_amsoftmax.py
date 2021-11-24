@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/fcn_litehr18_no-aggregator.py', '../_base_/datasets/kvasir_extra.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k.py'
 ]
 
 norm_cfg = dict(type='SyncBN', requires_grad=True)
@@ -51,7 +51,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=True,
-             enable_loss_equalizer=True,
+             # enable_loss_equalizer=True,
              loss_decode=[
                  dict(type='AMSoftmaxLoss',
                       scale_cfg=dict(
@@ -78,21 +78,21 @@ model = dict(
                       border_reweighting=False,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                       loss_weight=1.0),
-                 dict(type='GeneralizedDiceLoss',
-                      scale_cfg=dict(
-                          type='PolyScalarScheduler',
-                          start_scale=30,
-                          end_scale=5,
-                          num_iters=30000,
-                          power=1.2
-                      ),
-                      smooth=1.0,
-                      gamma=2.0,
-                      alpha=0.5,
-                      beta=0.5,
-                      focal_gamma=1.0,
-                      loss_jitter_prob=0.01,
-                      loss_weight=1.0),
+                 # dict(type='GeneralizedDiceLoss',
+                 #      scale_cfg=dict(
+                 #          type='PolyScalarScheduler',
+                 #          start_scale=30,
+                 #          end_scale=5,
+                 #          num_iters=30000,
+                 #          power=1.2
+                 #      ),
+                 #      smooth=1.0,
+                 #      gamma=5.0,
+                 #      alpha=0.5,
+                 #      beta=0.5,
+                 #      focal_gamma=1.0,
+                 #      loss_jitter_prob=0.01,
+                 #      loss_weight=1.0),
              ]),
     ],
     auxiliary_head=[
@@ -139,7 +139,7 @@ model = dict(
              align_corners=False,
              enable_aggregator=True,
              enable_out_norm=True,
-             enable_loss_equalizer=True,
+             # enable_loss_equalizer=True,
              loss_decode=[
                  dict(type='AMSoftmaxLoss',
                       scale_cfg=dict(
@@ -166,21 +166,21 @@ model = dict(
                       border_reweighting=False,
                       sampler=dict(type='MaxPoolingPixelSampler', ratio=0.25, p=1.7),
                       loss_weight=1.0),
-                 dict(type='GeneralizedDiceLoss',
-                      scale_cfg=dict(
-                          type='PolyScalarScheduler',
-                          start_scale=30,
-                          end_scale=5,
-                          num_iters=30000,
-                          power=1.2
-                      ),
-                      smooth=1.0,
-                      gamma=2.0,
-                      alpha=0.5,
-                      beta=0.5,
-                      focal_gamma=1.0,
-                      loss_jitter_prob=0.01,
-                      loss_weight=1.0),
+                 # dict(type='GeneralizedDiceLoss',
+                 #      scale_cfg=dict(
+                 #          type='PolyScalarScheduler',
+                 #          start_scale=30,
+                 #          end_scale=5,
+                 #          num_iters=30000,
+                 #          power=1.2
+                 #      ),
+                 #      smooth=1.0,
+                 #      gamma=5.0,
+                 #      alpha=0.5,
+                 #      beta=0.5,
+                 #      focal_gamma=1.0,
+                 #      loss_jitter_prob=0.01,
+                 #      loss_weight=1.0),
              ]),
         dict(type='FCNHead',
              in_channels=[40, 80, 160, 320],
