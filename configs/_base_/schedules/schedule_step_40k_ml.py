@@ -4,12 +4,12 @@ optimizer = dict(
     lr=1e-3,
     momentum=0.9,
     weight_decay=0.0005,
-    paramwise_cfg=dict(
-        bias_decay_mult=0.0,
-        norm_decay_mult=0.0,
-        dwconv_decay_mult=1.0,
-        bias_lr_mult=1.0
-    )
+    # paramwise_cfg=dict(
+    #     bias_decay_mult=0.0,
+    #     norm_decay_mult=0.0,
+    #     dwconv_decay_mult=1.0,
+    #     bias_lr_mult=1.0
+    # )
 )
 optimizer_config = dict(
     grad_clip=dict(
