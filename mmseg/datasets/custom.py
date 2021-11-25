@@ -387,6 +387,8 @@ class CustomDataset(Dataset):
         # each metric dict
         eval_results = {}
         for key, value in ret_metrics_summary.items():
+            value = np.nan_to_num(value)
+
             if key == 'aAcc':
                 eval_results[key] = value / 100.0
             else:
@@ -394,6 +396,8 @@ class CustomDataset(Dataset):
 
         ret_metrics_class.pop('Class', None)
         for key, value in ret_metrics_class.items():
+            value = np.nan_to_num(value)
+
             eval_results.update({
                 key + '.' + str(name): value[idx] / 100.0
                 for idx, name in enumerate(class_names)
