@@ -387,8 +387,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
     def save_model(self, output_model: ModelEntity):
         hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
-        labels = {label.name: label.color.rgb_tuple for label in self._labels}
-        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
+        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str,
+                      'label_schema': self._task_environment.label_schema, 'VERSION': 1}
 
         buffer = io.BytesIO()
         torch.save(model_info, buffer)
