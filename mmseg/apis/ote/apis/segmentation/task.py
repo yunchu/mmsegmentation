@@ -44,6 +44,7 @@ from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.entities.tensor import TensorEntity
 from ote_sdk.entities.train_parameters import TrainParameters
 from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
+from ote_sdk.serialization.label_mapper import LabelSchemaMapper
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
@@ -411,8 +412,9 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
     def save_model(self, output_model: ModelEntity):
         hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
+        serialized_label_schema = LabelSchemaMapper.forward(self._task_environment.label_schema)
         model_info = {'model': self._model.state_dict(), 'config': hyperparams_str,
-                      'label_schema': self._task_environment.label_schema, 'VERSION': 1}
+                      'label_schema': serialized_label_schema, 'VERSION': 1}
 
         buffer = io.BytesIO()
         torch.save(model_info, buffer)
