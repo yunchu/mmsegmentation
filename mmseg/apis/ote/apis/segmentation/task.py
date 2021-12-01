@@ -168,6 +168,9 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         set_hyperparams(self._config, self._hyperparams)
 
+        # There is no need to have many workers for a couple of images.
+        self._config.data.workers_per_gpu = max(min(self._config.data.workers_per_gpu, len(dataset) - 1), 0)
+
         if inference_parameters is not None:
             update_progress_callback = inference_parameters.update_progress
             is_evaluation = inference_parameters.is_evaluation
