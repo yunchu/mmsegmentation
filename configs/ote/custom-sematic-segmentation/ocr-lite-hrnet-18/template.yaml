@@ -38,6 +38,8 @@ hyper_parameters:
     pot_parameters:
       preset:
         default_value: Mixed
+      stat_subset_size:
+        default_value: 500
 
 # Training resources.
 max_nodes: 1

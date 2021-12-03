@@ -266,8 +266,9 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
                 })
             ]
         for algo in algorithms:
+            algo.params.stat_subset_size = self.hparams.pot_parameters.stat_subset_size
+            algo.params.shuffle_data = True
             if 'Quantization' in algo['name']:
-                algo.params.stat_subset_size = self.hparams.pot_parameters.stat_subset_size
                 algo.params.preset = self.hparams.pot_parameters.preset.name.lower()
 
         engine = IEEngine(config=engine_config, data_loader=data_loader, metric=None)
