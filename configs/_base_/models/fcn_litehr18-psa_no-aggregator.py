@@ -25,7 +25,7 @@ model = dict(
             num_stages=3,
             stages_spec=dict(
                 neighbour_weighting=False,
-                weighting_module_version='v1',
+                weighting_module_version='v2',
                 num_modules=(2, 4, 2),
                 num_branches=(2, 3, 4),
                 num_blocks=(2, 2, 2),
@@ -54,17 +54,17 @@ model = dict(
                 )
             ),
             out_aggregator=dict(
-                enable=True
+                enable=False
             ),
             add_input=False
         )
     ),
     decode_head=dict(
         type='FCNHead',
-        in_channels=40,
-        in_index=0,
+        in_channels=[40, 80, 160, 320],
+        in_index=[0, 1, 2, 3],
+        input_transform='multiple_select',
         channels=40,
-        input_transform=None,
         kernel_size=1,
         num_convs=0,
         concat_input=False,
@@ -72,6 +72,7 @@ model = dict(
         num_classes=19,
         norm_cfg=norm_cfg,
         align_corners=False,
+        enable_aggregator=True,
         loss_decode=dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,

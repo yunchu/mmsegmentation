@@ -54,17 +54,17 @@ model = dict(
                 )
             ),
             out_aggregator=dict(
-                enable=True
+                enable=False
             ),
             add_input=False
         )
     ),
     decode_head=dict(
         type='FCNHead',
-        in_channels=40,
-        in_index=0,
+        in_channels=[40, 80, 160, 320],
+        in_index=[0, 1, 2, 3],
+        input_transform='multiple_select',
         channels=40,
-        input_transform=None,
         kernel_size=1,
         num_convs=0,
         concat_input=False,
@@ -72,6 +72,7 @@ model = dict(
         num_classes=19,
         norm_cfg=norm_cfg,
         align_corners=False,
+        enable_aggregator=True,
         loss_decode=dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,

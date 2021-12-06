@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/kvasir.py',
+    '../_base_/models/fcn_litehr18.py', '../_base_/datasets/pascal_voc12_aug.py',
     '../_base_/default_runtime.py', '../_base_/schedules/schedule_step_40k_ml.py'
 ]
 
@@ -65,7 +65,7 @@ model = dict(
              num_convs=0,
              concat_input=False,
              dropout_ratio=-1,
-             num_classes=2,
+             num_classes=21,
              norm_cfg=norm_cfg,
              align_corners=False,
              enable_out_norm=False,
@@ -85,7 +85,7 @@ model = dict(
              sep_conv=True,
              input_transform=None,
              dropout_ratio=-1,
-             num_classes=2,
+             num_classes=21,
              norm_cfg=norm_cfg,
              align_corners=False,
              enable_out_norm=True,
@@ -122,7 +122,7 @@ model = dict(
     ),
 )
 evaluation = dict(
-    metric='mDice',
+    metric='mIoU',
 )
 
 find_unused_parameters = True

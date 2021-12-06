@@ -24,9 +24,8 @@ model = dict(
             ),
             num_stages=3,
             stages_spec=dict(
-                neighbour_weighting=False,
                 weighting_module_version='v1',
-                num_modules=(2, 4, 2),
+                num_modules=(3, 8, 3),
                 num_branches=(2, 3, 4),
                 num_blocks=(2, 2, 2),
                 module_type=('LITE', 'LITE', 'LITE'),
@@ -41,12 +40,12 @@ model = dict(
             out_modules=dict(
                 conv=dict(
                     enable=False,
-                    channels=320
+                    channels=280
                 ),
                 position_att=dict(
                     enable=False,
                     key_channels=128,
-                    value_channels=320,
+                    value_channels=280,
                     psp_size=(1, 3, 6, 8),
                 ),
                 local_att=dict(
