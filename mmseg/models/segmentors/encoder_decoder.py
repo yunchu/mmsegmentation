@@ -87,10 +87,14 @@ class EncoderDecoder(BaseSegmentor):
             self.mutual_losses = nn.ModuleList()
             for mutual_loss_config in mutual_loss_configs:
                 self.mutual_losses.append(builder.build_loss(mutual_loss_config))
+        else:
+            self.mutual_losses = None
 
         loss_reweighting_config = train_cfg.get('loss_reweighting')
         if loss_reweighting_config:
             self.loss_equalizer = LossEqualizer(**loss_reweighting_config)
+        else:
+            self.loss_equalizer = None
 
     def init_weights(self, pretrained=None):
         """Initialize the weights in backbone and heads.
