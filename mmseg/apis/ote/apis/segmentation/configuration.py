@@ -17,7 +17,7 @@ from sys import maxsize
 
 from ote_sdk.configuration.elements import (ParameterGroup,
                                             add_parameter_group,
-                                            boolean_attribute,
+                                            configurable_boolean,
                                             configurable_float,
                                             configurable_integer,
                                             selectable,
@@ -150,6 +150,35 @@ class OTESegmentationConfig(ConfigurableParameters):
                             editable=False,
                             visible_in_ui=False)
 
+    @attrs
+    class __NNCFOptimization(ParameterGroup):
+        header = string_attribute("Optimization by NNCF")
+        description = header
+
+        enable_quantization = configurable_boolean(
+            default_value=True,
+            header="Enable quantization algorithm",
+            description="Enable quantization algorithm",
+            affects_outcome_of=ModelLifecycle.TRAINING
+        )
+
+        enable_pruning = configurable_boolean(
+            default_value=False,
+            header="Enable filter pruning algorithm",
+            description="Enable filter pruning algorithm",
+            affects_outcome_of=ModelLifecycle.TRAINING
+        )
+
+        maximal_accuracy_degradation = configurable_float(
+            default_value=0.01,
+            min_value=0.0,
+            max_value=100.0,
+            header="Maximum accuracy degradation",
+            description="The maximal allowed accuracy metric drop",
+            affects_outcome_of=ModelLifecycle.TRAINING
+        )
+
     learning_parameters = add_parameter_group(__LearningParameters)
+    nncf_optimization = add_parameter_group(__NNCFOptimization)
     postprocessing = add_parameter_group(__Postprocessing)
     pot_parameters = add_parameter_group(__POTParameter)
