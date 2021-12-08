@@ -216,10 +216,11 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             dataset_item.append_annotations(annotations=annotations)
 
-            if fmap is not None:
-                active_score = TensorEntity(name="representation_vector", numpy=fmap)
-                dataset_item.append_metadata_item(active_score, model=self._task_environment.model)
+            # if fmap is not None:
+            #     active_score = TensorEntity(name="representation_vector", numpy=fmap)
+            #     dataset_item.append_metadata_item(active_score, model=self._task_environment.model)
 
+            dump_features = False
             if dump_features:
                 for label_index, label in label_dictionary.items():
                     if label_index == 0:
@@ -526,7 +527,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
-            
+
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
     def _delete_scratch_space(self):
