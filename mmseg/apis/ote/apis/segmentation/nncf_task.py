@@ -38,19 +38,19 @@ from ote_sdk.usecases.tasks.interfaces.optimization_interface import Optimizatio
 from ote_sdk.entities.optimization_parameters import default_progress_callback
 
 from mmseg.apis import train_segmentor
-from mmseg.apis.train import build_val_dataloader
+from mmseg.apis.fake_input import get_fake_input
+from mmseg.apis.ote.apis.segmentation import OTESegmentationInferenceTask
 from mmseg.apis.ote.apis.segmentation.config_utils import prepare_for_training
 from mmseg.apis.ote.apis.segmentation.configuration import OTESegmentationConfig
 from mmseg.apis.ote.apis.segmentation.ote_utils import TrainingProgressCallback
 from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
+from mmseg.apis.train import build_val_dataloader
 from mmseg.datasets import build_dataloader, build_dataset
-from mmseg.apis.ote.apis.segmentation import OTESegmentationInferenceTask
 from mmseg.integration.nncf import check_nncf_is_enabled
-from mmseg.integration.nncf.config import compose_nncf_config
-from mmseg.integration.nncf import is_state_nncf
 from mmseg.integration.nncf import is_accuracy_aware_training_set
+from mmseg.integration.nncf import is_state_nncf
 from mmseg.integration.nncf import wrap_nncf_model
-from mmseg.apis.fake_input import get_fake_input
+from mmseg.integration.nncf.config import compose_nncf_config
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +211,7 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         output_model.optimization_methods = self._optimization_methods
         output_model.precision = self._precision
 
+        self._is_training = False
 
     def save_model(self, output_model: ModelEntity):
         buffer = io.BytesIO()
@@ -232,3 +233,4 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
 
         torch.save(modelinfo, buffer)
         output_model.set_data("weights.pth", buffer.getvalue())
+        output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))

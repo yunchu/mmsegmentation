@@ -58,7 +58,7 @@ class OTESegmentationTrainingTask(OTESegmentationInferenceTask, ITrainingTask):
         old_model = copy.deepcopy(self._model)
 
         # Evaluate model performance before training.
-        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, True)
+        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, eval=True)
         logger.info('INITIAL MODEL PERFORMANCE\n' + str(initial_performance))
 
         # Check for stop signal between pre-eval and training. If training is cancelled at this point,
@@ -152,6 +152,8 @@ class OTESegmentationTrainingTask(OTESegmentationInferenceTask, ITrainingTask):
         buffer = io.BytesIO()
         torch.save(model_info, buffer)
         output_model.set_data("weights.pth", buffer.getvalue())
+        output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
+
 
     def cancel_training(self):
         """
