@@ -29,6 +29,7 @@ from ote_sdk.entities.model import ModelEntity, ModelPrecision, ModelStatus
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.train_parameters import TrainParameters
 from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
+from ote_sdk.serialization.label_mapper import label_schema_to_bytes
 from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 
 from mmseg.apis import train_segmentor
