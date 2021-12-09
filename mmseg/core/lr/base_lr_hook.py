@@ -19,11 +19,11 @@ class BaseLrUpdaterHook(Hook, metaclass=ABCMeta):
 
         if fixed is not None:
             assert fixed in self.schedulers
-            assert fixed_iters > 0
+            assert fixed_iters >= 0
 
         if warmup is not None:
             assert warmup in self.schedulers
-            assert warmup_iters > 0
+            assert warmup_iters >= 0
             assert 0 < warmup_ratio <= 1.0
 
         self.warmup_policy = warmup

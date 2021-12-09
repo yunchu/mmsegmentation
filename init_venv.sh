@@ -26,11 +26,6 @@ if [[ $PYTHON_VERSION != "3.7" && $PYTHON_VERSION != "3.8" && $PYTHON_VERSION !=
   exit 1
 fi
 
-if [[ -z $SC_SDK_REPO ]]; then
-  echo "The environment variable SC_SDK_REPO is not set -- it is required for creating virtual environment"
-  exit 1
-fi
-
 cd ${work_dir}
 
 if [[ -e ${venv_dir} ]]; then
@@ -42,6 +37,11 @@ fi
 
 # Create virtual environment
 $PYTHON_NAME -m venv ${venv_dir} --prompt="segmentation"
+
+if ! [ -e "${venv_dir}/bin/activate" ]; then
+  echo "The virtual environment was not created."
+  exit
+fi
 
 . ${venv_dir}/bin/activate
 
@@ -65,8 +65,8 @@ if [ -e "$CUDA_HOME" ]; then
 fi
 
 # install PyTorch and MMCV.
-export TORCH_VERSION=1.7.1
-export TORCHVISION_VERSION=0.8.2
+export TORCH_VERSION=1.8.2
+export TORCHVISION_VERSION=0.9.2
 export MMCV_VERSION=1.3.1
 
 if [[ -z ${CUDA_VERSION} ]]; then
@@ -75,64 +75,40 @@ else
   # Remove dots from CUDA version string, if any.
   CUDA_VERSION_CODE=$(echo ${CUDA_VERSION} | sed -e "s/\.//" -e "s/\(...\).*/\1/")
   echo "Using CUDA_VERSION ${CUDA_VERSION}"
-  if [[ "${CUDA_VERSION_CODE}" != "111" && "${CUDA_VERSION_CODE}" != "102" && "${CUDA_VERSION_CODE}" != "101" ]] ; then
-    echo "CUDA version must be either 10.1, 10.2 or 11.1"
+  if [[ "${CUDA_VERSION_CODE}" != "111" ]] && [[ "${CUDA_VERSION_CODE}" != "102" ]] ; then
+    echo "CUDA version must be either 11.1 or 10.2"
     exit 1
   fi
-  if [[ "${CUDA_VERSION_CODE}" == "101" ]] ; then
-    if [[ "${TORCH_VERSION}" != "1.7.1" ]]; then
-      echo "if CUDA version is 10.1, then PyTorch must be 1.7.1"
-      exit 1
-    fi
-  elif [[ "${CUDA_VERSION_CODE}" == "102" ]] ; then
-    if [[ "${TORCH_VERSION}" != "1.8.1" && "${TORCH_VERSION}" != "1.9.0" ]]; then
-      echo "if CUDA version is 10.2, then PyTorch must be either 1.8.1 or 1.9.0"
-      exit 1
-    fi
-  fi
+  echo "export CUDA_HOME=${CUDA_HOME}" >> ${venv_dir}/bin/activate
 fi
 
 CONSTRAINTS_FILE=$(tempfile)
 cat constraints.txt >> ${CONSTRAINTS_FILE}
+export PIP_CONSTRAINT=${CONSTRAINTS_FILE}
 
 pip install --upgrade pip || exit 1
-pip install wheel -c ${CONSTRAINTS_FILE} || exit 1
-pip install --upgrade setuptools -c ${CONSTRAINTS_FILE} || exit 1
+pip install wheel || exit 1
+pip install --upgrade setuptools || exit 1
 
 if [[ -z $CUDA_VERSION_CODE ]]; then
-  pip install torch==${TORCH_VERSION}+cpu torchvision==${TORCHVISION_VERSION}+cpu -f https://download.pytorch.org/whl/torch_stable.html \
-          -c ${CONSTRAINTS_FILE} || exit 1
-  echo torch==${TORCH_VERSION}+cpu >> ${CONSTRAINTS_FILE}
-  echo torchvision==${TORCHVISION_VERSION}+cpu >> ${CONSTRAINTS_FILE}
-elif [[ $CUDA_VERSION_CODE == "102" ]]; then
-  pip install torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} -c ${CONSTRAINTS_FILE} || exit 1
-  echo torch==${TORCH_VERSION} >> ${CONSTRAINTS_FILE}
-  echo torchvision==${TORCHVISION_VERSION} >> ${CONSTRAINTS_FILE}
-elif [[ $CUDA_VERSION_CODE == "111" ]]; then
-  export TORCH_VERSION=1.8.2
-  export TORCHVISION_VERSION=0.9.2
-  echo torch==${TORCH_VERSION}+cu${CUDA_VERSION_CODE} >> ${CONSTRAINTS_FILE}
-  echo torchvision==${TORCHVISION_VERSION}+cu${CUDA_VERSION_CODE} >> ${CONSTRAINTS_FILE}
-  pip install torch==${TORCH_VERSION}+cu${CUDA_VERSION_CODE} torchvision==${TORCHVISION_VERSION}+cu${CUDA_VERSION_CODE} -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html \
-          -c ${CONSTRAINTS_FILE} || exit 1
+  export TORCH_VERSION=${TORCH_VERSION}+cpu
+  export TORCHVISION_VERSION=${TORCHVISION_VERSION}+cpu
 else
-  pip install torch==${TORCH_VERSION}+cu${CUDA_VERSION_CODE} torchvision==${TORCHVISION_VERSION}+cu${CUDA_VERSION_CODE} -f https://download.pytorch.org/whl/torch_stable.html \
-          -c ${CONSTRAINTS_FILE} || exit 1
-  echo torch==${TORCH_VERSION}+cu${CUDA_VERSION_CODE} >> ${CONSTRAINTS_FILE}
-  echo torchvision==${TORCHVISION_VERSION}+cu${CUDA_VERSION_CODE} >> ${CONSTRAINTS_FILE}
+  export TORCH_VERSION=${TORCH_VERSION}+cu${CUDA_VERSION_CODE}
+  export TORCHVISION_VERSION=${TORCHVISION_VERSION}+cu${CUDA_VERSION_CODE}
 fi
 
-if [[ -z $CUDA_VERSION_CODE ]]; then
-  pip install --no-cache-dir mmcv-full==${MMCV_VERSION} -f https://download.openmmlab.com/mmcv/dist/cpu/torch${TORCH_VERSION}/index.html -c ${CONSTRAINTS_FILE} || exit 1
-else
-  pip install --no-cache-dir mmcv-full==${MMCV_VERSION} -c ${CONSTRAINTS_FILE} || exit 1
-fi
+pip install torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html || exit 1
+echo torch==${TORCH_VERSION} >> ${CONSTRAINTS_FILE}
+echo torchvision==${TORCHVISION_VERSION} >> ${CONSTRAINTS_FILE}
+
+pip install --no-cache-dir mmcv-full==${MMCV_VERSION} || exit 1
 
 # Install other requirements.
-cat requirements.txt | xargs -n 1 -L 1 pip install --no-cache -c ${CONSTRAINTS_FILE} || exit 1
-cat openvino-requirements.txt | xargs -n 1 -L 1 pip install --no-cache -c ${CONSTRAINTS_FILE} || exit 1
+cat requirements.txt | xargs -n 1 -L 1 pip install --no-cache || exit 1
+cat openvino-requirements.txt | xargs -n 1 -L 1 pip install --no-cache || exit 1
 
-pip install -e . -c ${CONSTRAINTS_FILE} || exit 1
+pip install -e . || exit 1
 MMSEGMENTATION_DIR=`realpath .`
 echo "export MMSEGMENTATION_DIR=${MMSEGMENTATION_DIR}" >> ${venv_dir}/bin/activate
 
@@ -141,11 +117,13 @@ pip install -r requirements/nncf_compression.txt || exit 1
 echo "Build NNCF extensions ..."
 python -c "import nncf"
 
-pip install -e $SC_SDK_REPO/src/ote_sdk -c ${CONSTRAINTS_FILE} || exit 1
-pip install -e $SC_SDK_REPO/src/sc_sdk -c ${CONSTRAINTS_FILE} || exit 1
-pip install -e $SC_SDK_REPO/src/common/users_handler -c ${CONSTRAINTS_FILE} || exit 1
-if [[ -z ${SKIP_SC_SDK_ADDITIONAL_PACKAGES} ]]; then
-  pip install `find $SC_SDK_REPO/.cache -name *.whl` || exit 1
+if [[ ! -z $OTE_SDK_PATH ]]; then
+  pip install -e $OTE_SDK_PATH || exit 1
+elif [[ ! -z $SC_SDK_REPO ]]; then
+  pip install -e $SC_SDK_REPO/src/ote_sdk || exit 1
+else
+  echo "OTE_SDK_PATH or SC_SDK_REPO should be specified"
+  exit 1
 fi
 
 deactivate

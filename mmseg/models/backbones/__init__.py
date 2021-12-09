@@ -11,8 +11,6 @@ from .resnext import ResNeXt
 from .unet import UNet
 from .vit import VisionTransformer
 from .dabnet import DABNet
-from .dfanet import DFANet
-from .xception_a import XceptionA
 from .ddrnet import DDRNet
 from .bisenet_v2 import BiSeNetV2
 from .shelfnet import ShelfNet
@@ -36,8 +34,6 @@ __all__ = [
     'VisionTransformer',
     'ICNet',
     'DABNet',
-    'DFANet',
-    'XceptionA',
     'DDRNet',
     'BiSeNetV2',
     'ShelfNet',

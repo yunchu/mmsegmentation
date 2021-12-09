@@ -37,11 +37,14 @@ from ote_sdk.entities.inference_parameters import default_progress_callback as d
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
+from ote_sdk.entities.result_media import ResultMediaEntity
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
+from ote_sdk.entities.tensor import TensorEntity
 from ote_sdk.entities.train_parameters import TrainParameters
 from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
+from ote_sdk.serialization.label_mapper import label_schema_to_bytes
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
@@ -49,7 +52,7 @@ from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 
-from mmseg.apis import single_gpu_test, train_segmentor, export_model
+from mmseg.apis import train_segmentor, export_model
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
                                                            prepare_for_training,
@@ -166,10 +169,16 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         set_hyperparams(self._config, self._hyperparams)
 
+        # There is no need to have many workers for a couple of images.
+        self._config.data.workers_per_gpu = max(min(self._config.data.workers_per_gpu, len(dataset) - 1), 0)
+
         if inference_parameters is not None:
             update_progress_callback = inference_parameters.update_progress
+            is_evaluation = inference_parameters.is_evaluation
         else:
             update_progress_callback = default_infer_progress_callback
+            is_evaluation = False
+        dump_features = not is_evaluation
 
         time_monitor = InferenceProgressCallback(len(dataset), update_progress_callback)
 
@@ -182,15 +191,15 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         pre_hook_handle = self._model.register_forward_pre_hook(pre_hook)
         hook_handle = self._model.register_forward_hook(hook)
 
-        prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, False,
-                                                      output_logits=True)
+        prediction_results, _ = self._infer_segmentor(self._model, self._config, dataset, eval=False,
+                                                      output_logits=True, dump_features=True)
 
         label_dictionary = {
             i + 1: self._labels[i] for i in range(len(self._labels))
         }
 
         # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
-        for dataset_item, soft_prediction in zip(dataset, prediction_results):
+        for dataset_item, (soft_prediction, fmap) in zip(dataset, prediction_results):
             soft_prediction = np.transpose(soft_prediction, axes=(1, 2, 0))
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
@@ -207,6 +216,33 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             dataset_item.append_annotations(annotations=annotations)
 
+            if fmap is not None:
+                active_score = TensorEntity(name="representation_vector", numpy=fmap)
+                dataset_item.append_metadata_item(active_score, model=self._task_environment.model)
+
+            if dump_features:
+                for label_index, label in label_dictionary.items():
+                    if label_index == 0:
+                        continue
+
+                    if len(soft_prediction.shape) == 3:
+                        current_label_soft_prediction = soft_prediction[:, :, label_index]
+                    else:
+                        current_label_soft_prediction = soft_prediction
+
+                    min_soft_score = np.min(current_label_soft_prediction)
+                    max_soft_score = np.max(current_label_soft_prediction)
+                    factor = 255.0 / (max_soft_score - min_soft_score + 1e-12)
+                    result_media_numpy = (factor * (current_label_soft_prediction - min_soft_score)).astype(np.uint8)
+
+                    result_media = ResultMediaEntity(name=f'{label.name}',
+                                                     type='Soft Prediction',
+                                                     label=label,
+                                                     annotation_scene=dataset_item.annotation_scene,
+                                                     roi=dataset_item.roi,
+                                                     numpy=result_media_numpy)
+                    dataset_item.append_metadata_item(result_media, model=self._task_environment.model)
+
         pre_hook_handle.remove()
         hook_handle.remove()
 
@@ -215,7 +251,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
     @staticmethod
     def _infer_segmentor(model: torch.nn.Module, config: Config, dataset: DatasetEntity,
                          eval: Optional[bool] = False, metric_name: Optional[str] = 'mDice',
-                         output_logits: bool = False) -> Tuple[List, float]:
+                         output_logits: bool = False, dump_features: bool = True) -> Tuple[List, float]:
         model.eval()
 
         test_config = prepare_for_testing(config, dataset)
@@ -234,15 +270,31 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         else:
             eval_model = MMDataCPU(model)
 
+        eval_predictions = []
+        feature_maps = []
+
+        def dump_features_hook(mod, inp, out):
+            feature_maps.append(out[0].detach().cpu().numpy())
+
+        def dummy_dump_features_hook(mod, inp, out):
+            feature_maps.append(None)
+
+        hook = dump_features_hook if dump_features else dummy_dump_features_hook
+
         # Use a single gpu for testing. Set in both mm_val_dataloader and eval_model
-        eval_predictions = single_gpu_test(eval_model, mm_val_dataloader,
-                                           output_logits=output_logits,
-                                           show=False)
+        with eval_model.module.backbone.register_forward_hook(hook):
+            for data in mm_val_dataloader:
+                with torch.no_grad():
+                    result = eval_model(return_loss=False, output_logits=output_logits, **data)
+                eval_predictions.extend(result)
 
         metric = None
         if eval:
             assert not output_logits
             metric = mm_val_dataset.evaluate(eval_predictions, metric=metric_name)[metric_name]
+
+        assert len(eval_predictions) == len(feature_maps), f'{len(eval_predictions)} != {len(feature_maps)}'
+        eval_predictions = zip(eval_predictions, feature_maps)
 
         return eval_predictions, metric
 
@@ -272,7 +324,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         old_model = copy.deepcopy(self._model)
 
         # Evaluate model performance before training.
-        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, True)
+        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, eval=True)
         logger.info('INITIAL MODEL PERFORMANCE\n' + str(initial_performance))
 
         # Check for stop signal between pre-eval and training. If training is cancelled at this point,
@@ -360,12 +412,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
     def save_model(self, output_model: ModelEntity):
         hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
-        labels = {label.name: label.color.rgb_tuple for label in self._labels}
-        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str, 'labels': labels, 'VERSION': 1}
+        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str,
+                      'VERSION': 1}
 
         buffer = io.BytesIO()
         torch.save(model_info, buffer)
         output_model.set_data("weights.pth", buffer.getvalue())
+        output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
     def cancel_training(self):
         """
@@ -473,6 +526,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
+            
+        output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
     def _delete_scratch_space(self):
         """
