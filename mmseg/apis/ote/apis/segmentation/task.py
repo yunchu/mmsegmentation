@@ -217,11 +217,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             for annotation in annotations:
                 x = annotation.shape._as_shapely_polygon()
                 if not x.is_valid:
-                    from shapely.validation import make_valid
-                    warnings.warn(
-                        f'Invalid segmentation shape {str(x)} -> {str(make_valid(x))}',
-                        UserWarning
-                    )
+                    message = f'Invalid segmentation shape {str(x)}'
+                    try:
+                        from shapely.validation import make_valid
+                        message = message + f'-> {str(make_valid(x))}'
+                    except:
+                        pass
+                    warnings.warn(message, UserWarning)
 
             dataset_item.append_annotations(annotations=annotations)
 
