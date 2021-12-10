@@ -23,8 +23,8 @@ import subprocess
 import tempfile
 from addict import Dict as ADDict
 from typing import Any, Dict, Tuple, List, Optional, Union
+from zipfile import ZipFile
 
-import cv2
 import numpy as np
 
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
@@ -47,6 +47,7 @@ from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.exportable_code.inference import BaseInferencer
 from ote_sdk.usecases.exportable_code.prediction_to_annotation_converter import SegmentationToAnnotationConverter
 import ote_sdk.usecases.exportable_code.demo as demo
+from ote_sdk.usecases.tasks.interfaces.deployment_interface import IDeploymentTask
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import IOptimizationTask, OptimizationType
@@ -125,12 +126,12 @@ class OTEOpenVinoDataLoader(DataLoader):
         return len(self.dataset)
 
 
-class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTask):
+class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask, IOptimizationTask):
     def __init__(self,
                  task_environment: TaskEnvironment):
         self.task_environment = task_environment
         self.model = self.task_environment.model
-        self.model_name = task_environment.model_template.name.replace(" ", "_").replace('-', '_')
+        self.model_name = task_environment.model_template.model_template_id
         self.inferencer = self.load_inferencer()
 
         template_file_path = task_environment.model_template.model_template_path
@@ -172,35 +173,42 @@ class OpenVINOSegmentationTask(IInferenceTask, IEvaluationTask, IOptimizationTas
         output_result_set.performance = metrics.get_performance()
 
     def deploy(self,
-               output_path: str):
+               output_model: ModelEntity) -> None:
+        logger.info('Deploying the model')
+
         work_dir = os.path.dirname(demo.__file__)
         model_file = inspect.getfile(type(self.inferencer.model))
         parameters = {}
-        parameters['name_of_model'] = self.model_name
         parameters['type_of_model'] = self.hparams.inference_parameters.class_name.value
-        parameters['model_parameters'] = self.inferencer.configuration
         parameters['converter_type'] = 'SEGMENTATION'
-        name_of_package = parameters['name_of_model'].lower()
+        parameters['model_parameters'] = self.inferencer.configuration
+        name_of_package = "demo_package"
         with tempfile.TemporaryDirectory() as tempdir:
             copyfile(os.path.join(work_dir, "setup.py"), os.path.join(tempdir, "setup.py"))
             copyfile(os.path.join(work_dir, "requirements.txt"), os.path.join(tempdir, "requirements.txt"))
-            copytree(os.path.join(work_dir, "demo_package"), os.path.join(tempdir, name_of_package))
-            xml_path = os.path.join(tempdir, name_of_package, "model.xml")
-            bin_path = os.path.join(tempdir, name_of_package, "model.bin")
+            copytree(os.path.join(work_dir, name_of_package), os.path.join(tempdir, name_of_package))
             config_path = os.path.join(tempdir, name_of_package, "config.json")
-            with open(xml_path, "wb") as f:
-                f.write(self.model.get_data("openvino.xml"))
-            with open(bin_path, "wb") as f:
-                f.write(self.model.get_data("openvino.bin"))
-            with open(config_path, "w") as f:
-                json.dump(parameters, f)
+            with open(config_path, "w", encoding='utf-8') as f:
+                json.dump(parameters, f, ensure_ascii=False, indent=4)
             # generate model.py
             if (inspect.getmodule(self.inferencer.model) in
-                [module[1] for module in inspect.getmembers(model_wrappers, inspect.ismodule)]):
+               [module[1] for module in inspect.getmembers(model_wrappers, inspect.ismodule)]):
                 copyfile(model_file, os.path.join(tempdir, name_of_package, "model.py"))
             # create wheel package
             subprocess.run([sys.executable, os.path.join(tempdir, "setup.py"), 'bdist_wheel',
-                            '--dist-dir', output_path, 'clean', '--all'])
+                            '--dist-dir', tempdir, 'clean', '--all'])
+            wheel_file_name = [f for f in os.listdir(tempdir) if f.endswith('.whl')][0]
+
+            with ZipFile(os.path.join(tempdir, "openvino.zip"), 'w') as zip:
+                zip.writestr(os.path.join("model", "model.xml"), self.model.get_data("openvino.xml"))
+                zip.writestr(os.path.join("model", "model.bin"), self.model.get_data("openvino.bin"))
+                zip.write(os.path.join(tempdir, "requirements.txt"), os.path.join("python", "requirements.txt"))
+                zip.write(os.path.join(work_dir, "README.md"), os.path.join("python", "README.md"))
+                zip.write(os.path.join(work_dir, "demo.py"), os.path.join("python", "demo.py"))
+                zip.write(os.path.join(tempdir, wheel_file_name), os.path.join("python", wheel_file_name))
+            with open(os.path.join(tempdir, "openvino.zip"), "rb") as file:
+                output_model.exportable_code = file.read()
+        logger.info('Deploying completed')
 
     def optimize(self,
                  optimization_type: OptimizationType,
