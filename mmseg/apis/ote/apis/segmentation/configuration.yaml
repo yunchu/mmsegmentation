@@ -151,7 +151,7 @@ postprocessing:
       operator: AND
       rules: []
       type: UI_RULES
-    value: ssd
+    value: blur_segmentation
     visible_in_ui: True
     warning: null
   blur_strength:
