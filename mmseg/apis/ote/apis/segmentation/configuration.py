@@ -25,7 +25,7 @@ from ote_sdk.configuration.elements import (ParameterGroup,
 from ote_sdk.configuration.configurable_parameters import ConfigurableParameters
 from ote_sdk.configuration.model_lifecycle import ModelLifecycle
 
-from .configuration_enums import POTQuantizationPreset
+from .configuration_enums import POTQuantizationPreset, Models
 
 
 @attrs
@@ -112,6 +112,11 @@ class OTESegmentationConfig(ConfigurableParameters):
         header = string_attribute("Postprocessing")
         description = header
 
+        class_name = selectable(default_value=Models.BlurSegmetation,
+                                header="Model class for inference",
+                                description="Model classes with defined pre- and postprocessing",
+                                editable=False,
+                                visible_in_ui=True)
         blur_strength = configurable_integer(
             header="Blur strength",
             description="With a higher value, the segmentation output will be smoother, but less accurate.",
@@ -120,7 +125,6 @@ class OTESegmentationConfig(ConfigurableParameters):
             max_value=25,
             affects_outcome_of=ModelLifecycle.INFERENCE
         )
-
         soft_threshold = configurable_float(
             default_value=0.5,
             header="Soft threshold",

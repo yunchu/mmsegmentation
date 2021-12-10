@@ -135,6 +135,25 @@ learning_parameters:
 postprocessing:
   description: Postprocessing
   header: Postprocessing
+  class_name:
+    affects_outcome_of: INFERENCE
+    default_value: blur_segmentation
+    description: Model classes with defined pre- and postprocessing
+    editable: false
+    enum_name: Models
+    header: Model class for inference
+    options:
+      Segmentation: segmentation
+      BlurSegmentation: blur_segmentation
+    type: SELECTABLE
+    ui_rules:
+      action: DISABLE_EDITING
+      operator: AND
+      rules: []
+      type: UI_RULES
+    value: blur_segmentation
+    visible_in_ui: True
+    warning: null
   blur_strength:
     affects_outcome_of: INFERENCE
     default_value: 1

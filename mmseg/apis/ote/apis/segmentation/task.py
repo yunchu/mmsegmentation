@@ -526,7 +526,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
-            
+
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
     def _delete_scratch_space(self):
