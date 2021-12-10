@@ -4,6 +4,7 @@ prettytable
 mmcv-full==1.3.1
 numpy
 six
+Shapely==1.8.0
 terminaltables
 torch>=1.7.1,<=1.9.0
 torchvision>=0.8.1,<=0.10.0

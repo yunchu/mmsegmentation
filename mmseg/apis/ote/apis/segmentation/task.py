@@ -214,6 +214,15 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                 label_map=label_dictionary,
             )
 
+            for annotation in annotations:
+                x = annotation.shape._as_shapely_polygon()
+                if not x.is_valid:
+                    from shapely.validation import make_valid
+                    warnings.warn(
+                        f'Invalid segmentation shape {str(x)} -> {str(make_valid(x))}',
+                        UserWarning
+                    )
+
             dataset_item.append_annotations(annotations=annotations)
 
             # if fmap is not None:
