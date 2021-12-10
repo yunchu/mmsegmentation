@@ -108,8 +108,8 @@ class OTESegmentationConfig(ConfigurableParameters):
         )
 
     @attrs
-    class __InferenceParameters(ParameterGroup):
-        header = string_attribute("Parameters for inference")
+    class __Postprocessing(ParameterGroup):
+        header = string_attribute("Postprocessing")
         description = header
 
         class_name = selectable(default_value=Models.BlurSegmetation,
@@ -117,32 +117,24 @@ class OTESegmentationConfig(ConfigurableParameters):
                                 description="Model classes with defined pre- and postprocessing",
                                 editable=False,
                                 visible_in_ui=True)
+        blur_strength = configurable_integer(
+            header="Blur strength",
+            description="With a higher value, the segmentation output will be smoother, but less accurate.",
+            default_value=1,
+            min_value=1,
+            max_value=25,
+            affects_outcome_of=ModelLifecycle.INFERENCE
+        )
+        soft_threshold = configurable_float(
+            default_value=0.5,
+            header="Soft threshold",
+            description="The threshold to apply to the probability output of the model, for each pixel. A higher value "
+                        "means a stricter segmentation prediction.",
+            min_value=0.0,
+            max_value=1.0,
+            affects_outcome_of=ModelLifecycle.INFERENCE
+        )
 
-        @attrs
-        class __Postprocessing(ParameterGroup):
-            header = string_attribute("Postprocessing")
-            description = header
-
-            blur_strength = configurable_integer(
-                header="Blur strength",
-                description="With a higher value, the segmentation output will be smoother, but less accurate.",
-                default_value=1,
-                min_value=1,
-                max_value=25,
-                affects_outcome_of=ModelLifecycle.INFERENCE
-            )
-
-            soft_threshold = configurable_float(
-                default_value=0.5,
-                header="Soft threshold",
-                description="The threshold to apply to the probability output of the model, for each pixel. A higher value "
-                            "means a stricter segmentation prediction.",
-                min_value=0.0,
-                max_value=1.0,
-                affects_outcome_of=ModelLifecycle.INFERENCE
-            )
-
-        postprocessing = add_parameter_group(__Postprocessing)
 
     @attrs
     class __POTParameter(ParameterGroup):
@@ -164,5 +156,5 @@ class OTESegmentationConfig(ConfigurableParameters):
                             visible_in_ui=False)
 
     learning_parameters = add_parameter_group(__LearningParameters)
-    inference_parameters = add_parameter_group(__InferenceParameters)
+    postprocessing_parameters = add_parameter_group(__Postprocessing)
     pot_parameters = add_parameter_group(__POTParameter)

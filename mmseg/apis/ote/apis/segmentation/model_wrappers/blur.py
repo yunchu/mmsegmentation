@@ -22,8 +22,8 @@ from ote_sdk.utils.segmentation_utils import create_hard_prediction_from_soft_pr
 class BlurSegmentation(SegmentationModel):
     __model__ = 'blur_segmentation'
 
-    def __init__(self, model_adapter, configuration=None):
-        super().__init__(model_adapter, configuration)
+    def __init__(self, model_adapter, configuration=None, preload=False):
+        super().__init__(model_adapter, configuration, preload)
 
     @classmethod
     def parameters(cls):

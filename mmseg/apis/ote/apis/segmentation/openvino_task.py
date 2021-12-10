@@ -90,10 +90,10 @@ class OpenVINOSegmentationInferencer(BaseInferencer):
         try:
             model_adapter = OpenvinoAdapter(create_core(), model_file, weight_file, device=device, max_num_requests=num_requests)
             label_names = [label.name for label in self.labels]
-            self.configuration = {**attr.asdict(hparams.inference_parameters.postprocessing,
-                                  filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui']),
+            self.configuration = {**attr.asdict(hparams.postprocessing_parameters,
+                                  filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui', 'class_name']),
                                   'labels': label_names}
-            self.model = Model.create_model(hparams.inference_parameters.class_name.value, model_adapter, self.configuration)
+            self.model = Model.create_model(hparams.postprocessing_parameters.class_name.value, model_adapter, self.configuration)
             self.model.load()
         except ValueError as e:
             print(e)
@@ -180,7 +180,7 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         work_dir = os.path.dirname(demo.__file__)
         model_file = inspect.getfile(type(self.inferencer.model))
         parameters = {}
-        parameters['type_of_model'] = self.hparams.inference_parameters.class_name.value
+        parameters['type_of_model'] = self.hparams.postprocessing_parameters.class_name.value
         parameters['converter_type'] = 'SEGMENTATION'
         parameters['model_parameters'] = self.inferencer.configuration
         name_of_package = "demo_package"
@@ -189,6 +189,7 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
             copyfile(os.path.join(work_dir, "requirements.txt"), os.path.join(tempdir, "requirements.txt"))
             copytree(os.path.join(work_dir, name_of_package), os.path.join(tempdir, name_of_package))
             config_path = os.path.join(tempdir, name_of_package, "config.json")
+            print(parameters)
             with open(config_path, "w", encoding='utf-8') as f:
                 json.dump(parameters, f, ensure_ascii=False, indent=4)
             # generate model.py

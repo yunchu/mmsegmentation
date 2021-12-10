@@ -204,8 +204,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
                 soft_prediction=soft_prediction,
-                soft_threshold=self._hyperparams.inference_parameters.postprocessing.soft_threshold,
-                blur_strength=self._hyperparams.inference_parameters.postprocessing.blur_strength,
+                soft_threshold=self._hyperparams.postprocessing_parameters.soft_threshold,
+                blur_strength=self._hyperparams.postprocessing_parameters.blur_strength,
             )
 
             annotations = create_annotation_from_segmentation_map(
@@ -526,7 +526,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
-            
+
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
     def _delete_scratch_space(self):
