@@ -16,6 +16,7 @@
 import copy
 import glob
 import logging
+import math
 import os
 import tempfile
 from collections import defaultdict
@@ -126,9 +127,12 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
         init_num_iterations = config.runner.max_iters
         config.runner.max_iters = total_iterations
 
-    # estimate the schedule scale
+    # rescale the learning schedules
     schedule_scale = float(total_iterations) / float(init_num_iterations)
+    rescale_num_iterations(config, schedule_scale)
 
+
+def rescale_num_iterations(config: Config, schedule_scale: float):
     # rescale number of iterations for lr scheduler
     if config.lr_config.policy == 'customstep':
         config.lr_config.step = [int(schedule_scale * step) for step in config.lr_config.step]
@@ -164,6 +168,35 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
         config.model[head_type] = heads
 
 
+def patch_adaptive_repeat_dataset(config: Config, num_samples: int, decay: float = 0.002, factor: float = 10):
+    if config.data.train.type != 'RepeatDataset':
+        return
+
+    if not config.data.train.get('adaptive_repeat', False):
+        return
+
+    if not is_epoch_based_runner(config.runner):
+        return
+
+    # calculate new number of iterations
+    init_max_epoch = config.runner.max_epochs
+    new_repeat_times = max(round(math.exp(-decay * num_samples) * factor), 1)
+    new_max_epoch = math.ceil(init_max_epoch / new_repeat_times)
+    if new_max_epoch == 1:
+        return
+
+    # set proper number of iterations
+    config.runner.max_epochs = new_max_epoch
+    config.data.train.times = new_repeat_times
+
+    # rescale the learning schedules
+    schedule_scale = float(new_max_epoch) / float(init_max_epoch)
+    config.params_config.iters = math.ceil(schedule_scale * config.params_config.iters)
+    config.lr_config.fixed_iters = math.ceil(schedule_scale * config.lr_config.fixed_iters)
+    config.lr_config.warmup_iters = math.ceil(schedule_scale * config.lr_config.warmup_iters)
+    rescale_num_iterations(config, schedule_scale)
+
+
 def prepare_for_testing(config: Config, dataset: DatasetEntity) -> Config:
     config = copy.deepcopy(config)
     config.data.test.ote_dataset = dataset
@@ -174,13 +207,19 @@ def prepare_for_training(config: Config, train_dataset: DatasetEntity, val_datas
                          time_monitor: TimeMonitorCallback, learning_curves: defaultdict) -> Config:
     config = copy.deepcopy(config)
     prepare_work_dir(config)
+
     config.data.val.ote_dataset = val_dataset
     if 'ote_dataset' in config.data.train:
         config.data.train.ote_dataset = train_dataset
     else:
         config.data.train.dataset.ote_dataset = train_dataset
+
+    train_num_samples = len(train_dataset)
+    patch_adaptive_repeat_dataset(config, train_num_samples)
+
     config.custom_hooks.append({'type': 'OTEProgressHook', 'time_monitor': time_monitor, 'verbose': True})
     config.log_config.hooks.append({'type': 'OTELoggerHook', 'curves': learning_curves})
+
     return config
 
 

@@ -2,7 +2,12 @@ import argparse
 import os.path as osp
 
 import mmcv
-from cityscapesscripts.preparation.json2labelImg import json2labelImg
+
+try:
+    from cityscapesscripts.preparation.json2labelImg import json2labelImg
+except ImportError:
+    raise ImportError('Please run "pip install cityscapesscripts" to '
+                      'install cityscapesscripts first.')
 
 
 def convert_json_to_label(json_file):
