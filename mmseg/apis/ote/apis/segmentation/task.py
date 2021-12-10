@@ -204,8 +204,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
                 soft_prediction=soft_prediction,
-                soft_threshold=self._hyperparams.postprocessing_parameters.soft_threshold,
-                blur_strength=self._hyperparams.postprocessing_parameters.blur_strength,
+                soft_threshold=self._hyperparams.postprocessing.soft_threshold,
+                blur_strength=self._hyperparams.postprocessing.blur_strength,
             )
 
             annotations = create_annotation_from_segmentation_map(

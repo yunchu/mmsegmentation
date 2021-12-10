@@ -135,7 +135,6 @@ class OTESegmentationConfig(ConfigurableParameters):
             affects_outcome_of=ModelLifecycle.INFERENCE
         )
 
-
     @attrs
     class __POTParameter(ParameterGroup):
         header = string_attribute("POT Parameters")
@@ -156,5 +155,5 @@ class OTESegmentationConfig(ConfigurableParameters):
                             visible_in_ui=False)
 
     learning_parameters = add_parameter_group(__LearningParameters)
-    postprocessing_parameters = add_parameter_group(__Postprocessing)
+    postprocessing = add_parameter_group(__Postprocessing)
     pot_parameters = add_parameter_group(__POTParameter)

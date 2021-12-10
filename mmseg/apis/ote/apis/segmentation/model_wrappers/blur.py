@@ -14,10 +14,12 @@
 
 import cv2
 import numpy as np
+from typing import Any, Dict
 
 from openvino.model_zoo.model_api.models import SegmentationModel
 from openvino.model_zoo.model_api.models.types import NumericalValue
 from ote_sdk.utils.segmentation_utils import create_hard_prediction_from_soft_prediction
+
 
 class BlurSegmentation(SegmentationModel):
     __model__ = 'blur_segmentation'
@@ -35,7 +37,7 @@ class BlurSegmentation(SegmentationModel):
 
         return parameters
 
-    def postprocess(self, outputs, meta):
+    def postprocess(self, outputs: Dict[str, np.ndarray], metadata: Dict[str, Any]):
         predictions = outputs[self.output_blob_name].squeeze()
         soft_prediction = np.transpose(predictions, axes=(1, 2, 0))
 
@@ -44,8 +46,8 @@ class BlurSegmentation(SegmentationModel):
             soft_threshold=self.soft_threshold,
             blur_strength=self.blur_strength
         )
-        hard_prediction = cv2.resize(hard_prediction, meta['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
-        soft_prediction = cv2.resize(soft_prediction, meta['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
-        meta['soft_predictions'] = soft_prediction
+        hard_prediction = cv2.resize(hard_prediction, metadata['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
+        soft_prediction = cv2.resize(soft_prediction, metadata['original_shape'][1::-1], 0, 0, interpolation=cv2.INTER_NEAREST)
+        metadata['soft_predictions'] = soft_prediction
 
         return hard_prediction
