@@ -17,7 +17,7 @@ from sys import maxsize
 
 from ote_sdk.configuration.elements import (ParameterGroup,
                                             add_parameter_group,
-                                            boolean_attribute,
+                                            configurable_boolean,
                                             configurable_float,
                                             configurable_integer,
                                             selectable,
@@ -150,6 +150,19 @@ class OTESegmentationConfig(ConfigurableParameters):
                             editable=False,
                             visible_in_ui=False)
 
+    @attrs
+    class __DebugParameters(ParameterGroup):
+        header = string_attribute("Debugging Parameters")
+        description = header
+
+        enable_debug_dump = configurable_boolean(
+            default_value=True,
+            header="Enable data dumps for debugging",
+            description="Enable data dumps for debugging",
+            affects_outcome_of=ModelLifecycle.NONE
+        )
+
     learning_parameters = add_parameter_group(__LearningParameters)
     postprocessing = add_parameter_group(__Postprocessing)
     pot_parameters = add_parameter_group(__POTParameter)
+    debug_parameters = add_parameter_group(__DebugParameters)

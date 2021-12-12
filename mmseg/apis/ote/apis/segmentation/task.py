@@ -14,9 +14,9 @@
 
 import copy
 import io
-import logging
 import os
 import shutil
+import subprocess
 import tempfile
 import warnings
 from collections import defaultdict
@@ -53,9 +53,11 @@ from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 
 from mmseg.apis import train_segmentor, export_model
+from mmseg.apis.ote.apis.segmentation.debug import debug_trace, get_dump_file_path
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
                                                            prepare_for_training,
+                                                           save_config_to_file,
                                                            set_hyperparams)
 from mmseg.apis.ote.apis.segmentation.configuration import OTESegmentationConfig
 from mmseg.apis.ote.apis.segmentation.ote_utils import InferenceProgressCallback, TrainingProgressCallback
@@ -63,12 +65,15 @@ from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.parallel import MMDataCPU
+from mmseg.utils.collect_env import collect_env
+from mmseg.utils.logger import get_root_logger
 
-logger = logging.getLogger(__name__)
+logger = get_root_logger()
 
 
 class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
     task_environment: TaskEnvironment
+    _debug_dump_file_path: str = get_dump_file_path()
 
     def __init__(self, task_environment: TaskEnvironment):
         """"
@@ -77,6 +82,13 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         """
 
         logger.info(f"Loading OTESegmentationTask.")
+
+        logger.info('ENVIRONMENT:')
+        for name, val in collect_env().items():
+            logger.info(f'{name}: {val}')
+        logger.info('pip list:')
+        logger.info(subprocess.check_output(['pip', 'list'], universal_newlines=True))
+
         self._scratch_space = tempfile.mkdtemp(prefix="ote-seg-scratch-")
         logger.info(f"Scratch space created at {self._scratch_space}")
 
@@ -108,6 +120,48 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
     @property
     def _hyperparams(self):
         return self._task_environment.get_hyper_parameters(OTESegmentationConfig)
+
+    def __getstate__(self):
+        from ote_sdk.configuration.helper import convert
+
+        model = {
+            'weights': self._model.state_dict(),
+            'config': self._config,
+        }
+        environment = {
+            'model_template': self._task_environment.model_template,
+            'hyperparams': convert(self._hyperparams, str),
+            'label_schema': self._task_environment.label_schema,
+        }
+        return {
+            'environment': environment,
+            'model': model,
+        }
+
+    def __setstate__(self, state):
+        from ote_sdk.configuration.helper import create
+        from dataclasses import asdict
+        import yaml
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_template = state['environment']['model_template']
+            save_config_to_file(state['model']['config'], os.path.join(tmpdir, 'model.py'))
+            with open(os.path.join(tmpdir, 'template.yaml'), 'wt') as f:
+                yaml.dump(asdict(model_template), f)
+            model_template.model_template_path = os.path.join(tmpdir, 'template.yaml')
+
+            hyperparams = create(state['environment']['hyperparams'])
+            label_schema = state['environment']['label_schema']
+            environment = TaskEnvironment(
+                model_template=model_template,
+                model=None,
+                hyper_parameters=hyperparams,
+                label_schema=label_schema,
+            )
+            self.__init__(environment)
+
+        self._model.load_state_dict(state['model']['weights'])
+        self._config = state['model']['config']
 
     def _load_model(self, model: ModelEntity):
         if model is not None:
@@ -163,6 +217,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return model
 
+    @debug_trace
     def infer(self, dataset: DatasetEntity,
               inference_parameters: Optional[InferenceParameters] = None) -> DatasetEntity:
         """ Analyzes a dataset using the latest inference model. """
@@ -310,6 +365,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         return eval_predictions, metric
 
+    @debug_trace
     def evaluate(self, output_result_set: ResultSetEntity, evaluation_metric: Optional[str] = None):
         """ Computes performance on a resultset """
 
@@ -321,6 +377,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         output_result_set.performance = metrics.get_performance()
 
+    @debug_trace
     def train(self, dataset: DatasetEntity,
               output_model: ModelEntity,
               train_parameters: Optional[TrainParameters] = None):
@@ -499,6 +556,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
             logger.warning(f"Done unloading. "
                            f"Torch is still occupying {torch.cuda.memory_allocated()} bytes of GPU memory")
 
+    @debug_trace
     def export(self, export_type: ExportType, output_model: ModelEntity):
         assert export_type == ExportType.OPENVINO
 
