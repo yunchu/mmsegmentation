@@ -34,8 +34,6 @@ from ote_sdk.entities.task_environment import TaskEnvironment
 
 from mmseg.apis.ote.apis.segmentation.ote_utils import get_task_class
 from mmseg.apis.ote.extension.datasets.mmdataset import load_dataset_items
-
-from sc_sdk.entities.datasets import NullDataset
 from ote_sdk.usecases.adapters.model_adapter import ModelAdapter
 
 
@@ -168,12 +166,13 @@ def main(args):
             f.write(trained_model.get_data('weights.pth'))
     else:
         model_bytes = load_model_weights(args.weights)
-        trained_model = ModelEntity(configuration=environment.get_model_configuration(),
-                                    model_adapters={'weights.pth': ModelAdapter(model_bytes)},
-                                    train_dataset=NullDataset())
+        trained_model = ModelEntity(
+            train_dataset=dataset,
+            configuration=environment.get_model_configuration(),
+            model_adapters={'weights.pth': ModelAdapter(model_bytes)}
+        )
         environment.model = trained_model
         train(model_template, dataset, environment)
-
 
     environment_nncf.model = trained_model
     logger.info('Create NNCF Task')
