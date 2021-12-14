@@ -95,7 +95,7 @@ def prepare(data_dir, template_file_path):
     params_nncf = create(model_template.hyper_parameters.data)
     params_nncf.nncf_optimization.maximal_accuracy_degradation = 1.0
     params_nncf.nncf_optimization.enable_quantization = True
-    params_nncf.nncf_optimization.enable_pruning = True
+    params_nncf.nncf_optimization.enable_pruning = False
     environment_nncf = TaskEnvironment(model=None,
                                   hyper_parameters=params_nncf,
                                   label_schema=labels_schema,

@@ -34,6 +34,7 @@ from ote_sdk.entities.optimization_parameters import default_progress_callback
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.serialization.label_mapper import label_schema_to_bytes
+from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import IOptimizationTask
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationParameters
 from ote_sdk.usecases.tasks.interfaces.optimization_interface import OptimizationType
@@ -213,6 +214,15 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         output_model.precision = self._precision
 
         self._is_training = False
+
+    def export(self, export_type: ExportType, output_model: ModelEntity):
+        if self._compression_ctrl is None:
+            super().export(export_type, output_model)
+        else:
+            self._compression_ctrl.prepare_for_export()
+            self._model.disable_dynamic_graph_building()
+            super().export(export_type, output_model)
+            self._model.enable_dynamic_graph_building()
 
     def save_model(self, output_model: ModelEntity):
         buffer = io.BytesIO()
