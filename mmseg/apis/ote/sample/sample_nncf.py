@@ -91,9 +91,11 @@ def prepare(data_dir, template_file_path):
                                   label_schema=labels_schema,
                                   model_template=model_template)
 
-    logger.info('Setup environment')
+    logger.info('Setup NNCF environment')
     params_nncf = create(model_template.hyper_parameters.data)
-    logger.info('Set hyperparameters')
+    params_nncf.nncf_optimization.maximal_accuracy_degradation = 1.0
+    params_nncf.nncf_optimization.enable_quantization = True
+    params_nncf.nncf_optimization.enable_pruning = True
     environment_nncf = TaskEnvironment(model=None,
                                   hyper_parameters=params_nncf,
                                   label_schema=labels_schema,

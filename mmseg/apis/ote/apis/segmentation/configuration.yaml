@@ -270,7 +270,7 @@ nncf_optimization:
     warning: null
   maximal_accuracy_degradation:
     affects_outcome_of: TRAINING
-    default_value: 0.01
+    default_value: 1.0
     description: The maximal allowed accuracy metric drop
     editable: true
     header: Maximum accuracy degradation
@@ -282,7 +282,7 @@ nncf_optimization:
       operator: AND
       rules: []
       type: UI_RULES
-    value: 0.01
+    value: 1.0
     visible_in_ui: true
     warning: null
   type: PARAMETER_GROUP
