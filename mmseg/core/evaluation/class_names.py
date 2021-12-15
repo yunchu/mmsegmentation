@@ -1,3 +1,5 @@
+from ast import literal_eval
+
 import mmcv
 
 
@@ -127,7 +129,7 @@ def get_classes(dataset):
 
     if mmcv.is_str(dataset):
         if dataset in alias2name:
-            labels = eval(alias2name[dataset] + '_classes()')
+            labels = literal_eval(alias2name[dataset] + '_classes()')
         else:
             raise ValueError(f'Unrecognized dataset: {dataset}')
     else:
@@ -144,7 +146,7 @@ def get_palette(dataset):
 
     if mmcv.is_str(dataset):
         if dataset in alias2name:
-            labels = eval(alias2name[dataset] + '_palette()')
+            labels = literal_eval(alias2name[dataset] + '_palette()')
         else:
             raise ValueError(f'Unrecognized dataset: {dataset}')
     else:

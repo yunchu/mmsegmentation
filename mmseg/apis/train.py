@@ -3,15 +3,27 @@ import warnings
 
 import numpy as np
 import torch
-from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import HOOKS, build_optimizer, build_runner
 from mmcv.utils import build_from_cfg
 
-from mmseg.core import DistEvalHook, EvalHook, CustomOptimizerHook, load_checkpoint, IterBasedEMAHook
+from mmseg.core import (
+    CustomOptimizerHook,
+    DistEvalHook,
+    DistEvalPlusBeforeRunHook,
+    EvalHook,
+    EvalPlusBeforeRunHook,
+    IterBasedEMAHook,
+    load_checkpoint,
+)
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.utils import get_root_logger
-from mmseg.parallel import MMDataCPU
+from mmseg.utils import prepare_mmseg_model_for_execution
 from mmseg.models import build_params_manager
+from mmseg.integration.nncf import wrap_nncf_model
+from mmseg.integration.nncf import is_accuracy_aware_training_set
+from mmseg.apis.fake_input import get_fake_input
+from mmseg.integration.nncf import CompressionHook
+from mmseg.integration.nncf import CheckpointHookBeforeTraining
 
 
 def set_random_seed(seed, deterministic=False):
@@ -34,6 +46,16 @@ def set_random_seed(seed, deterministic=False):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+def build_val_dataloader(cfg, distributed):
+    val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
+    val_dataloader = build_dataloader(
+        val_dataset,
+        samples_per_gpu=1,
+        workers_per_gpu=cfg.data.workers_per_gpu,
+        dist=distributed,
+        shuffle=False
+    )
+    return val_dataloader
 
 def train_segmentor(model,
                     dataset,
@@ -41,7 +63,9 @@ def train_segmentor(model,
                     distributed=False,
                     validate=False,
                     timestamp=None,
-                    meta=None):
+                    meta=None,
+                    compression_ctrl=None,
+                    val_dataloader=None):
     """Launch segmentor training."""
     logger = get_root_logger(cfg.log_level)
 
@@ -60,25 +84,25 @@ def train_segmentor(model,
         for ds in dataset
     ]
 
-    if torch.cuda.is_available():
-        # put model on gpus
-        if distributed:
-            find_unused_parameters = cfg.get('find_unused_parameters', False)
-            # Sets the `find_unused_parameters` parameter in
-            # torch.nn.parallel.DistributedDataParallel
-            model = MMDistributedDataParallel(
-                model.cuda(),
-                device_ids=[torch.cuda.current_device()],
-                broadcast_buffers=False,
-                find_unused_parameters=find_unused_parameters
-            )
-        else:
-            model = MMDataParallel(
-                model.cuda(cfg.gpu_ids[0]),
-                device_ids=cfg.gpu_ids
-            )
-    else:
-        model = MMDataCPU(model)
+    if validate and not val_dataloader:
+        val_dataloader = build_val_dataloader(cfg, distributed)
+
+    # nncf model wrapper
+    nncf_enable_compression = 'nncf_config' in cfg
+    nncf_config = cfg.get('nncf_config', {})
+    nncf_is_acc_aware_training_set = is_accuracy_aware_training_set(nncf_config)
+
+    if not compression_ctrl and nncf_enable_compression:
+        dataloader_for_init = data_loaders[0]
+        compression_ctrl, model = wrap_nncf_model(model,
+                                                  cfg,
+                                                  distributed=distributed,
+                                                  val_dataloader=val_dataloader,
+                                                  dataloader_for_init=dataloader_for_init,
+                                                  get_fake_input_func=get_fake_input,
+                                                  is_accuracy_aware=nncf_is_acc_aware_training_set)
+
+    model = prepare_mmseg_model_for_execution(model, cfg, distributed)
 
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
@@ -90,6 +114,14 @@ def train_segmentor(model,
             'config is now expected to have a `runner` section, '
             'please set `runner` in your config.', UserWarning
         )
+
+    if nncf_is_acc_aware_training_set:
+        # Prepare runner for Accuracy Aware
+        cfg.runner = {
+            'type': 'AccuracyAwareRunner',
+            'target_metric_name': nncf_config['target_metric_name']
+        }
+
     runner = build_runner(
         cfg.runner,
         default_args=dict(
@@ -132,18 +164,22 @@ def train_segmentor(model,
 
     # register eval hooks
     if validate:
-        val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
-        val_dataloader = build_dataloader(
-            val_dataset,
-            samples_per_gpu=1,
-            workers_per_gpu=cfg.data.workers_per_gpu,
-            dist=distributed,
-            shuffle=False
-        )
         eval_cfg = cfg.get('evaluation', {})
         eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
         eval_hook = DistEvalHook if distributed else EvalHook
+        if nncf_enable_compression:
+            # disable saving best snapshot, because it works incorrectly for NNCF,
+            # best metric can be reached on not target compression rate.
+            eval_cfg.pop('save_best')
+            # enable evaluation after initialization of compressed model,
+            # target accuracy can be reached without fine-tuning model
+            eval_hook = DistEvalPlusBeforeRunHook if distributed else EvalPlusBeforeRunHook
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
+
+    # Add integration hooks for NNCF
+    if nncf_enable_compression:
+        runner.register_hook(CompressionHook(compression_ctrl=compression_ctrl))
+        runner.register_hook(CheckpointHookBeforeTraining())
 
     # user-defined hooks
     if cfg.get('custom_hooks', None):
@@ -172,4 +208,17 @@ def train_segmentor(model,
         )
 
     # run training
-    runner.run(data_loaders, cfg.workflow)
+    if nncf_is_acc_aware_training_set:
+        def configure_optimizers_fn():
+            optimizer = build_optimizer(runner.model, cfg.optimizer)
+            return optimizer, None
+
+        runner.run(
+            data_loaders,
+            cfg.workflow,
+            compression_ctrl=compression_ctrl,
+            configure_optimizers_fn=configure_optimizers_fn,
+            nncf_config=nncf_config
+        )
+    else:
+        runner.run(data_loaders, cfg.workflow, compression_ctrl=compression_ctrl)

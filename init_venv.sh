@@ -86,7 +86,8 @@ CONSTRAINTS_FILE=$(tempfile)
 cat constraints.txt >> ${CONSTRAINTS_FILE}
 export PIP_CONSTRAINT=${CONSTRAINTS_FILE}
 
-pip install --upgrade pip || exit 1
+# Newer versions of pip have troubles with NNCF installation from the repo commit.
+pip install pip==21.2.1 || exit 1
 pip install wheel || exit 1
 pip install --upgrade setuptools || exit 1
 
@@ -112,6 +113,11 @@ pip install -e . || exit 1
 MMSEGMENTATION_DIR=`realpath .`
 echo "export MMSEGMENTATION_DIR=${MMSEGMENTATION_DIR}" >> ${venv_dir}/bin/activate
 
+# Install NNCF
+pip install -r requirements/nncf_compression.txt || exit 1
+echo "Build NNCF extensions ..."
+python -c "import nncf"
+
 if [[ ! -z $OTE_SDK_PATH ]]; then
   pip install -e $OTE_SDK_PATH || exit 1
 elif [[ ! -z $SC_SDK_REPO ]]; then
@@ -120,7 +126,6 @@ else
   echo "OTE_SDK_PATH or SC_SDK_REPO should be specified"
   exit 1
 fi
-
 
 deactivate
 

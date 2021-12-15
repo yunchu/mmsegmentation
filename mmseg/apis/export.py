@@ -143,10 +143,11 @@ def check_onnx_model(export_name):
 def _get_mo_cmd():
     for mo_cmd in ('mo', 'mo.py'):
         try:
-            run(f'{mo_cmd} -h', stdout=DEVNULL, stderr=DEVNULL, shell=True, check=True)
+            run([mo_cmd, '-h'], stdout=DEVNULL, stderr=DEVNULL, shell=False, check=True)
             return mo_cmd
         except CalledProcessError:
             pass
+
     raise RuntimeError('OpenVINO Model Optimizer is not found or configured improperly')
 
 
@@ -171,23 +172,23 @@ def export_to_openvino(cfg, onnx_model_path, output_dir_path, input_shape=None,
 
     mean_values = normalize['mean']
     scale_values = normalize['std']
-    command_line = f'{mo_cmd} --input_model="{onnx_model_path}" ' \
-                   f'--mean_values="{mean_values}" ' \
-                   f'--scale_values="{scale_values}" ' \
-                   f'--output_dir="{output_dir_path}" ' \
-                   f'--output="{output_names}" ' \
-                   f'--data_type {precision}'
+    command_line = [mo_cmd,
+                    f'--input_model={onnx_model_path}',
+                    f'--mean_values={mean_values}',
+                    f'--scale_values={scale_values}',
+                    f'--output_dir={output_dir_path}',
+                    f'--output={output_names}',
+                    f'--data_type={precision}']
 
     assert input_format.lower() in ['bgr', 'rgb']
 
     if input_shape is not None:
-        command_line += f' --input_shape="{input_shape}"'
+        command_line.append(f'--input_shape={input_shape}')
     if normalize['to_rgb'] and input_format.lower() == 'bgr' or \
             not normalize['to_rgb'] and input_format.lower() == 'rgb':
-        command_line += ' --reverse_input_channels'
+        command_line.append('--reverse_input_channels')
 
-    print(command_line)
-    run(command_line, shell=True, check=True)
+    run(command_line, shell=False, check=True)
 
 
 def optimize_onnx_graph(onnx_model_path):
