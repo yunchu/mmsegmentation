@@ -13,8 +13,9 @@ framework: OTESegmentation v0.14.0
 
 # Task implementations.
 entrypoints:
-  base: mmseg.apis.ote.apis.segmentation.OTESegmentationTask
+  base: mmseg.apis.ote.apis.segmentation.OTESegmentationTrainingTask
   openvino: mmseg.apis.ote.apis.segmentation.OpenVINOSegmentationTask
+  nncf: mmseg.apis.ote.apis.segmentation.OTESegmentationNNCFTask
 
 # Capabilities.
 capabilities:
@@ -40,6 +41,13 @@ hyper_parameters:
         default_value: Mixed
       stat_subset_size:
         default_value: 500
+    nncf_optimization:
+      enable_quantization:
+        default_value: true
+      enable_pruning:
+        default_value: false
+      maximal_accuracy_degradation:
+        default_value: 1.0
 
 # Training resources.
 max_nodes: 1

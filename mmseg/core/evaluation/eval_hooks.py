@@ -37,6 +37,28 @@ class EvalHook(_EvalHook):
         if self.save_best:
             self._save_ckpt(runner, key_score)
 
+    def evaluate(self, runner, results):
+        """Evaluate the results.
+
+        Args:
+            runner (:obj:`mmcv.Runner`): The underlined training runner.
+            results (list): Output results.
+        """
+        eval_res = self.dataloader.dataset.evaluate(
+            results, logger=runner.logger, **self.eval_kwargs)
+        for name, val in eval_res.items():
+            runner.log_buffer.output[name] = val
+            # Log can be cleared, used for AccuracyAwareRunner
+            setattr(runner, name, val)
+        runner.log_buffer.ready = True
+
+        if self.save_best is not None:
+            if self.key_indicator == 'auto':
+                # infer from eval_results
+                self._init_rule(self.rule, list(eval_res.keys())[0])
+            return eval_res[self.key_indicator]
+
+        return None
 
 class DistEvalHook(_DistEvalHook):
     """Distributed EvalHook, with efficient test support.
@@ -90,6 +112,36 @@ class DistEvalHook(_DistEvalHook):
             print('\n')
             runner.log_buffer.output['eval_iter_num'] = len(self.dataloader)
             key_score = self.evaluate(runner, results)
+            # Log can be cleared, used for AccuracyAwareRunner
+            for name, val in runner.log_buffer.output.items():
+                setattr(runner, name, val)
 
             if self.save_best:
                 self._save_ckpt(runner, key_score)
+
+
+class EvalPlusBeforeRunHook(EvalHook):
+    """Evaluation hook, adds evaluation before training.
+    """
+
+    def before_run(self, runner):
+        super().before_run(runner)
+        from mmseg.apis import single_gpu_test
+        results = single_gpu_test(runner.model, self.dataloader, show=False)
+        self.evaluate(runner, results)
+
+
+class DistEvalPlusBeforeRunHook(EvalPlusBeforeRunHook, DistEvalHook):
+    """Distributed evaluation hook, adds evaluation before training.
+    """
+
+    def before_run(self, runner):
+        from mmseg.apis import multi_gpu_test
+        results = multi_gpu_test(
+            runner.model,
+            self.dataloader,
+            tmpdir=osp.join(runner.work_dir, '.eval_hook'),
+            gpu_collect=self.gpu_collect)
+        if runner.rank == 0:
+            print('\n')
+            self.evaluate(runner, results)

@@ -19,7 +19,6 @@ import os
 import shutil
 import tempfile
 import warnings
-from collections import defaultdict
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -27,39 +26,30 @@ import torch
 from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
 from mmcv.utils import Config
-from ote_sdk.configuration import cfg_helper
-from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
                                               create_annotation_from_segmentation_map)
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.inference_parameters import default_progress_callback as default_infer_progress_callback
-from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
-                                      VisualizationInfo, VisualizationType)
 from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
 from ote_sdk.entities.result_media import ResultMediaEntity
 from ote_sdk.entities.resultset import ResultSetEntity
-from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.task_environment import TaskEnvironment
 from ote_sdk.entities.tensor import TensorEntity
-from ote_sdk.entities.train_parameters import TrainParameters
-from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
 from ote_sdk.serialization.label_mapper import label_schema_to_bytes
 from ote_sdk.usecases.evaluation.metrics_helper import MetricsHelper
 from ote_sdk.usecases.tasks.interfaces.evaluate_interface import IEvaluationTask
 from ote_sdk.usecases.tasks.interfaces.export_interface import ExportType, IExportTask
 from ote_sdk.usecases.tasks.interfaces.inference_interface import IInferenceTask
-from ote_sdk.usecases.tasks.interfaces.training_interface import ITrainingTask
 from ote_sdk.usecases.tasks.interfaces.unload_interface import IUnload
 
-from mmseg.apis import train_segmentor, export_model
+
+from mmseg.apis import export_model
 from mmseg.apis.ote.apis.segmentation.config_utils import (patch_config,
                                                            prepare_for_testing,
-                                                           prepare_for_training,
                                                            set_hyperparams)
 from mmseg.apis.ote.apis.segmentation.configuration import OTESegmentationConfig
-from mmseg.apis.ote.apis.segmentation.ote_utils import InferenceProgressCallback, TrainingProgressCallback
-from mmseg.apis.ote.extension.utils.hooks import OTELoggerHook
+from mmseg.apis.ote.apis.segmentation.ote_utils import InferenceProgressCallback
 from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.parallel import MMDataCPU
@@ -67,7 +57,7 @@ from mmseg.parallel import MMDataCPU
 logger = logging.getLogger(__name__)
 
 
-class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluationTask, IUnload):
+class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask, IUnload):
     task_environment: TaskEnvironment
 
     def __init__(self, task_environment: TaskEnvironment):
@@ -88,14 +78,19 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         template_file_path = task_environment.model_template.model_template_path
 
         # Get and prepare mmseg config.
-        base_dir = os.path.abspath(os.path.dirname(template_file_path))
-        config_file_path = os.path.join(base_dir, "model.py")
+        self._base_dir = os.path.abspath(os.path.dirname(template_file_path))
+        config_file_path = os.path.join(self._base_dir, "model.py")
         self._config = Config.fromfile(config_file_path)
 
         distributed = torch.distributed.is_initialized()
         patch_config(self._config, self._scratch_space, self._labels,
                      random_seed=42, distributed=distributed)
         set_hyperparams(self._config, self._hyperparams)
+
+        # Set default model attributes.
+        self._optimization_methods = []
+        self._precision = [ModelPrecision.FP32]
+        self._optimization_type = ModelOptimizationType.MO
 
         # Create and initialize PyTorch model.
         self._model = self._load_model(task_environment.model)
@@ -309,152 +304,6 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
 
         output_result_set.performance = metrics.get_performance()
 
-    def train(self, dataset: DatasetEntity,
-              output_model: ModelEntity,
-              train_parameters: Optional[TrainParameters] = None):
-        """ Trains a model on a dataset """
-
-        set_hyperparams(self._config, self._hyperparams)
-
-        train_dataset = dataset.get_subset(Subset.TRAINING)
-        val_dataset = dataset.get_subset(Subset.VALIDATION)
-        config = self._config
-
-        # Create new model if training from scratch.
-        old_model = copy.deepcopy(self._model)
-
-        # Evaluate model performance before training.
-        _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, eval=True)
-        logger.info('INITIAL MODEL PERFORMANCE\n' + str(initial_performance))
-
-        # Check for stop signal between pre-eval and training. If training is cancelled at this point,
-        # old_model should be restored.
-        if self._should_stop:
-            logger.info('Training cancelled.')
-            self._model = old_model
-            self._should_stop = False
-            self._is_training = False
-            self._training_work_dir = None
-            return
-
-        # Run training.
-        if train_parameters is not None:
-            update_progress_callback = train_parameters.update_progress
-        else:
-            update_progress_callback = default_train_progress_callback
-        time_monitor = TrainingProgressCallback(update_progress_callback)
-        learning_curves = defaultdict(OTELoggerHook.Curve)
-        training_config = prepare_for_training(config, train_dataset, val_dataset, time_monitor, learning_curves)
-        self._training_work_dir = training_config.work_dir
-        mm_train_dataset = build_dataset(training_config.data.train)
-        self._is_training = True
-        self._model.train()
-
-        train_segmentor(model=self._model, dataset=mm_train_dataset, cfg=training_config, validate=True)
-
-        # Check for stop signal when training has stopped. If should_stop is true, training was cancelled and no new
-        # model should be returned. Old train model is restored.
-        if self._should_stop:
-            logger.info('Training cancelled.')
-            self._model = old_model
-            self._should_stop = False
-            self._is_training = False
-            return
-
-        # Load the best weights and check if model has improved.
-        training_metrics = self._generate_training_metrics_group(learning_curves)
-        best_checkpoint_path = self._find_best_checkpoint(training_config.work_dir, config.evaluation.metric)
-        best_checkpoint = torch.load(best_checkpoint_path)
-        self._model.load_state_dict(best_checkpoint['state_dict'])
-
-        # Evaluate model performance after training.
-        _, final_performance = self._infer_segmentor(self._model, config, val_dataset, True)
-        improved = final_performance > initial_performance
-
-        # Return a new model if model has improved, or there is no model yet.
-        if improved or self._task_environment.model is None:
-            if improved:
-                logger.info("Training finished, and it has an improved model")
-            else:
-                logger.info("First training round, saving the model.")
-
-            # Add mDice metric and loss curves
-            performance = Performance(score=ScoreMetric(value=final_performance, name="mDice"),
-                                      dashboard_metrics=training_metrics)
-            logger.info('FINAL MODEL PERFORMANCE\n' + str(performance))
-
-            self.save_model(output_model)
-            output_model.performance = performance
-            output_model.precision = [ModelPrecision.FP32]
-            output_model.model_status = ModelStatus.SUCCESS
-        else:
-            logger.info("Model performance has not improved while training. No new model has been saved.")
-            output_model.model_status = ModelStatus.NOT_IMPROVED
-            # Restore old training model if training from scratch and not improved
-            self._model = old_model
-
-        self._is_training = False
-
-    @staticmethod
-    def _find_best_checkpoint(work_dir, metric):
-        all_files = [f for f in os.listdir(work_dir) if os.path.isfile(os.path.join(work_dir, f))]
-
-        name_prefix = f'best_{metric}_'
-        candidates = [f for f in all_files if f.startswith(name_prefix) and f.endswith('.pth')]
-
-        if len(candidates) == 0:
-            out_name = 'latest.pth'
-        else:
-            assert len(candidates) == 1
-            out_name = candidates[0]
-
-        return os.path.join(work_dir, out_name)
-
-    def save_model(self, output_model: ModelEntity):
-        hyperparams_str = ids_to_strings(cfg_helper.convert(self._hyperparams, dict, enum_to_str=True))
-        model_info = {'model': self._model.state_dict(), 'config': hyperparams_str,
-                      'VERSION': 1}
-
-        buffer = io.BytesIO()
-        torch.save(model_info, buffer)
-        output_model.set_data("weights.pth", buffer.getvalue())
-        output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
-
-    def cancel_training(self):
-        """
-        Sends a cancel training signal to gracefully stop the optimizer. The signal consists of creating a
-        '.stop_training' file in the current work_dir. The runner checks for this file periodically.
-        The stopping mechanism allows stopping after each iteration, but validation will still be carried out. Stopping
-        will therefore take some time.
-        """
-        logger.info("Cancel training requested.")
-        self._should_stop = True
-        stop_training_filepath = os.path.join(self._training_work_dir, '.stop_training')
-        open(stop_training_filepath, 'a').close()
-
-    def _generate_training_metrics_group(self, learning_curves) -> Optional[List[MetricsGroup]]:
-        """
-        Parses the mmsegmentation logs to get metrics from the latest training run
-
-        :return output List[MetricsGroup]
-        """
-        output: List[MetricsGroup] = []
-
-        # Model architecture
-        architecture = InfoMetric(name='Model architecture', value=self._model_name)
-        visualization_info_architecture = VisualizationInfo(name="Model architecture",
-                                                            visualisation_type=VisualizationType.TEXT)
-        output.append(MetricsGroup(metrics=[architecture],
-                                   visualization_info=visualization_info_architecture))
-
-        # Learning curves
-        for key, curve in learning_curves.items():
-            metric_curve = CurveMetric(xs=curve.x, ys=curve.y, name=key)
-            visualization_info = LineChartInfo(name=key, x_axis_label="Epoch", y_axis_label=key)
-            output.append(MetricsGroup(metrics=[metric_curve], visualization_info=visualization_info))
-
-        return output
-
     @staticmethod
     def _is_docker():
         """
@@ -491,7 +340,7 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
         assert export_type == ExportType.OPENVINO
 
         output_model.model_format = ModelFormat.OPENVINO
-        output_model.optimization_type = ModelOptimizationType.MO
+        output_model.optimization_type = self._optimization_type
 
         with tempfile.TemporaryDirectory() as tempdir:
             optimized_model_dir = os.path.join(tempdir, "export")
@@ -520,8 +369,8 @@ class OTESegmentationTask(ITrainingTask, IInferenceTask, IExportTask, IEvaluatio
                     output_model.set_data("openvino.bin", f.read())
                 with open(os.path.join(tempdir, xml_file), "rb") as f:
                     output_model.set_data("openvino.xml", f.read())
-                output_model.precision = [ModelPrecision.FP32]
-                output_model.optimization_methods = []
+                output_model.precision = self._precision
+                output_model.optimization_methods = self._optimization_methods
                 output_model.model_status = ModelStatus.SUCCESS
             except Exception as ex:
                 output_model.model_status = ModelStatus.FAILED

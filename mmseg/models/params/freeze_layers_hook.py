@@ -20,7 +20,7 @@ class FreezeLayers(Hook):
         self.finish = False
 
     def before_train_epoch(self, runner):
-        if not self.by_epoch:
+        if not self.by_epoch or not self.enable:
             return
 
         cur_epoch = runner.epoch
