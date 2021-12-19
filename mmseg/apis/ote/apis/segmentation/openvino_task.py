@@ -32,7 +32,7 @@ from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_p
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.annotation import AnnotationSceneEntity, AnnotationSceneKind
 from ote_sdk.entities.inference_parameters import InferenceParameters, default_progress_callback
-from ote_sdk.entities.label import LabelEntity
+from ote_sdk.entities.label_schema import LabelSchemaEntity
 from ote_sdk.entities.model import (
     ModelStatus,
     ModelEntity,
@@ -57,7 +57,7 @@ from compression.engines.ie_engine import IEEngine
 from compression.graph import load_model, save_model
 from compression.graph.model_utils import compress_model_weights, get_nodes_by_type
 from compression.pipeline.initializer import create_pipeline
-from ote_sdk.serialization.label_mapper import label_schema_to_bytes
+from ote_sdk.serialization.label_mapper import LabelSchemaMapper, label_schema_to_bytes
 
 from .configuration import OTESegmentationConfig
 from openvino.model_zoo.model_api.models import Model
@@ -70,7 +70,7 @@ class OpenVINOSegmentationInferencer(BaseInferencer):
     def __init__(
         self,
         hparams: OTESegmentationConfig,
-        labels: List[LabelEntity],
+        label_schema: LabelSchemaEntity,
         model_file: Union[str, bytes],
         weight_file: Union[str, bytes, None] = None,
         device: str = "CPU",
@@ -80,24 +80,18 @@ class OpenVINOSegmentationInferencer(BaseInferencer):
         Inferencer implementation for OTESegmentation using OpenVINO backend.
 
         :param hparams: Hyper parameters that the model should use.
+        :param label_schema: LabelSchemaEntity that was used during model training.
         :param model_file: Path to model to load, `.xml`, `.bin` or `.onnx` file.
         :param device: Device to run inference on, such as CPU, GPU or MYRIAD. Defaults to "CPU".
         :param num_requests: Maximum number of requests that the inferencer can make.
             Good value is the number of available cores. Defaults to 1.
         """
 
-        self.labels = labels
-        try:
-            model_adapter = OpenvinoAdapter(create_core(), model_file, weight_file, device=device, max_num_requests=num_requests)
-            label_names = [label.name for label in self.labels]
-            self.configuration = {**attr.asdict(hparams.postprocessing,
-                                  filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui', 'class_name']),
-                                  'labels': label_names}
-            self.model = Model.create_model(hparams.postprocessing.class_name.value, model_adapter, self.configuration)
-            self.model.load()
-        except ValueError as e:
-            print(e)
-        self.converter = SegmentationToAnnotationConverter(self.labels)
+        model_adapter = OpenvinoAdapter(create_core(), model_file, weight_file, device=device, max_num_requests=num_requests)
+        self.configuration = {**attr.asdict(hparams.postprocessing,
+                              filter=lambda attr, value: attr.name not in ['header', 'description', 'type', 'visible_in_ui', 'class_name'])}
+        self.model = Model.create_model(hparams.postprocessing.class_name.value, model_adapter, self.configuration, preload=True)
+        self.converter = SegmentationToAnnotationConverter(label_schema)
 
     def pre_process(self, image: np.ndarray) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         return self.model.preprocess(image)
@@ -134,7 +128,6 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         self.model = self.task_environment.model
         self.model_name = task_environment.model_template.model_template_id
         self.inferencer = self.load_inferencer()
-
         template_file_path = task_environment.model_template.model_template_path
         self._base_dir = os.path.abspath(os.path.dirname(template_file_path))
 
@@ -143,9 +136,8 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         return self.task_environment.get_hyper_parameters(OTESegmentationConfig)
 
     def load_inferencer(self) -> OpenVINOSegmentationInferencer:
-        labels = self.task_environment.label_schema.get_labels(include_empty=False)
         return OpenVINOSegmentationInferencer(self.hparams,
-                                              labels,
+                                              self.task_environment.label_schema,
                                               self.model.get_data("openvino.xml"),
                                               self.model.get_data("openvino.bin"))
 
@@ -183,6 +175,7 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         parameters['type_of_model'] = self.hparams.postprocessing.class_name.value
         parameters['converter_type'] = 'SEGMENTATION'
         parameters['model_parameters'] = self.inferencer.configuration
+        parameters['model_parameters']['labels'] = LabelSchemaMapper.forward(self.task_environment.label_schema)
         name_of_package = "demo_package"
         with tempfile.TemporaryDirectory() as tempdir:
             copyfile(os.path.join(work_dir, "setup.py"), os.path.join(tempdir, "setup.py"))
