@@ -1,5 +1,6 @@
 import glob
 import os
+import os.path as osp
 from setuptools import find_packages, setup
 
 
@@ -21,8 +22,12 @@ version_file = 'mmseg/version.py'
 
 
 def get_version():
-    with open(version_file, 'r') as f:
-        exec(compile(f.read(), version_file, 'exec'))
+    root_dir_path = osp.dirname(osp.realpath(__file__))
+    version_file_path = osp.join(root_dir_path, version_file)
+
+    with open(version_file_path, 'r') as f:
+        exec(compile(f.read(), version_file_path, 'exec'))
+
     return locals()['__version__']
 
 
