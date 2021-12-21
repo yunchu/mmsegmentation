@@ -13,17 +13,18 @@ except ModuleNotFoundError:
 
 
 def readme():
-    with open('README.md', encoding='utf-8') as f:
+    root_dir_path = osp.dirname(osp.realpath(__file__))
+    readme_file_path = osp.join(root_dir_path, 'README.md')
+
+    with open(readme_file_path, encoding='utf-8') as f:
         content = f.read()
+
     return content
-
-
-version_file = 'mmseg/version.py'
 
 
 def get_version():
     root_dir_path = osp.dirname(osp.realpath(__file__))
-    version_file_path = osp.join(root_dir_path, version_file)
+    version_file_path = osp.join(root_dir_path, 'mmseg/version.py')
 
     with open(version_file_path, 'r') as f:
         exec(compile(f.read(), version_file_path, 'exec'))
@@ -48,7 +49,9 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     import sys
     from os.path import exists
     import re
-    require_fpath = fname
+
+    root_dir_path = osp.dirname(osp.realpath(__file__))
+    require_fpath = osp.join(root_dir_path, fname)
 
     def parse_line(line):
         """Parse information from a line in a requirements text file."""
@@ -104,6 +107,7 @@ def parse_requirements(fname='requirements.txt', with_version=True):
                 yield item
 
     packages = list(gen_packages_items())
+
     return packages
 
 
