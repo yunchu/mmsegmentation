@@ -194,7 +194,7 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
         }
 
         # Loop over dataset again to assign predictions. Convert from MMSegmentation format to OTE format
-        for dataset_item, (soft_prediction, fmap) in zip(dataset, prediction_results):
+        for dataset_item, (soft_prediction, feature_vector) in zip(dataset, prediction_results):
             soft_prediction = np.transpose(soft_prediction, axes=(1, 2, 0))
 
             hard_prediction = create_hard_prediction_from_soft_prediction(
@@ -211,8 +211,8 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
 
             dataset_item.append_annotations(annotations=annotations)
 
-            if fmap is not None:
-                active_score = TensorEntity(name="representation_vector", numpy=fmap)
+            if feature_vector is not None:
+                active_score = TensorEntity(name="representation_vector", numpy=feature_vector)
                 dataset_item.append_metadata_item(active_score, model=self._task_environment.model)
 
             if dump_features:
@@ -266,13 +266,18 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
             eval_model = MMDataCPU(model)
 
         eval_predictions = []
-        feature_maps = []
+        feature_vectors = []
 
         def dump_features_hook(mod, inp, out):
-            feature_maps.append(out[0].detach().cpu().numpy())
+            with torch.no_grad():
+                feature_map = out[0]
+                feature_vector = torch.nn.functional.adaptive_avg_pool2d(feature_map, (1, 1))
+                assert feature_vector.size(0) == 1
+
+            feature_vectors.append(feature_vector.view(-1).detach().cpu().numpy())
 
         def dummy_dump_features_hook(mod, inp, out):
-            feature_maps.append(None)
+            feature_vectors.append(None)
 
         hook = dump_features_hook if dump_features else dummy_dump_features_hook
 
@@ -288,8 +293,8 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
             assert not output_logits
             metric = mm_val_dataset.evaluate(eval_predictions, metric=metric_name)[metric_name]
 
-        assert len(eval_predictions) == len(feature_maps), f'{len(eval_predictions)} != {len(feature_maps)}'
-        eval_predictions = zip(eval_predictions, feature_maps)
+        assert len(eval_predictions) == len(feature_vectors), f'{len(eval_predictions)} != {len(feature_vectors)}'
+        eval_predictions = zip(eval_predictions, feature_vectors)
 
         return eval_predictions, metric
 
