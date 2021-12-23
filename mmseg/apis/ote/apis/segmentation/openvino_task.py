@@ -22,23 +22,22 @@ import sys
 import subprocess
 import tempfile
 from addict import Dict as ADDict
-from typing import Any, Dict, Tuple, List, Optional, Union
+from typing import Any, Dict, Tuple, Optional, Union
 from zipfile import ZipFile
 
 import numpy as np
 
-from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_prediction,
-                                              create_annotation_from_segmentation_map)
 from ote_sdk.entities.datasets import DatasetEntity
-from ote_sdk.entities.annotation import AnnotationSceneEntity, AnnotationSceneKind
+from ote_sdk.entities.annotation import AnnotationSceneEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters, default_progress_callback
 from ote_sdk.entities.label_schema import LabelSchemaEntity
 from ote_sdk.entities.model import (
     ModelStatus,
     ModelEntity,
     ModelFormat,
-    OptimizationMethod,
+    ModelOptimizationType,
     ModelPrecision,
+    OptimizationMethod
 )
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
@@ -280,7 +279,7 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         # set model attributes for quantized model
         output_model.model_status = ModelStatus.SUCCESS
         output_model.model_format = ModelFormat.OPENVINO
-        output_model.optimization_type = OptimizationType.POT
+        output_model.optimization_type = ModelOptimizationType.POT
         output_model.optimization_methods = [OptimizationMethod.QUANTIZATION]
         output_model.precision = [ModelPrecision.INT8]
 
