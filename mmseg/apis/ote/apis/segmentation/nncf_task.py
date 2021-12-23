@@ -27,6 +27,7 @@ from ote_sdk.entities.model import (
     ModelStatus,
     ModelEntity,
     ModelFormat,
+    ModelOptimizationType,
     OptimizationMethod,
     ModelPrecision,
 )
@@ -65,6 +66,7 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         self._val_dataloader = None
         self._compression_ctrl = None
         self._nncf_preset = "nncf_quantization"
+        self._optimization_type = ModelOptimizationType.NNCF
         check_nncf_is_enabled()
         super().__init__(task_environment)
 
@@ -212,6 +214,8 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         output_model.optimization_type = self._optimization_type
         output_model.optimization_methods = self._optimization_methods
         output_model.precision = self._precision
+        print(f"!!!self._optimization_type = {self._optimization_type}")
+        print(f"!!!output_model.optimization_type = {output_model.optimization_type}")
 
         self._is_training = False
 

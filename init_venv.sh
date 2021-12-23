@@ -108,7 +108,6 @@ pip install --no-cache-dir mmcv-full==${MMCV_VERSION} || exit 1
 # Install other requirements.
 cat requirements.txt | xargs -n 1 -L 1 pip install --no-cache || exit 1
 cat openvino-requirements.txt | xargs -n 1 -L 1 pip install --no-cache || exit 1
-cat requirements/nncf_compression.txt | xargs -n 1 -L 1 pip install --no-cache || exit 1
 
 pip install -e . || exit 1
 MMSEGMENTATION_DIR=`realpath .`
