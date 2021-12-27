@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from mmcv.runner.hooks import HOOKS
 
 from .base_lr_hook import BaseLrUpdaterHook

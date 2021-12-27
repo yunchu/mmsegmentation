@@ -1,3 +1,10 @@
+# Copyright (c) 2018 CoinCheung
+# SPDX-License-Identifier: MIT
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 # The original repo: https://github.com/CoinCheung/BiSeNet
 
 import torch

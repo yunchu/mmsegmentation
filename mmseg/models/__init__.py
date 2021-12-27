@@ -1,3 +1,10 @@
+# Copyright (c) 2020-2021 The MMSegmentation Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .backbones import *  # noqa: F401,F403
 from .builder import (BACKBONES, HEADS, LOSSES, SEGMENTORS,
                       build_backbone, build_head, build_loss,

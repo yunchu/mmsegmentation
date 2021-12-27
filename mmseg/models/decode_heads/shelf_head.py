@@ -1,3 +1,10 @@
+# Copyright (c) 2021 Juntang Zhuang
+# SPDX-License-Identifier: MIT
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 # The original repo: https://github.com/juntang-zhuang/ShelfNet
 
 import torch.nn as nn

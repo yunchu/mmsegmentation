@@ -1,3 +1,11 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Modified from https://github.com/LikeLy-Journey/SegmenTron/blob/master/
 segmentron/solver/loss.py (Apache-2.0 License)"""
 

@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import torch
 import torch.nn as nn
 from mmcv.cnn import ConvModule, constant_init, kaiming_init, normal_init

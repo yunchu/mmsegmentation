@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .compression import (
     check_nncf_is_enabled,
     get_nncf_config_from_meta,

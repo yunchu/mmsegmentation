@@ -1,0 +1,79 @@
+MMSegmentation Third Party Programs File
+
+This file contains the list of third party software ("third party programs")
+contained in the Intel software and their required notices and/or license
+terms. This third party software, even if included with the distribution of
+the Intel software, may be governed by separate license terms, including
+without limitation, third party license terms, other Intel software license
+terms, and open source software license terms. These separate license terms
+govern your use of the third party programs as set forth in the
+"third-party-programs.txt" or other similarly-named text file.
+
+Third party programs and their corresponding required notices and/or license
+terms are listed below.
+
+-------------------------------------------------------------
+
+1. MaxPoolingPixelSampler
+   Copyright (c) 2018, Sergei Belousov
+   SPDX-License-Identifier: BSD-3-Clause
+
+-------------------------------------------------------------
+
+2. BiSeNetV2, BiSeHead
+   Copyright (c) 2018 CoinCheung
+   SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+3. GhostModule
+   Copyright (c) 2020. Huawei Technologies Co., Ltd.
+   SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+4. CAPAttentionModule
+   Copyright (c) 2019 MendelXu
+   SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+5. DABModule, DABNet
+   Copyright (c) 2019 Gen Li
+   SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+6. DDRNet, DDRHead
+   Copyright (c) 2020 xingkong
+   SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+7. EfficientNet, HyperSegHead
+   Copyright (C) 2020-2021 YuvalNirkin
+   SPDX-License-Identifier: CC0-1.0
+
+-------------------------------------------------------------
+
+8. LiteHRNet
+   Copyright (c) 2018-2020 Open-MMLab.
+   SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+9. ShelfNet, ShelfHead
+   Copyright (c) 2021 Juntang Zhuang
+   SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+10. MemoryHead
+    Copyright (c) 2021 CharlesPikachu
+    SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+11. PointHead
+    Copyright (C) 2019-2021 Facebook
+    SPDX-License-Identifier: Apache-2.0

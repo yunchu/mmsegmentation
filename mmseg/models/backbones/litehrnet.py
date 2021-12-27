@@ -1,3 +1,10 @@
+# Copyright (c) 2018-2020 Open-MMLab.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 # The original repo: https://github.com/HRNet/Lite-HRNet
 
 import mmcv
