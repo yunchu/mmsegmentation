@@ -107,3 +107,9 @@ terms are listed below.
 16. scatter_cpu, scatter_kwargs
     Copyright (C) 2016-2021 Facebook, Inc
     SPDX-License-Identifier: BSD-3-Clause
+
+-------------------------------------------------------------
+
+17. STDCNet
+    Copyright (c) 2021 Mingyuan Fan
+    SPDX-License-Identifier: MIT
