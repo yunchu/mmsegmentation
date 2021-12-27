@@ -33,9 +33,9 @@ hyper_parameters:
       learning_rate_fixed_iters:
         default_value: 0
       learning_rate_warmup_iters:
-        default_value: 2
+        default_value: 80
       num_iters:
-        default_value: 2
+        default_value: 180
     pot_parameters:
       preset:
         default_value: Mixed

@@ -66,9 +66,9 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         self._val_dataloader = None
         self._compression_ctrl = None
         self._nncf_preset = "nncf_quantization"
-        self._optimization_type = ModelOptimizationType.NNCF
         check_nncf_is_enabled()
         super().__init__(task_environment)
+        self._optimization_type = ModelOptimizationType.NNCF
 
     def _set_attributes_by_hyperparams(self):
         quantization = self._hyperparams.nncf_optimization.enable_quantization
@@ -214,8 +214,6 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         output_model.optimization_type = self._optimization_type
         output_model.optimization_methods = self._optimization_methods
         output_model.precision = self._precision
-        print(f"!!!self._optimization_type = {self._optimization_type}")
-        print(f"!!!output_model.optimization_type = {output_model.optimization_type}")
 
         self._is_training = False
 
