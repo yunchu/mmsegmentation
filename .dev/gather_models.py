@@ -4,7 +4,7 @@ import json
 import os
 import os.path as osp
 import shutil
-import subprocess
+import subprocess  # nosec
 
 import mmcv
 import torch

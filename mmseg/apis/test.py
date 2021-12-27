@@ -6,7 +6,7 @@
 #
 
 import os.path as osp
-import pickle
+import pickle  # nosec
 import shutil
 import tempfile
 
