@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from ..builder import SCALAR_SCHEDULERS
 from .base import BaseScalarScheduler
 

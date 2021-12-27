@@ -14,7 +14,7 @@ terms are listed below.
 
 -------------------------------------------------------------
 
-1. MaxPoolingPixelSampler
+1. MaxPoolingPixelSampler, file mmseg/ops/csrc/lib_mpl.cpp
    Copyright (c) 2018, Sergei Belousov
    SPDX-License-Identifier: BSD-3-Clause
 
@@ -32,7 +32,7 @@ terms are listed below.
 
 -------------------------------------------------------------
 
-4. CAPAttentionModule
+4. CAPAttentionModule, PSPModule
    Copyright (c) 2019 MendelXu
    SPDX-License-Identifier: Apache-2.0
 
@@ -50,7 +50,7 @@ terms are listed below.
 
 -------------------------------------------------------------
 
-7. EfficientNet, HyperSegHead
+7. EfficientNet, HyperSegHead, MetaConv2d, MetaSequential
    Copyright (C) 2020-2021 YuvalNirkin
    SPDX-License-Identifier: CC0-1.0
 
@@ -77,3 +77,33 @@ terms are listed below.
 11. PointHead
     Copyright (C) 2019-2021 Facebook
     SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+12. DiceLoss
+    Copyright (C) 2019-2020 LikeLy-Journey
+    SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+13. LovaszLoss, lovasz_softmax
+    Copyright (c) 2018-2019 Maxim Berman
+    SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+14. TverskyLoss
+    Copyright (C) 2018-2021 kornia
+    SPDX-License-Identifier: Apache-2.0
+
+-------------------------------------------------------------
+
+15. LocalAttentionModule
+    Copyright (C) 2019-2021 Xiangtai Lee
+    SPDX-License-Identifier: MIT
+
+-------------------------------------------------------------
+
+16. scatter_cpu, scatter_kwargs
+    Copyright (C) 2016-2021 Facebook, Inc
+    SPDX-License-Identifier: BSD-3-Clause

@@ -1,3 +1,10 @@
+# Copyright (C) 2018-2021 kornia
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 """Modified from https://kornia.readthedocs.io/en/v0.1.2/_modules/torchgeometry/losses/tversky.html"""
 
 import torch

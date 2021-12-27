@@ -1,3 +1,10 @@
+# Copyright (c) 2020-2021 The MMSegmentation Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .drop import DropPath
 from .inverted_residual import InvertedResidual, InvertedResidualV3
 from .make_divisible import make_divisible
