@@ -1,3 +1,14 @@
+# Copyright (C) 2019-2020 LikeLy-Journey
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2020-2021 The MMSegmentation Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
+
 """Modified from https://github.com/LikeLy-Journey/SegmenTron/blob/master/
 segmentron/solver/loss.py (Apache-2.0 License)"""
 

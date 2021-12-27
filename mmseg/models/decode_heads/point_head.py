@@ -1,3 +1,10 @@
+# Copyright (C) 2019-2021 Facebook
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 # Modified from https://github.com/facebookresearch/detectron2/tree/master/projects/PointRend/point_head/point_head.py  # noqa
 
 import torch

@@ -1,3 +1,9 @@
+// Copyright (c) 2018, Sergei Belousov
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// Copyright (C) 2021 Intel Corporation
+// SPDX-License-Identifier: Apache-2.0
+//
 // The original repo: https://github.com/bes-dev/mpl.pytorch
 
 #include <limits>

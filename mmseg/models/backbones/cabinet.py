@@ -1,3 +1,13 @@
+# Copyright (c) 2020. Huawei Technologies Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2019 MendelXu
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import math
 
 import torch
@@ -81,7 +91,9 @@ class SpatialBranch(nn.Module):
 
 
 class GhostModule(nn.Module):
-    """Reference: https://github.com/iamhankai/ghostnet.pytorch
+    """Reference:
+    https://github.com/huawei-noah/CV-Backbones/blob/master/ghostnet_pytorch/ghostnet.py
+    License: https://github.com/huawei-noah/CV-Backbones/blob/master/ghostnet_pytorch/License.txt
     """
 
     def __init__(self,

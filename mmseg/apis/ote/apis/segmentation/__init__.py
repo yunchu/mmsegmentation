@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .config_utils import (patch_config,
                            set_hyperparams)
 from .configuration import OTESegmentationConfig

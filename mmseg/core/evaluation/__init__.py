@@ -1,3 +1,10 @@
+# Copyright (c) 2020-2021 The MMSegmentation Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .class_names import get_classes, get_palette
 from .eval_hooks import (
     DistEvalHook,

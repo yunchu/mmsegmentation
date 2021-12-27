@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This project is based on [mmsegmentation project by OpenMMLab](https://github.com/open-mmlab/mmsegmentation).
+With respect to it we made the following changes.
 
-## \[Unreleased\]
+## \[2021-12-27\]
 ### Added
 - Support of datasets: `COCO Stuff`, `Kvasir-Seg`, `Kvasir-Instrument`.
 - Implemented `MaskCompose` and `ProbCompose` composers to merge different

@@ -1,3 +1,10 @@
+# Copyright (c) 2020-2021 The MMSegmentation Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .accuracy import Accuracy, accuracy
 from .cross_entropy_loss import CrossEntropyLoss, binary_cross_entropy, cross_entropy, mask_cross_entropy
 from .dice_loss import DiceLoss

@@ -1,3 +1,7 @@
+# Copyright (C) 2021 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from .constant import ConstantScalarScheduler
 from .poly import PolyScalarScheduler
 from .step import StepScalarScheduler
