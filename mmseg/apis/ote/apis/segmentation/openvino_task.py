@@ -19,7 +19,7 @@ import json
 import os
 from shutil import copyfile, copytree
 import sys
-import subprocess
+import subprocess  # nosec
 import tempfile
 from addict import Dict as ADDict
 from typing import Any, Dict, Tuple, Optional, Union

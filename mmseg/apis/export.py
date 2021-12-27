@@ -14,7 +14,7 @@
 
 import os.path as osp
 from functools import partial
-from subprocess import DEVNULL, CalledProcessError, run
+from subprocess import DEVNULL, CalledProcessError, run  # nosec
 
 import mmcv
 import onnx
