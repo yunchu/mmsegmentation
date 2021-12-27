@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import torch.nn as nn
 from ..builder import LOSSES
 
 def boundary_loss(pred,
