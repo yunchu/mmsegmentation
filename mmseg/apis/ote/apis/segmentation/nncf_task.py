@@ -27,6 +27,7 @@ from ote_sdk.entities.model import (
     ModelStatus,
     ModelEntity,
     ModelFormat,
+    ModelOptimizationType,
     OptimizationMethod,
     ModelPrecision,
 )
@@ -67,6 +68,7 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
         self._nncf_preset = "nncf_quantization"
         check_nncf_is_enabled()
         super().__init__(task_environment)
+        self._optimization_type = ModelOptimizationType.NNCF
 
     def _set_attributes_by_hyperparams(self):
         quantization = self._hyperparams.nncf_optimization.enable_quantization
