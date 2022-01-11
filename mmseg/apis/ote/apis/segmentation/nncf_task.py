@@ -24,7 +24,6 @@ from ote_sdk.configuration import cfg_helper
 from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.model import (
-    ModelStatus,
     ModelEntity,
     ModelFormat,
     ModelOptimizationType,
@@ -209,7 +208,6 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
                         validate=True,
                         compression_ctrl=self._compression_ctrl)
 
-        output_model.model_status = ModelStatus.SUCCESS
         output_model.model_format = ModelFormat.BASE_FRAMEWORK
         output_model.optimization_type = self._optimization_type
         output_model.optimization_methods = self._optimization_methods

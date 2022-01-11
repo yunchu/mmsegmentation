@@ -21,7 +21,7 @@ from ote_sdk.configuration.helper import create
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.label_schema import LabelSchemaEntity
-from ote_sdk.entities.model import ModelEntity, ModelStatus
+from ote_sdk.entities.model import ModelEntity
 from ote_sdk.entities.model_template import parse_model_template
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
@@ -91,7 +91,7 @@ def main(args):
     output_model = ModelEntity(
         dataset,
         environment.get_model_configuration(),
-        model_status=ModelStatus.NOT_READY)
+    )
     task.train(dataset, output_model)
 
     logger.info('Get predictions on the validation set')
@@ -113,7 +113,7 @@ def main(args):
         exported_model = ModelEntity(
             dataset,
             environment.get_model_configuration(),
-            model_status=ModelStatus.NOT_READY)
+        )
         task.export(ExportType.OPENVINO, exported_model)
 
         logger.info('Create OpenVINO Task')
@@ -139,7 +139,7 @@ def main(args):
         optimized_model = ModelEntity(
             dataset,
             environment.get_model_configuration(),
-            model_status=ModelStatus.NOT_READY)
+        )
         openvino_task.optimize(
             OptimizationType.POT,
             dataset.get_subset(Subset.TRAINING),
