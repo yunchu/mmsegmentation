@@ -128,7 +128,7 @@ def set_hyperparams(config: Config, hyperparams: OTESegmentationConfig):
         config.runner.max_iters = total_iterations
 
     # rescale the learning schedules
-    schedule_scale = float(total_iterations) / float(init_num_iterations)
+    schedule_scale = float(total_iterations) / float(init_num_iterations) if init_num_iterations > 0 else 0.0
     rescale_num_iterations(config, schedule_scale)
 
 
