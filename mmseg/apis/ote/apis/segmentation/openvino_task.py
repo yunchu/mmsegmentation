@@ -17,9 +17,6 @@ import logging
 import inspect
 import json
 import os
-from shutil import copyfile
-import sys
-import subprocess  # nosec
 import tempfile
 from addict import Dict as ADDict
 from typing import Any, Dict, Tuple, Optional, Union
@@ -178,19 +175,19 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         parameters['model_parameters']['labels'] = LabelSchemaMapper.forward(self.task_environment.label_schema)
 
         with tempfile.TemporaryDirectory() as tempdir:
-            with ZipFile(os.path.join(tempdir, "openvino.zip"), 'w') as zip:
+            with ZipFile(os.path.join(tempdir, "openvino.zip"), 'w') as arch:
                 # model files
-                zip.writestr(os.path.join("model", "model.xml"), self.model.get_data("openvino.xml"))
-                zip.writestr(os.path.join("model", "model.bin"), self.model.get_data("openvino.bin"))
-                zip.writestr(os.path.join("model", "config.json"), json.dumps(parameters, ensure_ascii=False, indent=4))
+                arch.writestr(os.path.join("model", "model.xml"), self.model.get_data("openvino.xml"))
+                arch.writestr(os.path.join("model", "model.bin"), self.model.get_data("openvino.bin"))
+                arch.writestr(os.path.join("model", "config.json"), json.dumps(parameters, ensure_ascii=False, indent=4))
 
                 # python files
                 if (inspect.getmodule(self.inferencer.model) in
                    [module[1] for module in inspect.getmembers(model_wrappers, inspect.ismodule)]):
-                    zip.write(model_file, os.path.join("python", "model.py"))
-                zip.write(os.path.join(work_dir, "requirements.txt"), os.path.join("python", "requirements.txt"))
-                zip.write(os.path.join(work_dir, "README.md"), os.path.join("python", "README.md"))
-                zip.write(os.path.join(work_dir, "demo.py"), os.path.join("python", "demo.py"))
+                    arch.write(model_file, os.path.join("python", "model.py"))
+                arch.write(os.path.join(work_dir, "requirements.txt"), os.path.join("python", "requirements.txt"))
+                arch.write(os.path.join(work_dir, "README.md"), os.path.join("python", "README.md"))
+                arch.write(os.path.join(work_dir, "demo.py"), os.path.join("python", "demo.py"))
             with open(os.path.join(tempdir, "openvino.zip"), "rb") as file:
                 output_model.exportable_code = file.read()
         logger.info('Deploying completed')
