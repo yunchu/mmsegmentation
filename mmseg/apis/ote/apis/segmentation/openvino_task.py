@@ -17,7 +17,7 @@ import logging
 import inspect
 import json
 import os
-from shutil import copyfile, copytree
+from shutil import copyfile
 import sys
 import subprocess  # nosec
 import tempfile
@@ -61,7 +61,6 @@ from ote_sdk.serialization.label_mapper import LabelSchemaMapper, label_schema_t
 from .configuration import OTESegmentationConfig
 from openvino.model_zoo.model_api.models import Model
 from openvino.model_zoo.model_api.adapters import create_core, OpenvinoAdapter
-from . import model_wrappers
 logger = logging.getLogger(__name__)
 
 
@@ -186,7 +185,8 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
             copyfile(os.path.join(work_dir, "setup.py"), os.path.join(tempdir, "setup.py"))
             copyfile(os.path.join(work_dir, "requirements.txt"), os.path.join(tempdir, "requirements.txt"))
             os.mkdir(os.path.join(tempdir, name_of_package))
-            open(os.path.join(tempdir, name_of_package, "__init__.py"), 'a').close()
+            with open(os.path.join(tempdir, name_of_package, "__init__.py"), 'a') as file:
+                pass
             copyfile(model_file, os.path.join(tempdir, name_of_package, "model.py"))
             # create wheel package
             subprocess.run([sys.executable, os.path.join(tempdir, "setup.py"), 'bdist_wheel',
