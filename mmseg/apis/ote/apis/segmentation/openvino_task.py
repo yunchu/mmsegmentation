@@ -32,7 +32,6 @@ from ote_sdk.entities.annotation import AnnotationSceneEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters, default_progress_callback
 from ote_sdk.entities.label_schema import LabelSchemaEntity
 from ote_sdk.entities.model import (
-    ModelStatus,
     ModelEntity,
     ModelFormat,
     ModelOptimizationType,
@@ -232,9 +231,7 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
             model = load_model(model_config)
 
             if get_nodes_by_type(model, ['FakeQuantize']):
-                logger.warning("Model is already optimized by POT")
-                output_model.model_status = ModelStatus.FAILED
-                return
+                raise RuntimeError("Model is already optimized by POT")
 
         engine_config = ADDict({
             'device': 'CPU'
@@ -277,7 +274,6 @@ class OpenVINOSegmentationTask(IDeploymentTask, IInferenceTask, IEvaluationTask,
         output_model.set_data("label_schema.json", label_schema_to_bytes(self.task_environment.label_schema))
 
         # set model attributes for quantized model
-        output_model.model_status = ModelStatus.SUCCESS
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = ModelOptimizationType.POT
         output_model.optimization_methods = [OptimizationMethod.QUANTIZATION]

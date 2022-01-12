@@ -25,7 +25,7 @@ from ote_sdk.configuration.helper.utils import ids_to_strings
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.metrics import (CurveMetric, InfoMetric, LineChartInfo, MetricsGroup, Performance, ScoreMetric,
                                       VisualizationInfo, VisualizationType)
-from ote_sdk.entities.model import ModelEntity, ModelPrecision, ModelStatus
+from ote_sdk.entities.model import ModelEntity, ModelPrecision
 from ote_sdk.entities.subset import Subset
 from ote_sdk.entities.train_parameters import TrainParameters
 from ote_sdk.entities.train_parameters import default_progress_callback as default_train_progress_callback
@@ -59,6 +59,7 @@ class OTESegmentationTrainingTask(OTESegmentationInferenceTask, ITrainingTask):
         old_model = copy.deepcopy(self._model)
 
         # Evaluate model performance before training.
+        # FIXME: This could be safely removed.
         _, initial_performance = self._infer_segmentor(self._model, config, val_dataset, eval=True)
         logger.info('INITIAL MODEL PERFORMANCE\n' + str(initial_performance))
 
@@ -97,36 +98,21 @@ class OTESegmentationTrainingTask(OTESegmentationInferenceTask, ITrainingTask):
             return
 
         # Load the best weights and check if model has improved.
-        training_metrics = self._generate_training_metrics_group(learning_curves)
         best_checkpoint_path = self._find_best_checkpoint(training_config.work_dir, config.evaluation.metric)
         best_checkpoint = torch.load(best_checkpoint_path)
         self._model.load_state_dict(best_checkpoint['state_dict'])
 
         # Evaluate model performance after training.
         _, final_performance = self._infer_segmentor(self._model, config, val_dataset, True)
-        improved = final_performance > initial_performance
 
-        # Return a new model if model has improved, or there is no model yet.
-        if improved or self._task_environment.model is None:
-            if improved:
-                logger.info("Training finished, and it has an improved model")
-            else:
-                logger.info("First training round, saving the model.")
+        # Add mDice metric and loss curves
+        training_metrics = self._generate_training_metrics_group(learning_curves)
+        performance = Performance(score=ScoreMetric(value=final_performance, name="mDice"),
+                                  dashboard_metrics=training_metrics)
+        logger.info('FINAL MODEL PERFORMANCE\n' + str(performance))
 
-            # Add mDice metric and loss curves
-            performance = Performance(score=ScoreMetric(value=final_performance, name="mDice"),
-                                      dashboard_metrics=training_metrics)
-            logger.info('FINAL MODEL PERFORMANCE\n' + str(performance))
-
-            self.save_model(output_model)
-            output_model.performance = performance
-            output_model.precision = [ModelPrecision.FP32]
-            output_model.model_status = ModelStatus.SUCCESS
-        else:
-            logger.info("Model performance has not improved while training. No new model has been saved.")
-            output_model.model_status = ModelStatus.NOT_IMPROVED
-            # Restore old training model if training from scratch and not improved
-            self._model = old_model
+        self.save_model(output_model)
+        output_model.performance = performance
 
         self._is_training = False
 
@@ -154,6 +140,7 @@ class OTESegmentationTrainingTask(OTESegmentationInferenceTask, ITrainingTask):
         torch.save(model_info, buffer)
         output_model.set_data("weights.pth", buffer.getvalue())
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
+        output_model.precision = [ModelPrecision.FP32]
 
 
     def cancel_training(self):

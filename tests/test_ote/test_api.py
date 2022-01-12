@@ -30,7 +30,7 @@ from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.color import Color
 from ote_sdk.entities.label import LabelEntity
 from ote_sdk.entities.label_schema import LabelGroup, LabelGroupType, LabelSchemaEntity
-from ote_sdk.entities.model import ModelEntity, ModelStatus
+from ote_sdk.entities.model import ModelEntity
 from ote_sdk.entities.model_template import parse_model_template
 from ote_sdk.entities.shapes.ellipse import Ellipse
 from ote_sdk.entities.shapes.polygon import Polygon, Point
@@ -159,7 +159,6 @@ class API(unittest.TestCase):
         output_model = ModelEntity(
             dataset,
             segmentation_environment.get_model_configuration(),
-            model_status=ModelStatus.NOT_READY
         )
         task.train(dataset, output_model, train_parameters)
 
