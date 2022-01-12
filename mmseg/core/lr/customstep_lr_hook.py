@@ -15,9 +15,9 @@ class CustomstepLrUpdaterHook(BaseLrUpdaterHook):
         assert isinstance(step, (list, int))
         if isinstance(step, list):
             for s in step:
-                assert isinstance(s, int) and s > 0
+                assert isinstance(s, int) and s >= 0
         elif isinstance(step, int):
-            assert step > 0
+            assert step >= 0
         else:
             raise TypeError('"step" must be a list or integer')
 

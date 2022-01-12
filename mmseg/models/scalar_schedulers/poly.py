@@ -18,7 +18,7 @@ class PolyScalarScheduler(BaseScalarScheduler):
         self._end_s = end_scale
         assert self._end_s >= 0.0
         self._num_iters = num_iters
-        assert self._num_iters > 0
+        assert self._num_iters >= 0
         self._power = power
         assert self._power >= 0.0
         self.by_epoch = by_epoch
@@ -31,6 +31,8 @@ class PolyScalarScheduler(BaseScalarScheduler):
             num_iters = epoch_size * self._num_iters
         else:
             num_iters = self._num_iters
+        if num_iters == 0:
+            return self._end_s
 
         if step < num_iters:
             factor = (self._end_s - self._start_s) / (1.0 - self._power)
