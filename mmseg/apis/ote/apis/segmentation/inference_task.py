@@ -31,7 +31,7 @@ from ote_sdk.utils.segmentation_utils import (create_hard_prediction_from_soft_p
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.inference_parameters import default_progress_callback as default_infer_progress_callback
-from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision, ModelStatus
+from ote_sdk.entities.model import ModelEntity, ModelFormat, ModelOptimizationType, ModelPrecision
 from ote_sdk.entities.result_media import ResultMediaEntity
 from ote_sdk.entities.resultset import ResultSetEntity
 from ote_sdk.entities.task_environment import TaskEnvironment
@@ -376,9 +376,7 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
                     output_model.set_data("openvino.xml", f.read())
                 output_model.precision = self._precision
                 output_model.optimization_methods = self._optimization_methods
-                output_model.model_status = ModelStatus.SUCCESS
             except Exception as ex:
-                output_model.model_status = ModelStatus.FAILED
                 raise RuntimeError("Optimization was unsuccessful.") from ex
 
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))

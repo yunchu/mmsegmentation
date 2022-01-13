@@ -23,7 +23,7 @@ from ote_sdk.configuration.helper import create
 from ote_sdk.entities.datasets import DatasetEntity
 from ote_sdk.entities.inference_parameters import InferenceParameters
 from ote_sdk.entities.label_schema import LabelSchemaEntity
-from ote_sdk.entities.model import ModelEntity, ModelStatus
+from ote_sdk.entities.model import ModelEntity
 from ote_sdk.entities.model_template import parse_model_template
 from ote_sdk.entities.optimization_parameters import OptimizationParameters
 from ote_sdk.entities.resultset import ResultSetEntity
@@ -113,9 +113,10 @@ def train(model_template, dataset, environment):
     task = task_cls(task_environment=environment)
 
     logger.info('Train model')
-    output_model = ModelEntity(dataset,
-                               environment.get_model_configuration(),
-                               model_status=ModelStatus.NOT_READY)
+    output_model = ModelEntity(
+        dataset,
+        environment.get_model_configuration(),
+    )
     if environment.model is None:
         task.train(dataset, output_model)
     else:
@@ -145,9 +146,10 @@ def eval_pt(task, dataset, model, model_name):
 
 def export(task, dataset, environment, model_name):
     begin_time = time.time()
-    exported_model = ModelEntity(dataset,
-                                 environment.get_model_configuration(),
-                                 model_status=ModelStatus.NOT_READY)
+    exported_model = ModelEntity(
+        dataset,
+        environment.get_model_configuration(),
+    )
     task.export(ExportType.OPENVINO, exported_model)
     TIMES[f"export_{model_name}"] = time.time() - begin_time
 
@@ -186,7 +188,7 @@ def main(args):
     output_model = ModelEntity(
         dataset,
         environment.get_model_configuration(),
-        model_status=ModelStatus.NOT_READY)
+    )
     optimize_parameters = OptimizationParameters()
 
     nncf_task.optimize(OptimizationType.NNCF, dataset, output_model, optimize_parameters)
