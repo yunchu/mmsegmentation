@@ -240,7 +240,6 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
             'model': self._model.state_dict(),
             'config': hyperparams_str,
             'labels': labels,
-            'confidence_threshold': self.confidence_threshold,
             'VERSION': 1,
         }
 
