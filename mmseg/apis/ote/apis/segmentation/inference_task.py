@@ -347,37 +347,37 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = self._optimization_type
 
-        with tempfile.TemporaryDirectory() as tempdir:
-            optimized_model_dir = os.path.join(tempdir, "export")
-            logger.info(f'Optimized model will be temporarily saved to "{optimized_model_dir}"')
-            os.makedirs(optimized_model_dir, exist_ok=True)
+        tempdir = tempfile.TemporaryDirectory()
+        optimized_model_dir = os.path.join(tempdir, "export")
+        logger.info(f'Optimized model will be temporarily saved to "{optimized_model_dir}"')
+        os.makedirs(optimized_model_dir, exist_ok=True)
 
-            try:
-                from torch.jit._trace import TracerWarning
-                warnings.filterwarnings("ignore", category=TracerWarning)
+        try:
+            from torch.jit._trace import TracerWarning
+            warnings.filterwarnings("ignore", category=TracerWarning)
 
-                if torch.cuda.is_available():
-                    model = self._model.cuda(self._config.gpu_ids[0])
-                else:
-                    model = self._model.cpu()
+            if torch.cuda.is_available():
+                model = self._model.cuda(self._config.gpu_ids[0])
+            else:
+                model = self._model.cpu()
 
-                export_model(model,
-                             self._config,
-                             tempdir,
-                             target='openvino',
-                             output_logits=True,
-                             input_format='bgr')  # ote expects RGB but mmseg uses BGR, so invert it
+            export_model(model,
+                         self._config,
+                         tempdir,
+                         target='openvino',
+                         output_logits=True,
+                         input_format='bgr')  # ote expects RGB but mmseg uses BGR, so invert it
 
-                bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
-                xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]
-                with open(os.path.join(tempdir, bin_file), "rb") as f:
-                    output_model.set_data("openvino.bin", f.read())
-                with open(os.path.join(tempdir, xml_file), "rb") as f:
-                    output_model.set_data("openvino.xml", f.read())
-                output_model.precision = self._precision
-                output_model.optimization_methods = self._optimization_methods
-            except Exception as ex:
-                raise RuntimeError("Optimization was unsuccessful.") from ex
+            bin_file = [f for f in os.listdir(tempdir) if f.endswith('.bin')][0]
+            xml_file = [f for f in os.listdir(tempdir) if f.endswith('.xml')][0]
+            with open(os.path.join(tempdir, bin_file), "rb") as f:
+                output_model.set_data("openvino.bin", f.read())
+            with open(os.path.join(tempdir, xml_file), "rb") as f:
+                output_model.set_data("openvino.xml", f.read())
+            output_model.precision = self._precision
+            output_model.optimization_methods = self._optimization_methods
+        except Exception as ex:
+            raise RuntimeError("Optimization was unsuccessful.") from ex
 
         output_model.set_data("label_schema.json", label_schema_to_bytes(self._task_environment.label_schema))
 
