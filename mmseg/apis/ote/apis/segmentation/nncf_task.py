@@ -208,6 +208,8 @@ class OTESegmentationNNCFTask(OTESegmentationInferenceTask, IOptimizationTask):
                         validate=True,
                         compression_ctrl=self._compression_ctrl)
 
+        self.save_model(output_model)
+
         output_model.model_format = ModelFormat.BASE_FRAMEWORK
         output_model.optimization_type = self._optimization_type
         output_model.optimization_methods = self._optimization_methods
