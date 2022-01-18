@@ -347,7 +347,7 @@ class OTESegmentationInferenceTask(IInferenceTask, IExportTask, IEvaluationTask,
         output_model.model_format = ModelFormat.OPENVINO
         output_model.optimization_type = self._optimization_type
 
-        tempdir = tempfile.TemporaryDirectory().name
+        tempdir = '/home/devuser'
         optimized_model_dir = os.path.join(tempdir, "export")
         logger.info(f'Optimized model will be temporarily saved to "{optimized_model_dir}"')
         os.makedirs(optimized_model_dir, exist_ok=True)
